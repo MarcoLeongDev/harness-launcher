@@ -26,7 +26,7 @@ The launcher SHALL bundle a Node.js runtime as a Tauri sidecar binary and a vend
 - **THEN** the app invokes the vendored npm CLI via `node <npm-cli.js> exec ...`
 
 ### Requirement: Harness Version Management
-The launcher SHALL let the user list published versions of `@deepseek-ai/dsh` (from the npm registry), install any listed version, switch the active version, and roll back to any previously installed version.
+The launcher SHALL let the user list published versions of `@deepseek-ai/dsh` (from the npm registry), install any listed version, switch the active version, and roll back to any previously installed version. Installs SHALL reuse the shared npm cache and use cache-friendly flags (prefer-offline, no audit/fund) so repeated or neighbor-version installs are as fast as the registry allows, and SHALL report honest progress to the user (command, elapsed time, terminal lines, cancel).
 
 #### Scenario: Default is latest
 - **WHEN** the user opens the version selector with no explicit choice
@@ -34,11 +34,7 @@ The launcher SHALL let the user list published versions of `@deepseek-ai/dsh` (f
 
 #### Scenario: Switch to a listed version
 - **WHEN** the user selects a published version
-- **THEN** the app installs it if absent and makes it the active version
-
-#### Scenario: Rollback to a previously installed version
-- **WHEN** the user chooses rollback
-- **THEN** the app switches the active pointer to the prior installed version without network access
+- **THEN** the app installs it if absent (reusing the npm cache) and makes it the active version, while showing honest progress with elapsed time
 
 ### Requirement: Harness Process Lifecycle
 The launcher SHALL start, stop, restart and supervise the harness `dsh --profile web` process, passing `--no-open` so no browser handoff happens, and the configured `--port`; it SHALL restart the harness after a version switch or port change and SHALL surface process status and recent log output to the user. The launcher SHALL expose explicit engine controls to start, stop and restart the harness, classify engine state as one of `stopped` / `starting` / `running` / `stopping`, and SHALL support a force-restart that escalates to killing any process still bound to the harness port when the child does not release it. The launcher SHALL keep the engine phase consistent with the actual child process: an idle harness that produces no output for an extended period SHALL NOT be reported as stopped and SHALL NOT lose its tracked process slot.
