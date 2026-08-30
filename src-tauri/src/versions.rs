@@ -231,11 +231,18 @@ pub fn install_version(
     let ver_sink = version.to_string();
     let mut last_console = std::time::Instant::now() - Duration::from_secs(1);
     let mut last_progress = std::time::Instant::now() - Duration::from_secs(1);
+    let mut fetched: u32 = 0;
     let mut throttled_sink = move |stream: &str, line: &str| {
         let line = line.trim();
         if line.is_empty() {
             return;
         }
+        let is_fetch = line.contains("npm http fetch");
+        if is_fetch {
+            fetched += 1;
+        }
+        let is_summary = line.starts_with("added ") || line.starts_with("changed ")
+            || line.starts_with("removed ");
         let now = std::time::Instant::now();
         // Terminal: surface every line (light throttle) with its stream.
         if now.duration_since(last_console).as_millis() >= 60 {
@@ -246,8 +253,16 @@ pub fn install_version(
         // Progress bar: throttled harder, truncated preview.
         if now.duration_since(last_progress).as_millis() >= 200 {
             last_progress = now;
-            let preview: String = line.chars().take(160).collect();
-            crate::progress::emit(&app_sink, &op_sink, Some(&ver_sink), "installing", &preview, None);
+            let preview: String = if is_fetch {
+                format!("fetching packages… {fetched}")
+            } else if is_summary {
+                line.chars().take(160).collect()
+            } else {
+                String::new()
+            };
+            if !preview.is_empty() {
+                crate::progress::emit(&app_sink, &op_sink, Some(&ver_sink), "installing", &preview, None);
+            }
         }
     };
     let (out, err) = run_npm(
@@ -260,7 +275,11 @@ pub fn install_version(
             "--no-save",
             "--no-audit",
             "--no-fund",
-            "--loglevel=warn",
+            "--no-color",
+            "--prefer-offline",
+            "--fetch-retries=1",
+            "--fetch-timeout=60000",
+            "--loglevel=http",
             "--progress=false",
             spec.as_str(),
         ],
