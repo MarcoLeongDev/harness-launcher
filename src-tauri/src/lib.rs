@@ -76,6 +76,7 @@ pub fn run() {
             commands::update_to_latest,
             commands::rollback,
             commands::set_port,
+            commands::set_host,
             commands::set_prerelease,
             commands::set_auto_update,
             commands::check_updates,
@@ -185,7 +186,7 @@ fn boot_inner(app: &AppHandle) -> Result<u16, String> {
     }
 
     let st = app.state::<AppState>();
-    runtime::start(app, &st.runtime, &rd, &version, actual)?;
+    runtime::start(app, &st.runtime, &rd, &version, actual, &settings_snapshot.host)?;
     let served = port::wait_until_serving(actual, Duration::from_secs(30));
     if !served {
         return Err(format!("harness {version} did not answer on 127.0.0.1:{actual} within 30s"));

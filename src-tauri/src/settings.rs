@@ -9,6 +9,7 @@ pub const DEFAULT_PORT: u16 = 3080;
 #[serde(default)]
 pub struct Settings {
     pub port: u16,
+    pub host: String,
     pub auto_update_harness: bool,
     pub auto_update_interval_hours: u64,
     pub include_prerelease: bool,
@@ -24,6 +25,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             port: DEFAULT_PORT,
+            host: "127.0.0.1".to_string(),
             auto_update_harness: true,
             auto_update_interval_hours: 6,
             include_prerelease: false,

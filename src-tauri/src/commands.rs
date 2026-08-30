@@ -73,6 +73,7 @@ fn start_engine(app: &AppHandle, op: &str) -> Result<u16, String> {
         .current_version
         .clone()
         .ok_or_else(|| "no active harness version installed".to_string())?;
+    let host = settings.host.clone();
     let st = app.state::<AppState>();
     let rd = state::runtime_dir(app);
     let actual = *st.effective_port.lock().unwrap();
@@ -82,17 +83,17 @@ fn start_engine(app: &AppHandle, op: &str) -> Result<u16, String> {
         return Ok(actual);
     }
 
-    progress::emit(app, op, Some(&version), "starting", &format!("Starting engine on 127.0.0.1:{actual}…"), None);
-    runtime::start(app, &st.runtime, &rd, &version, actual)?;
+    progress::emit(app, op, Some(&version), "starting", &format!("Starting engine on {host}:{actual}…"), None);
+    runtime::start(app, &st.runtime, &rd, &version, actual, &host)?;
     let served = port::wait_until_serving(actual, Duration::from_secs(30));
     if !served {
         runtime::stop(&st.runtime, &rd);
-        let msg = format!("harness did not answer on 127.0.0.1:{actual} within 30s");
+        let msg = format!("harness did not answer on {host}:{actual} within 30s");
         progress::emit(app, op, Some(&version), "failed", &msg, Some(0));
         return Err(msg);
     }
     st.runtime.mark_phase(runtime::PHASE_RUNNING);
-    progress::emit(app, op, Some(&version), "running", &format!("Engine running on 127.0.0.1:{actual}"), Some(100));
+    progress::emit(app, op, Some(&version), "running", &format!("Engine running on {host}:{actual}"), Some(100));
     crate::tray::refresh(app);
     Ok(actual)
 }
@@ -106,6 +107,7 @@ fn restart_engine(app: &AppHandle, op: &str, version: Option<&str>, force: bool)
         Some(v) => v.to_string(),
         None => state::active_version(app).ok_or_else(|| "no active harness version installed".to_string())?,
     };
+    let host = state::read_settings(app).host.clone();
     let actual = *st.effective_port.lock().unwrap();
 
     let had_child = if force {
@@ -116,10 +118,10 @@ fn restart_engine(app: &AppHandle, op: &str, version: Option<&str>, force: bool)
         runtime::stop(&st.runtime, &rd)
     };
     if !had_child && !force {
-        progress::emit(app, op, Some(&version), "starting", &format!("Starting engine on 127.0.0.1:{actual}…"), None);
+        progress::emit(app, op, Some(&version), "starting", &format!("Starting engine on {host}:{actual}…"), None);
     }
 
-    runtime::start(app, &st.runtime, &rd, &version, actual)?;
+    runtime::start(app, &st.runtime, &rd, &version, actual, &host)?;
     let served = port::wait_until_serving(actual, Duration::from_secs(30));
     if !served {
         runtime::stop(&st.runtime, &rd);
@@ -271,6 +273,7 @@ pub async fn set_port(app: AppHandle, port: u16) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
         with_progress_cleanup(&app, || {
         let st = app.state::<AppState>();
+        let running = st.runtime.is_running();
         let previous_effective = *st.effective_port.lock().unwrap();
         let previous_desired = state::read_settings(&app).port;
 
@@ -279,6 +282,15 @@ pub async fn set_port(app: AppHandle, port: u16) -> Result<String, String> {
 
         state::update_settings(&app, |s| s.port = port);
         *st.effective_port.lock().unwrap() = actual;
+
+        // When the engine is stopped, only persist the port — do NOT auto-start.
+        if !running {
+            progress::finish(&app, "port", None, &format!("Port set to {port} (applies on next start)"));
+            return Ok(format!(
+                "port set to {port}{} — applies when you start the engine",
+                if changed { format!(" (busy, will use {actual})") } else { String::new() }
+            ));
+        }
 
         progress::emit(&app, "port", None, "restarting", &format!("Restarting engine on port {actual}…"), Some(40));
         match restart_engine(&app, "port", None, false) {
@@ -302,6 +314,36 @@ pub async fn set_port(app: AppHandle, port: u16) -> Result<String, String> {
                 progress::emit(&app, "port", None, "failed", &e, Some(0));
                 Err(format!("{e} — reverted to port {previous_effective}"))
             }
+        }
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Set the bind host (e.g. "127.0.0.1" or "0.0.0.0"). Persisted; if the engine
+/// is running it is restarted on the new host, otherwise the change applies on
+/// the next start (mirrors the port behaviour).
+#[tauri::command]
+pub async fn set_host(app: AppHandle, host: String) -> Result<String, String> {
+    let h = if host.trim().is_empty() { "127.0.0.1".to_string() } else { host.trim().to_string() };
+    tauri::async_runtime::spawn_blocking(move || {
+        with_progress_cleanup(&app, || {
+        let st = app.state::<AppState>();
+        let running = st.runtime.is_running();
+        state::update_settings(&app, |s| s.host = h.clone());
+        if !running {
+            progress::finish(&app, "port", None, &format!("Host set to {h} (applies on next start)"));
+            return Ok(format!("host set to {h} — applies when you start the engine"));
+        }
+        progress::emit(&app, "port", None, "restarting", &format!("Restarting engine on {h}…"), Some(40));
+        match restart_engine(&app, "port", None, false) {
+            Ok(actual) => {
+                let _ = window::navigate(&app, &harness_url(actual));
+                progress::finish(&app, "port", None, &format!("Host set to {h}, engine on {actual}"));
+                Ok(format!("host set to {h} — harness on {actual}"))
+            }
+            Err(e) => Err(format!("{e} — host change reverted"))
         }
         })
     })

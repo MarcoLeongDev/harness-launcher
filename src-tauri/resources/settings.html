@@ -123,6 +123,7 @@
   .ecterm-toggle.open svg { transform: rotate(180deg); }
   .ecterm { border-top: 1px solid var(--hair); background: rgba(0,0,0,0.35); display: none; }
   .ecterm.open { display: block; }
+  /* Logs tab now also surfaces the live engine run output (merged view) */
   /* download row */
   .dl-row { align-items: center; }
   .dl-spin { width: 16px; height: 16px; flex: none; border: 2px solid rgba(64,169,255,0.25);
@@ -250,18 +251,19 @@
           <svg id="ver-chevron" style="display:none" viewBox="0 0 16 16" fill="currentColor"><path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg>
         </div>
         <span class="ec-sep">:</span>
+        <div class="ec-select-wrap" id="host-wrap">
+          <select id="sel-host" class="ec-select" aria-label="Host" disabled>
+            <option value="127.0.0.1">127.0.0.1</option>
+            <option value="0.0.0.0">0.0.0.0</option>
+          </select>
+          <svg id="host-chevron" style="display:none" viewBox="0 0 16 16" fill="currentColor"><path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg>
+        </div>
+        <span class="ec-sep">:</span>
         <input id="inp-port" class="ec-port" type="number" min="1" max="65535" aria-label="Port" disabled />
         <div class="ec-actions">
           <button class="ec-btn icon-start" id="btn-toggle" title="Start"><i class="ico bi" data-ico="play-fill"></i></button>
           <button class="ec-btn icon-restart" id="btn-restart" disabled title="Restart"><i class="ico bi" data-ico="arrow-repeat"></i></button>
         </div>
-      </div>
-    </div>
-
-    <div class="group" style="overflow:visible">
-      <button class="ecterm-toggle" id="engine-term-toggle"><i class="ico sm bi" data-ico="chevron-down"></i> Run output</button>
-      <div class="ecterm" id="engine-term">
-        <pre class="term-out" id="engine-term-out">No output yet.</pre>
       </div>
     </div>
   </section>
@@ -416,7 +418,7 @@
     stIcon: $('st-icon'),
     toggle: $('btn-toggle'), restart: $('btn-restart'),
     engineVer: $('sel-version'), verWrap: $('ver-wrap'), verChevron: $('ver-chevron'),
-    engineTerm: $('engine-term'), engineTermToggle: $('engine-term-toggle'), engineTermOut: $('engine-term-out'),
+    host: $('sel-host'), hostWrap: $('host-wrap'), hostChevron: $('host-chevron'),
     port: $('inp-port'),
     pre: $('chk-prerelease'),
     intervalSel: $('sel-interval'), installSel: $('sel-install-ver'), btnInstall: $('btn-install'),
@@ -670,6 +672,16 @@
       sel.verWrap.appendChild(verText);
       sel.verWrap.style.cursor = 'default';
 
+      // Host as text
+      sel.host.style.display = 'none';
+      sel.hostChevron.style.display = 'none';
+      var hostText = document.createElement('span');
+      hostText.className = 'ec-ver';
+      hostText.textContent = s.host || '127.0.0.1';
+      sel.hostWrap.innerHTML = '';
+      sel.hostWrap.appendChild(hostText);
+      sel.hostWrap.style.cursor = 'default';
+
       // Port as text
       sel.port.type = 'text';
       sel.port.readOnly = true;
@@ -683,6 +695,16 @@
       sel.verChevron.style.display = '';
       sel.engineVer.disabled = false;
       sel.verWrap.style.cursor = 'pointer';
+
+      // Host as dropdown
+      sel.hostWrap.innerHTML = '';
+      sel.hostWrap.appendChild(sel.host);
+      sel.hostWrap.appendChild(sel.hostChevron);
+      sel.host.style.display = '';
+      sel.hostChevron.style.display = '';
+      sel.host.disabled = false;
+      sel.hostWrap.style.cursor = 'pointer';
+      if (s.host) sel.host.value = s.host;
 
       // Port as input
       sel.port.type = 'number';
@@ -809,20 +831,6 @@
     }).catch(function () {});
   }
 
-  // engine run terminal (collapsed by default)
-  var engineTermOpen = false;
-  sel.engineTermToggle.addEventListener('click', function () {
-    engineTermOpen = !engineTermOpen;
-    sel.engineTerm.classList.toggle('open', engineTermOpen);
-    sel.engineTermToggle.classList.toggle('open', engineTermOpen);
-  });
-  function refreshEngineTerm() {
-    invoke('tail_logs', { lines: 120 }).then(function (text) {
-      sel.engineTermOut.textContent = text || 'No output yet.';
-      sel.engineTermOut.scrollTop = sel.engineTermOut.scrollHeight;
-    }).catch(function () {});
-  }
-
   // engine
   sel.engineVer.addEventListener('change', function () {
     var v = sel.engineVer.value;
@@ -841,7 +849,8 @@
   });
   sel.restart.addEventListener('click', function () { withCmd(function () { return invoke('engine_restart', {}); }, 'Restarted'); });
 
-  // port: save on blur (and Enter)
+  // port: save on blur (and Enter). When stopped this only persists the port;
+  // it does NOT auto-start the engine (handled in set_port on the backend).
   function applyPort() {
     var p = parseInt(sel.port.value, 10);
     if (!p || p < 1 || p > 65535) return setResult('Enter a valid port (1–65535)', true);
@@ -849,6 +858,14 @@
   }
   sel.port.addEventListener('blur', applyPort);
   sel.port.addEventListener('keydown', function (e) { if (e.key === 'Enter') sel.port.blur(); });
+
+  // host: save on change (when stopped only — the dropdown is hidden while
+  // running, so this only fires in the stopped state).
+  sel.host.addEventListener('change', function () {
+    var h = sel.host.value;
+    if (!h) return;
+    withCmd(function () { return invoke('set_host', { host: h }); }, 'Host set');
+  });
 
   // versions table
   sel.btnInstall.addEventListener('click', function () {
@@ -932,10 +949,8 @@
 
   refresh();
   refreshLog();
-  refreshEngineTerm();
   setInterval(refresh, 3000);
   setInterval(refreshLog, 5000);
-  setInterval(refreshEngineTerm, 5000);
 })();
 </script>
 </body>
