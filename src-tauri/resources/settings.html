@@ -408,6 +408,33 @@
   }
 
   var $ = function (id) { return document.getElementById(id); };
+
+  function loadIconsIn(root) {
+    var icons = root.querySelectorAll('i.ico.bi[data-ico]');
+    for (var i = 0; i < icons.length; i++) {
+      (function (el) {
+        var name = el.getAttribute('data-ico');
+        if (!name) return;
+        var url = 'dsh-ui://localhost/bootstrap-icons/' + name + '.svg';
+        fetch(url).then(function (r) {
+          if (!r.ok) return;
+          return r.text();
+        }).then(function (svg) {
+          if (!svg) return;
+          var wrapper = document.createElement('span');
+          wrapper.innerHTML = svg;
+          var svgEl = wrapper.querySelector('svg');
+          if (!svgEl) return;
+          svgEl.classList.add('ico');
+          if (el.classList.contains('sm')) svgEl.classList.add('sm');
+          svgEl.removeAttribute('width');
+          svgEl.removeAttribute('height');
+          el.parentNode.replaceChild(svgEl, el);
+        }).catch(function () {});
+      })(icons[i]);
+    }
+  }
+
   var sel = {
     stIcon: $('st-icon'), stTitle: $('st-title'), stSub: $('st-sub'),
     start: $('btn-start'), stop: $('btn-stop'), restart: $('btn-restart'), force: $('btn-force'),
