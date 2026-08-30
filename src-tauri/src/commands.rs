@@ -442,7 +442,6 @@ pub fn engine_stop(app: AppHandle) -> Result<String, String> {
     progress::emit(&app, "engine", None, "stopping", "Stopping engine…", Some(10));
     runtime::stop(&st.runtime, &rd);
     state::update_settings(&app, |s| s.start_on_launch = false);
-    let _ = window::show_stopped_page(&app);
     progress::finish(&app, "engine", None, "Engine stopped");
     runtime::emit_status(&app, &st.runtime);
     crate::tray::refresh(&app);
@@ -502,6 +501,7 @@ pub fn cancel_operation(app: AppHandle) -> Result<String, String> {
         return Ok("no operation in progress".into());
     }
     progress::request_cancel(&app);
+    progress::clear(&app);
     Ok("stop requested — download will abort shortly".into())
 }
 
