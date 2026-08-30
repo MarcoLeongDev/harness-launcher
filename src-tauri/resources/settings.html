@@ -81,13 +81,13 @@
   .err { color: var(--err); }
   .ok2 { color: var(--ok); }
   /* engine card */
-  .ec-row { display: flex; align-items: center; gap: 12px; padding: 14px 16px; }
-  .ec-status-icon { width: 28px; height: 28px; border-radius: 7px; display: flex; align-items: center;
+  .ec-row { display: flex; align-items: center; gap: 12px; padding: 14px 16px; flex-wrap: wrap; }
+  .ec-status-icon { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center;
     justify-content: center; flex: none; background: rgba(93,108,140,0.15);
     border: 1px solid rgba(93,108,140,0.4); color: var(--dim); }
-  .ec-status-icon svg { width: 16px; height: 16px; }
+  .ec-status-icon svg { width: 18px; height: 18px; }
   .ec-status-icon.running { background: rgba(48,209,88,0.12); border-color: rgba(48,209,88,0.45); color: var(--ok); }
-  .ec-status-icon.running svg { animation: spin-gear 3s linear infinite; }
+  .ec-status-icon.running svg { animation: spin-gear 3s linear infinite; transform-origin: 50% 50%; }
   .ec-status-icon.stopped { background: rgba(93,108,140,0.15); border-color: rgba(93,108,140,0.4); color: var(--dim); }
   .ec-status-icon.error { background: rgba(255,69,58,0.12); border-color: rgba(255,69,58,0.45); color: var(--err); }
   @keyframes spin-gear { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
@@ -97,33 +97,24 @@
     -webkit-appearance: none; }
   .ec-select:focus { outline: none; }
   .ec-select-wrap { display: inline-flex; align-items: center; gap: 2px; cursor: pointer; }
-  .ec-select-wrap svg { width: 10px; height: 10px; color: var(--faint); transition: transform .15s; }
+  .ec-select-wrap svg { width: 10px; height: 10px; color: var(--faint); transition: transform .15s; flex: none; }
   .ec-sep { color: var(--faint); font-size: 13px; }
   .ec-port { font-family: var(--mono); font-size: 13px; background: transparent; border: none;
-    color: var(--text); width: 50px; padding: 0; }
+    color: var(--text); width: 64px; padding: 2px 0; text-align: left; }
   .ec-port:focus { outline: none; border-bottom: 1px solid var(--accent); }
-  .ec-link { font-family: var(--mono); font-size: 13px; color: var(--faint); text-decoration: none;
-    cursor: pointer; transition: color .15s; }
-  .ec-link:hover { color: var(--text); }
-  .ec-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; }
-  .ec-btn { display: inline-flex; align-items: center; justify-content: center; gap: 5px;
-    height: 30px; padding: 0 12px; border-radius: 7px; font-size: 12px; font-weight: 600;
-    cursor: pointer; border: 1px solid var(--hair2); background: var(--cell); color: var(--text);
-    transition: all .15s; }
-  .ec-btn svg { width: 14px; height: 14px; }
+  .ec-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+  .ec-btn { display: inline-flex; align-items: center; justify-content: center;
+    width: 34px; height: 34px; border-radius: 50%; cursor: pointer; border: 1px solid var(--hair2);
+    background: var(--cell); color: var(--text); transition: all .15s; flex: none; }
+  .ec-btn svg { width: 16px; height: 16px; }
   .ec-btn:hover { background: var(--cell-hover); }
   .ec-btn:active { transform: translateY(1px); }
   .ec-btn:disabled { opacity: 0.4; cursor: default; transform: none; }
-  .ec-btn.start { background: var(--ok); border-color: var(--ok); color: #04231a; }
-  .ec-btn.start:hover { background: #4cd870; }
-  .ec-btn.stop { background: var(--err); border-color: var(--err); color: #fff; }
-  .ec-btn.stop:hover { background: #ff6259; }
-  .ec-btn.restart { background: transparent; }
-  .ec-apply { display: inline-flex; align-items: center; justify-content: center;
-    width: 24px; height: 24px; border-radius: 5px; border: 1px solid var(--hair2);
-    background: var(--cell); color: var(--text); cursor: pointer; transition: all .15s; }
-  .ec-apply svg { width: 12px; height: 12px; }
-  .ec-apply:hover { background: var(--cell-hover); }
+  .ec-btn.icon-start { background: var(--ok); border-color: var(--ok); color: #04231a; }
+  .ec-btn.icon-start:hover { background: #4cd870; }
+  .ec-btn.icon-stop { background: var(--err); border-color: var(--err); color: #fff; }
+  .ec-btn.icon-stop:hover { background: #ff6259; }
+  .ec-btn.icon-restart { background: transparent; }
   .ecterm-toggle { display: inline-flex; align-items: center; gap: 6px; background: none;
     border: none; color: var(--dim); font-size: 11.5px; cursor: pointer; padding: 8px 12px;
     border-radius: 6px; margin: 4px; }
@@ -268,10 +259,9 @@
         </div>
         <span class="ec-sep">:</span>
         <input id="inp-port" class="ec-port" type="number" min="1" max="65535" aria-label="Port" disabled />
-        <button class="ec-apply" id="btn-port" disabled title="Apply port"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425z"/></svg></button>
         <div class="ec-actions">
-          <button class="ec-btn start" id="btn-toggle"><i class="ico bi" data-ico="play-fill"></i> Start</button>
-          <button class="ec-btn restart" id="btn-restart" disabled title="Restart"><i class="ico bi" data-ico="arrow-repeat"></i></button>
+          <button class="ec-btn icon-start" id="btn-toggle" title="Start"><i class="ico bi" data-ico="play-fill"></i></button>
+          <button class="ec-btn icon-restart" id="btn-restart" disabled title="Restart"><i class="ico bi" data-ico="arrow-repeat"></i></button>
         </div>
       </div>
     </div>
@@ -436,7 +426,7 @@
     engineVer: $('sel-version'), verWrap: $('ver-wrap'), verChevron: $('ver-chevron'),
     host: $('sel-host'), hostWrap: $('host-wrap'), hostChevron: $('host-chevron'),
     engineTerm: $('engine-term'), engineTermToggle: $('engine-term-toggle'), engineTermOut: $('engine-term-out'),
-    port: $('inp-port'), btnPort: $('btn-port'),
+    port: $('inp-port'),
     pre: $('chk-prerelease'),
     intervalSel: $('sel-interval'), installSel: $('sel-install-ver'), btnInstall: $('btn-install'),
     verTbody: $('ver-tbody'),
@@ -493,7 +483,7 @@
     sel.checkResult.className = isErr ? 'err' : '';
   }
   function busy(on) {
-    [sel.toggle, sel.restart, sel.btnPort, sel.check, sel.btnInstall, sel.engineVer]
+    [sel.toggle, sel.restart, sel.check, sel.btnInstall, sel.engineVer]
       .forEach(function (b) { b.disabled = on; });
   }
 
@@ -701,7 +691,6 @@
       sel.port.type = 'text';
       sel.port.readOnly = true;
       sel.port.value = s.actualPort || 0;
-      sel.btnPort.disabled = true;
     } else {
       // Version as dropdown
       sel.verWrap.innerHTML = '';
@@ -725,16 +714,17 @@
       sel.port.type = 'number';
       sel.port.readOnly = false;
       sel.port.disabled = false;
-      sel.btnPort.disabled = false;
     }
 
-    // Toggle button
+    // Toggle button (icon only, circular)
     if (runningLike) {
-      sel.toggle.className = 'ec-btn stop';
-      sel.toggle.innerHTML = '<i class="ico bi" data-ico="pause-fill"></i> Stop';
+      sel.toggle.className = 'ec-btn icon-stop';
+      sel.toggle.innerHTML = '<i class="ico bi" data-ico="pause-fill"></i>';
+      sel.toggle.title = 'Stop';
     } else {
-      sel.toggle.className = 'ec-btn start';
-      sel.toggle.innerHTML = '<i class="ico bi" data-ico="play-fill"></i> Start';
+      sel.toggle.className = 'ec-btn icon-start';
+      sel.toggle.innerHTML = '<i class="ico bi" data-ico="play-fill"></i>';
+      sel.toggle.title = 'Start';
     }
     sel.toggle.disabled = false;
     sel.restart.disabled = !runningLike;
@@ -751,22 +741,6 @@
     if (curV && inst.indexOf(curV) !== -1) sel.engineVer.value = curV;
 
     if (!runningLike && sel.port.value === '') sel.port.value = String(s.port);
-
-    // version dropdown lists downloaded versions only
-    var inst = s.installedVersions || [];
-    var curV = s.activeVersion;
-    sel.engineVer.innerHTML = '';
-    inst.forEach(function (v) {
-      var o = document.createElement('option');
-      o.value = v; o.textContent = 'v' + v;
-      sel.engineVer.appendChild(o);
-    });
-    if (curV && inst.indexOf(curV) !== -1) sel.engineVer.value = curV;
-
-    if (sel.port.value === '') sel.port.value = String(s.port);
-    sel.portHint.textContent = s.portChanged
-      ? 'Port ' + s.port + ' is in use — serving on ' + s.actualPort + '.'
-      : '';
 
     sel.auto.checked = !!s.autoUpdateHarness;
     sel.intervalSel.value = String(s.autoUpdateIntervalHours || 6);
@@ -891,13 +865,14 @@
   });
   sel.restart.addEventListener('click', function () { withCmd(function () { return invoke('engine_restart', {}); }, 'Restarted'); });
 
-  // port
-  sel.btnPort.addEventListener('click', function () {
+  // port: save on blur (and Enter)
+  function applyPort() {
     var p = parseInt(sel.port.value, 10);
     if (!p || p < 1 || p > 65535) return setResult('Enter a valid port (1–65535)', true);
     withCmd(function () { return invoke('set_port', { port: p }); }, 'Port set');
-  });
-  sel.port.addEventListener('keydown', function (e) { if (e.key === 'Enter') sel.btnPort.click(); });
+  }
+  sel.port.addEventListener('blur', applyPort);
+  sel.port.addEventListener('keydown', function (e) { if (e.key === 'Enter') sel.port.blur(); });
 
   // versions table
   sel.btnInstall.addEventListener('click', function () {
@@ -919,6 +894,9 @@
     appendTermLine('info', 'Stopping download…');
     invoke('cancel_operation').then(function (res) {
       appendTermLine('info', (res && res.message) || 'stop requested');
+      // Immediately reflect the cancelled state in the UI, even if the
+      // backend's npm child takes a moment to actually exit.
+      setDownloadState(null);
       sel.dlStatus.textContent = 'cancelled';
       sel.dlStatus.style.color = '';
     }).catch(function (e) {
