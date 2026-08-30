@@ -5,10 +5,10 @@
 - [x] 1.4 Node syntax/ID checks; bump to 0.1.7
 
 ## 2. Version download UX (0.1.8)
-- [ ] 2.1 npm install flags: prefer-offline cache reuse, no audit/fund
-- [ ] 2.2 Honest progress: elapsed time, command shown once, collapsible terminal
-- [ ] 2.3 Apple-style design for download state + cancel
-- [ ] 2.4 cargo test + syntax checks; bump to 0.1.8
+- [x] 2.1 npm install flags: prefer-offline cache reuse, no audit/fund
+- [x] 2.2 Honest progress: elapsed time, command shown once, collapsible terminal
+- [x] 2.3 Apple-style design for download state + cancel
+- [x] 2.4 cargo test + syntax checks; bump to 0.1.8
 
 ## 3. Logs tab minimalism (0.1.9)
 - [ ] 3.1 Remove redundant "Harness Logs" label

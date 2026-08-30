@@ -101,6 +101,8 @@
   .dl-elapsed { font-family: var(--mono); font-size: 11px; color: var(--faint); min-width: 40px; text-align: right; }
   .dl-cmd { font-family: var(--mono); font-size: 10.5px; color: var(--faint); white-space: nowrap;
     overflow: hidden; text-overflow: ellipsis; }
+  .dl-status { font-size: 10.5px; color: var(--faint); white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; }
   .term-toggle { display: inline-flex; align-items: center; gap: 6px; background: none; border: none;
     color: var(--dim); font-size: 11.5px; cursor: pointer; padding: 4px 6px; border-radius: 6px; }
   .term-toggle:hover { color: var(--text); background: var(--cell-hover); }
@@ -247,7 +249,10 @@
       </div>
       <div class="cell dl-row" id="dl-row" hidden>
         <span class="dl-spin"></span>
-        <span class="dl-ver" id="dl-ver">installing…</span>
+        <div style="flex:1; display:flex; flex-direction:column; gap:2px; min-width:0">
+          <span class="dl-ver" id="dl-ver">installing…</span>
+          <span class="dl-status" id="dl-status">preparing…</span>
+        </div>
         <span class="dl-elapsed" id="dl-elapsed">0:00</span>
         <button class="btn warn" id="btn-stop-download">Cancel</button>
       </div>
@@ -343,7 +348,8 @@
     start: $('btn-start'), stop: $('btn-stop'), restart: $('btn-restart'), force: $('btn-force'),
     port: $('inp-port'), btnPort: $('btn-port'), portHint: $('port-hint'),
     verSel: $('sel-version'), update: $('btn-update'), rollback: $('btn-rollback'), pre: $('chk-prerelease'),
-    dlRow: $('dl-row'), dlVer: $('dl-ver'), dlElapsed: $('dl-elapsed'), dlCmd: $('dl-cmd'),
+    dlRow: $('dl-row'), dlVer: $('dl-ver'), dlStatus: $('dl-status'),
+    dlElapsed: $('dl-elapsed'), dlCmd: $('dl-cmd'),
     dlDetail: $('dl-detail'), termToggle: $('term-toggle'), term: $('term'), termOut: $('term-out'),
     stopDown: $('btn-stop-download'),
     progCell: $('prog-cell'), progPhase: $('prog-phase'), progMsg: $('prog-msg'),
@@ -429,9 +435,11 @@
         opKey = key; opStart = Date.now(); sel.termOut.innerHTML = ''; sel.dlElapsed.textContent = '0:00';
         sel.dlVer.textContent = 'Installing DeepSeek Harness v' + (p.version || '');
         sel.dlCmd.textContent = 'npm install @deepseek-ai/dsh@' + (p.version || '…');
+        sel.dlStatus.textContent = 'preparing…';
       }
       sel.dlRow.hidden = false;
       sel.dlDetail.hidden = false;
+      if (p && p.message) sel.dlStatus.textContent = p.message;
       tickElapsed();
     } else {
       sel.dlRow.hidden = true;
