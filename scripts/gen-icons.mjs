@@ -1,10 +1,23 @@
+// Icon generation: app icon, menu-bar template glyph and brand logo, all
+// derived from logo/DSH Launcher.png.
+// Image math is delegated to macOS `sips` (decode/resize/encode) — a plain
+// Node hand-rolled PNG decoder previously turned the logo into black
+// transparent garbage. Node only parses a sips-produced BMP to build the
+// monochrome menu-bar template glyph.
 import { deflateSync } from "node:zlib";
-import { mkdir, writeFile, readFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
+import { mkdir, writeFile, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const LOGO_PATH = path.join(root, "logo", "DSH Launcher.png");
+const SIPS = "/usr/bin/sips";
+
+function sips(args, opts = {}) {
+  return execFileSync(SIPS, args, { stdio: ["ignore", "pipe", "ignore"], ...opts });
+}
 
 function crc32(buf) {
   let c = ~0;
@@ -33,120 +46,109 @@ function encodePng(width, height, rgba) {
   return Buffer.concat([sig, chunk("IHDR", ihdr), chunk("IDAT", deflateSync(raw)), chunk("IEND", Buffer.alloc(0))]);
 }
 
-// Decode an 8-bit, non-interlaced PNG (color types 0/2/3/6) to RGBA.
-function decodePng(buf) {
-  let pos = 8, w = 0, h = 0, bit = 0, col = 0, interlace = 0;
-  const idat = [];
-  let trns = null;
-  while (pos < buf.length) {
-    const len = buf.readUInt32BE(pos);
-    const type = buf.toString("ascii", pos + 4, pos + 8);
-    if (type === "IHDR") {
-      w = buf.readUInt32BE(pos + 8); h = buf.readUInt32BE(pos + 12);
-      bit = buf[pos + 16]; col = buf[pos + 17]; interlace = buf[pos + 20];
-    } else if (type === "IDAT") {
-      idat.push(buf.subarray(pos + 8, pos + 8 + len));
-    } else if (type === "tRNS") {
-      trns = buf.subarray(pos + 8, pos + 8 + len);
-    }
-    pos += 12 + len;
-  }
-  if (bit !== 8 || interlace !== 0) throw new Error("unsupported png: bit=" + bit + " interlace=" + interlace);
-  const channels = col === 6 ? 4 : col === 2 ? 3 : col === 0 ? 1 : col === 3 ? 1 : 0;
-  if (!channels) throw new Error("unsupported png color type " + col);
-  const raw = deflateSync(Buffer.concat(idat));
-  const stride = w * channels + 1;
-  const out = Buffer.alloc(h * stride);
-  for (let y = 0; y < h; y++) {
-    const f = raw[y * stride];
-    const row = out.subarray(y * stride + 1, (y + 1) * stride);
-    const prev = y > 0 ? out.subarray((y - 1) * stride + 1, y * stride) : null;
-    for (let x = 0; x < w * channels; x++) {
-      let a = raw[y * stride + 1 + x];
-      const l = x >= channels ? row[x - channels] : 0;
-      const u = prev ? prev[x] : 0;
-      const ul = prev && x >= channels ? prev[x - channels] : 0;
-      if (f === 1) a += l;
-      else if (f === 2) a += u;
-      else if (f === 3) a += (l + u) >> 1;
-      else if (f === 4) {
-        const p = l + u - ul, pa = Math.abs(p - l), pb = Math.abs(p - u), pc = Math.abs(p - ul);
-        a += (pa <= pb && pa <= pc) ? l : (pb <= pc ? u : ul);
-      }
-      row[x] = a & 0xff;
-    }
-  }
-  const rgba = Buffer.alloc(w * h * 4);
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const src = y * stride + 1 + x * channels;
-      const dst = (y * w + x) * 4;
-      if (col === 2) {
-        const r = out[src], g = out[src + 1], b = out[src + 2];
-        let a = 255;
-        if (trns && trns.length >= 3 && r === trns[0] && g === trns[1] && b === trns[2]) a = 0;
-        rgba[dst] = r; rgba[dst + 1] = g; rgba[dst + 2] = b; rgba[dst + 3] = a;
-      } else if (col === 6) {
-        rgba[dst] = out[src]; rgba[dst + 1] = out[src + 1]; rgba[dst + 2] = out[src + 2]; rgba[dst + 3] = out[src + 3];
-      } else if (col === 0) {
-        const v = out[src]; let a = 255;
-        if (trns && trns.length >= 1 && v === trns[0]) a = 0;
-        rgba[dst] = v; rgba[dst + 1] = v; rgba[dst + 2] = v; rgba[dst + 3] = a;
-      }
-    }
-  }
-  return { width: w, height: h, rgba };
+/// Resize src PNG to a square of `size` pixels, writing an 8-bit PNG.
+function resizePng(src, out, size) {
+  // sips -z takes pixelHeight pixelWidth; input logo is square, output square.
+  sips(["-z", String(size), String(size), "-s", "format", "png", src, "--out", out]);
 }
 
-function resizeBilinear(src, sw, sh, dw, dh) {
-  const out = Buffer.alloc(dw * dh * 4);
-  const xr = sw / dw, yr = sh / dh;
-  for (let dy = 0; dy < dh; dy++) {
-    const srcY = (dy + 0.5) * yr - 0.5;
-    const y0 = Math.max(0, Math.floor(srcY));
-    const y1 = Math.min(sh - 1, y0 + 1);
-    const fy = srcY - y0;
-    for (let dx = 0; dx < dw; dx++) {
-      const srcX = (dx + 0.5) * xr - 0.5;
-      const x0 = Math.max(0, Math.floor(srcX));
-      const x1 = Math.min(sw - 1, x0 + 1);
-      const fx = srcX - x0;
-      for (let c = 0; c < 4; c++) {
-        const i00 = (y0 * sw + x0) * 4 + c, i10 = (y0 * sw + x1) * 4 + c;
-        const i01 = (y1 * sw + x0) * 4 + c, i11 = (y1 * sw + x1) * 4 + c;
-        const top = src[i00] * (1 - fx) + src[i10] * fx;
-        const bot = src[i01] * (1 - fx) + src[i11] * fx;
-        out[(dy * dw + dx) * 4 + c] = Math.round(top * (1 - fy) + bot * fy);
-      }
+/// Decode a plain 24/32-bit BMP (BITMAPINFOHEADER) produced by sips.
+function decodeBmp(buf) {
+  const off = buf.readUInt32LE(10);
+  const w = buf.readInt32LE(18);
+  const hRaw = buf.readInt32LE(22);
+  const height = Math.abs(hRaw);
+  const bpp = buf.readUInt16LE(28);
+  const stride = (((w * bpp) / 8 + 3) >> 2) << 2;
+  const rgba = Buffer.alloc(w * height * 4);
+  for (let y = 0; y < height; y++) {
+    const rowOff = off + (hRaw > 0 ? (height - 1 - y) * stride : y * stride);
+    for (let x = 0; x < w; x++) {
+      const i = rowOff + x * (bpp >> 3);
+      const d = (y * w + x) * 4;
+      rgba[d] = buf[i + 2]; rgba[d + 1] = buf[i + 1]; rgba[d + 2] = buf[i];
+      rgba[d + 3] = bpp === 32 ? buf[i + 3] : 255;
+    }
+  }
+  return { width: w, height, rgba };
+}
+
+/// Monochrome template glyph: the dark logo mark becomes black with alpha;
+/// the light background becomes transparent. (macOS template images are black
+/// + alpha and are tinted automatically by the menu bar.)
+function glyphAlpha(rgba, w, h) {
+  const out = Buffer.alloc(w * h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      const lum = 0.299 * rgba[i] + 0.587 * rgba[i + 1] + 0.114 * rgba[i + 2];
+      // Background is near-white: treat anything lighter than 225 as
+      // transparent so only the dark logo mark is silhouetted. Dark marks
+      // (navy/teal, lum <~150) reach full alpha; soft gray shadows stay.
+      const a = lum > 225 ? 0 : Math.max(0, Math.min(255, Math.round((255 - lum) * 3)));
+      out[y * w + x] = a;
     }
   }
   return out;
 }
 
-function distToSegment(px, py, ax, ay, bx, by) {
-  const abx = bx - ax, aby = by - ay;
-  const len2 = abx * abx + aby * aby;
-  let t = ((px - ax) * abx + (py - ay) * aby) / len2;
-  t = Math.max(0, Math.min(1, t));
-  const dx = px - (ax + t * abx), dy = py - (ay + t * aby);
-  return Math.sqrt(dx * dx + dy * dy);
+/// Bounding box of visible mark pixels.
+function bbox(alpha, w, h) {
+  let minX = w, minY = h, maxX = -1, maxY = -1;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (alpha[y * w + x] > 8) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  return maxX < 0 ? { x: 0, y: 0, w, h } : { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 };
 }
 
-// Crisp black "D"-chevron for the macOS menu bar (template image).
-function drawTrayIcon(size) {
-  const buf = Buffer.alloc(size * size * 4);
-  const lw = size * 0.16;
-  const x0 = size * 0.28, y0 = size * 0.22, x1 = size * 0.72, y1 = size * 0.5;
-  const x2 = size * 0.28, y2 = size * 0.78;
-  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
-    const p = x + 0.5, q = y + 0.5;
-    const d1 = distToSegment(p, q, x0, y0, x1, y1);
-    const d2 = distToSegment(p, q, x1, y1, x2, y2);
-    const a = Math.min(d1, d2) < lw ? 255 : 0;
-    const i = (y * size + x) * 4;
-    buf[i] = 0; buf[i + 1] = 0; buf[i + 2] = 0; buf[i + 3] = a;
+/// Box-average downscale of an alpha map into a target square with padding
+/// around the (cropped) mark, preserving aspect ratio.
+function fitAlpha(alpha, crop, srcSize, target) {
+  const content = Math.max(crop.w, crop.h);
+  const pad = 1 - 0.12; // ~12% padding around the mark
+  const scale = (target * pad) / content;
+  const outW = Math.max(1, Math.round(crop.w * scale));
+  const outH = Math.max(1, Math.round(crop.h * scale));
+  const res = Buffer.alloc(outW * outH);
+  for (let y = 0; y < outH; y++) {
+    for (let x = 0; x < outW; x++) {
+      const sx0 = crop.x + Math.floor((x * crop.w) / outW);
+      const sx1 = crop.x + Math.max(1, Math.floor(((x + 1) * crop.w) / outW));
+      const sy0 = crop.y + Math.floor((y * crop.h) / outH);
+      const sy1 = crop.y + Math.max(1, Math.floor(((y + 1) * crop.h) / outH));
+      let sum = 0, n = 0;
+      for (let yy = sy0; yy < sy1; yy++) {
+        for (let xx = sx0; xx < sx1; xx++) {
+          if (xx < srcSize && yy < srcSize) { sum += alpha[yy * srcSize + xx]; n++; }
+        }
+      }
+      res[y * outW + x] = n ? Math.round(sum / n) : 0;
+    }
   }
-  return buf;
+  // Center the scaled mark on a square canvas.
+  const canvas = Buffer.alloc(target * target);
+  const offX = Math.floor((target - outW) / 2);
+  const offY = Math.floor((target - outH) / 2);
+  for (let y = 0; y < outH; y++) {
+    res.copy(canvas, (offY + y) * target + offX, y * outW, (y + 1) * outW);
+  }
+  return canvas;
+}
+
+/// Turn an alpha map into an RGBA buffer (black + alpha).
+function alphaToRgba(a, size) {
+  const out = Buffer.alloc(size * size * 4);
+  for (let i = 0; i < size * size; i++) {
+    out[i * 4] = 0; out[i * 4 + 1] = 0; out[i * 4 + 2] = 0; out[i * 4 + 3] = a[i];
+  }
+  return out;
 }
 
 const iconsDir = path.join(root, "src-tauri", "icons");
@@ -156,19 +158,31 @@ await mkdir(iconsDir, { recursive: true });
 await mkdir(trayDir, { recursive: true });
 await mkdir(brandDir, { recursive: true });
 
-console.log("[gen-icons] reading logo", LOGO_PATH);
-const logoBuf = await readFile(LOGO_PATH);
-const { width: lw, height: lh, rgba } = decodePng(logoBuf);
-console.log("[gen-icons] logo", lw + "x" + lh);
+console.log("[gen-icons] logo:", LOGO_PATH);
 
-// 1) App icon: the full logo resized to the 1024 square tauri icon source.
-await writeFile(path.join(iconsDir, "icon.png"), encodePng(1024, 1024, resizeBilinear(rgba, lw, lh, 1024, 1024)));
+// 1) App icon source for `tauri icon`: the full logo at 1024x1024.
+const iconPng = path.join(iconsDir, "icon.png");
+resizePng(LOGO_PATH, iconPng, 1024);
+console.log("[gen-icons] wrote icons/icon.png (1024, full logo)");
 
-// 2) Tray icons: the black D-chevron (guaranteed crisp at 16-18 px).
-await writeFile(path.join(trayDir, "tray-icon.png"), encodePng(32, 32, drawTrayIcon(32)));
-await writeFile(path.join(trayDir, "tray-icon@2x.png"), encodePng(64, 64, drawTrayIcon(64)));
+// 2) Brand logo for the Control Panel header (retina-friendly 256px).
+const brandPng = path.join(brandDir, "logo.png");
+resizePng(LOGO_PATH, brandPng, 256);
+console.log("[gen-icons] wrote resources/brand/logo.png (256, full logo)");
 
-// 3) Brand logo for the Control Panel header (retina-friendly 256 px).
-await writeFile(path.join(brandDir, "logo.png"), encodePng(256, 256, resizeBilinear(rgba, lw, lh, 256, 256)));
-
-console.log("[gen-icons] icon.png (1024), tray-icon.png (32), tray-icon@2x.png (64), brand/logo.png (256) written");
+// 3) Menu-bar template glyph: silhouette of the logo mark.
+const tmp = path.join(tmpdir(), `dsh-mark-${process.pid}.bmp`);
+try {
+  sips(["-z", "128", "128", "-s", "format", "bmp", LOGO_PATH, "--out", tmp]);
+  const { width, height, rgba } = decodeBmp(await readFile(tmp));
+  const alpha = glyphAlpha(rgba, width, height);
+  const box = bbox(alpha, width, height);
+  console.log(`[gen-icons] logo mark bbox: ${box.w}x${box.h} @ (${box.x},${box.y})`);
+  const a64 = fitAlpha(alpha, box, width, 64);
+  const a32 = fitAlpha(alpha, box, width, 32);
+  await writeFile(path.join(trayDir, "tray-icon@2x.png"), encodePng(64, 64, alphaToRgba(a64, 64)));
+  await writeFile(path.join(trayDir, "tray-icon.png"), encodePng(32, 32, alphaToRgba(a32, 32)));
+  console.log("[gen-icons] wrote tray-icon.png (32) and tray-icon@2x.png (64), logo-mark template glyph");
+} finally {
+  await rm(tmp, { force: true });
+}

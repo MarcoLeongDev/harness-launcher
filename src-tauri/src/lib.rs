@@ -79,8 +79,17 @@ pub fn run() {
             update::spawn_auto_checker(handle, state::runtime_dir(app.handle()));
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running DeepSeek Harness Launcher");
+        .build(tauri::generate_context!())
+        .expect("error while building DeepSeek Harness Launcher")
+        .run(|app_handle, event| {
+            // Stop the harness child on ANY app exit path (tray/panel Quit,
+            // AppleScript quit, Cmd+Q) so no orphaned harness process keeps
+            // holding the configured port after the launcher exits.
+            if let tauri::RunEvent::Exit = event {
+                let st = app_handle.state::<AppState>();
+                let _ = runtime::stop(&st.runtime, &state::runtime_dir(app_handle));
+            }
+        });
 }
 
 fn boot(app: AppHandle) {
