@@ -1,4 +1,4 @@
-# DeepSeek Harness Launcher — Iteration Report (v0.1.1 → v0.1.5)
+# DeepSeek Harness Launcher — Iteration Report (v0.1.1 → v0.1.6)
 
 Branch: feat/control-panel-branding (based on main @ 0751bb6)
 Change: lightspec/changes/update-control-panel-and-branding (validated, all tasks done)
@@ -12,6 +12,7 @@ Change: lightspec/changes/update-control-panel-and-branding (validated, all task
 | 3 | Control Panel should use tabs | Rewrote settings.html with ARIA tabs: Engine (status + controls + port), Versions (version & update + auto-update + progress/terminal), Logs. All commands wired identically to before. | 26c0e81 | 0.1.3 |
 | 4 | Better, less text-heavy design | Visual polish: pulsing running-state dot, update-available banner with one-click Update, installed versions as tiles, version chips moved to footer, centered column, focus-visible/keyboard tab arrows. | fb14123 | 0.1.4 |
 | 5 | Control Panel should use the provided logo | Header now shows the brand logo (dsh-ui://localhost/brand/logo.png — now a real logo image); stopped page picks it up too. | 4ee99d2 | 0.1.5 |
+| 6 | (hardening) orphaned harness on quit | App now stops the harness child on ANY exit path (tray Quit, panel Quit, AppleScript/Cmd+Q) so no orphaned harness holds the port after the launcher exits. | 14055a0 | 0.1.6 |
 
 ## Verification
 - cargo test: 11/11 pass (port fallback, semver, settings roundtrip)
