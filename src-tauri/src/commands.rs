@@ -487,6 +487,26 @@ pub fn open_settings(app: AppHandle) -> Result<String, String> {
     Ok("settings window opened".into())
 }
 
+/// Select the active version WITHOUT starting the engine. Installs it if it is
+/// not already present locally, then records it as the current version so the
+/// next Start (or auto-launch) runs it. Used by the stopped-state version
+/// dropdown so picking a version persists the choice instead of auto-launching.
+#[tauri::command]
+pub fn set_version(app: AppHandle, version: String) -> Result<String, String> {
+    let rd = state::runtime_dir(&app);
+    ensure_runtime_dirs(&app).map_err(|e| format!("runtime dirs: {e}"))?;
+    if !versions::is_installed(&rd, &version) {
+        versions::install_version(&app, &rd, &version, "select")?;
+    }
+    let previous = state::read_settings(&app).current_version.clone();
+    state::update_settings(&app, |s| {
+        s.previous_version = previous;
+        s.current_version = Some(version.clone());
+    });
+    crate::tray::refresh(&app);
+    Ok(format!("active version set to {version}"))
+}
+
 #[tauri::command]
 pub fn open_harness_window(app: AppHandle) -> Result<String, String> {
     crate::tray::show_main_window(&app)?;
