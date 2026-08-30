@@ -146,6 +146,34 @@
   @keyframes slide { 0% { margin-left: -40%; } 100% { margin-left: 100%; } }
   .prog-phase { font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--accent2);
     font-weight: 700; }
+  /* version table */
+  .vhead { display: flex; align-items: center; gap: 16px; padding: 12px 16px;
+    border-bottom: 1px solid var(--hair); flex-wrap: wrap; }
+  .vtable { }
+  .vrow { display: flex; align-items: center; gap: 12px; padding: 10px 16px;
+    border-top: 1px solid var(--hair); position: relative; }
+  .vtable .vrow:first-child { border-top: none; }
+  .vhead-row { color: var(--faint); font-size: 10.5px; text-transform: uppercase;
+    letter-spacing: 0.7px; font-weight: 650; padding: 8px 16px; }
+  .vc-ver { flex: 1; font-family: var(--mono); font-size: 12.5px; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .vc-tag { width: 92px; flex: none; }
+  .vc-tag .tag { display: inline-block; }
+  .vc-acts { display: flex; gap: 7px; align-items: center; }
+  .btn.danger { background: var(--err); border-color: var(--err); color: #fff; }
+  .btn.danger:hover { background: #ff6259; }
+  .btn.ghost-danger { background: transparent; border-color: rgba(255,69,58,0.45);
+    color: var(--err); }
+  .btn.ghost-danger:hover { background: rgba(255,69,58,0.12); }
+  /* delete confirmation popover */
+  .pop { position: absolute; right: 16px; top: calc(100% - 2px); z-index: 40;
+    background: #141b2c; border: 1px solid var(--hair2); border-radius: 11px;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.55); padding: 11px 12px; min-width: 200px;
+    display: none; }
+  .pop.open { display: block; }
+  .pop-txt { font-size: 12px; margin-bottom: 10px; color: var(--text); }
+  .pop-txt b { font-family: var(--mono); }
+  .pop-acts { display: flex; gap: 8px; justify-content: flex-end; }
   /* logs */
   .log-toolbar { display: flex; align-items: center; gap: 6px; }
   .log-view { margin: 0; padding: 12px 16px; max-height: 60vh; overflow: auto;
@@ -174,6 +202,7 @@
   <symbol id="i-network" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5c2.5 2.3 3.8 5.2 3.8 8.5s-1.3 6.2-3.8 8.5c-2.5-2.3-3.8-5.2-3.8-8.5s1.3-6.2 3.8-8.5z"/></symbol>
   <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5 10 18 19.5 7"/></symbol>
   <symbol id="i-log" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h9"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5V15"/><path d="M7.5 11 12 15.5 16.5 11"/><path d="M4 21h16"/></symbol>
 </svg>
 
 <header>
@@ -241,11 +270,43 @@
     </div>
 
     <div class="group">
+      <div class="vhead">
+        <label class="hint" style="display:flex;align-items:center;gap:7px;flex:1">
+          Auto update
+          <span class="switch"><input type="checkbox" id="chk-autoupdate" /><span class="slider"></span></span>
+        </label>
+        <span class="hint" style="display:flex;align-items:center;gap:7px">
+          Check every
+          <select id="sel-interval" aria-label="Check every"></select>
+        </span>
+        <button class="btn" id="btn-check" title="Check for updates now">
+          <svg class="ico sm"><use href="#i-refresh"/></svg> Check
+        </button>
+      </div>
+      <div class="vtable">
+        <div class="vrow vhead-row">
+          <span class="vc-ver">Version</span>
+          <span class="vc-tag">Status</span>
+          <span class="vc-acts">Actions</span>
+        </div>
+        <div id="ver-tbody"></div>
+      </div>
+      <div class="cell" style="padding-top:7px;padding-bottom:11px;border-top:1px solid var(--hair)">
+        <span class="hint" id="check-result"></span>
+      </div>
+    </div>
+
+    <div class="group">
       <div class="cell" style="gap:10px">
-        <span class="lbl" style="flex:1">Version</span>
-        <select id="sel-version" aria-label="Harness version"></select>
-        <button class="btn" id="btn-update" title="Update to the latest version"><svg class="ico sm"><use href="#i-update"/></svg> Update</button>
-        <button class="btn" id="btn-rollback" title="Roll back to the previous version"><svg class="ico sm"><use href="#i-rollback"/></svg> Rollback</button>
+        <span class="lbl" style="flex:1">Install version</span>
+        <select id="sel-install-ver" aria-label="Published version"></select>
+        <button class="btn" id="btn-install">
+          <svg class="ico sm"><use href="#i-download"/></svg> Install
+        </button>
+        <label class="hint" style="display:flex;align-items:center;gap:6px">
+          Pre-release
+          <span class="switch"><input type="checkbox" id="chk-prerelease" /><span class="slider"></span></span>
+        </label>
       </div>
       <div class="cell dl-row" id="dl-row" hidden>
         <span class="dl-spin"></span>
@@ -272,32 +333,6 @@
       </div>
       <div class="cell" style="gap:8px;flex-wrap:wrap">
         <span class="hint" id="op-result" style="flex:1"></span>
-        <label class="hint" style="display:flex;align-items:center;gap:6px">
-          Pre-release
-          <span class="switch"><input type="checkbox" id="chk-prerelease" /><span class="slider"></span></span>
-        </label>
-      </div>
-    </div>
-
-    <div class="group">
-      <div class="cell col">
-        <div class="ver-list" id="ver-list"></div>
-      </div>
-    </div>
-
-    <div class="group">
-      <div class="cell">
-        <span class="lbl" style="flex:1">Auto-update</span>
-        <span class="switch"><input type="checkbox" id="chk-autoupdate" /><span class="slider"></span></span>
-      </div>
-      <div class="cell" style="padding-top:6px;padding-bottom:10px;border-top:none;min-height:0">
-        <span class="hint" style="flex:1">Check every
-          <input id="inp-interval" type="number" min="1" max="720" style="width:56px" aria-label="Hours between checks" /> h
-        </span>
-        <button class="btn icon" id="btn-check" title="Check for updates now"><svg class="ico sm"><use href="#i-refresh"/></svg></button>
-      </div>
-      <div class="cell" style="padding-top:6px;padding-bottom:10px;border-top:none;min-height:0">
-        <span class="hint" id="check-result"></span>
       </div>
     </div>
   </section>
@@ -347,15 +382,17 @@
     stIcon: $('st-icon'), stTitle: $('st-title'), stSub: $('st-sub'),
     start: $('btn-start'), stop: $('btn-stop'), restart: $('btn-restart'), force: $('btn-force'),
     port: $('inp-port'), btnPort: $('btn-port'), portHint: $('port-hint'),
-    verSel: $('sel-version'), update: $('btn-update'), rollback: $('btn-rollback'), pre: $('chk-prerelease'),
+    pre: $('chk-prerelease'),
+    intervalSel: $('sel-interval'), installSel: $('sel-install-ver'), btnInstall: $('btn-install'),
+    verTbody: $('ver-tbody'),
     dlRow: $('dl-row'), dlVer: $('dl-ver'), dlStatus: $('dl-status'),
     dlElapsed: $('dl-elapsed'), dlCmd: $('dl-cmd'),
     dlDetail: $('dl-detail'), termToggle: $('term-toggle'), term: $('term'), termOut: $('term-out'),
     stopDown: $('btn-stop-download'),
     progCell: $('prog-cell'), progPhase: $('prog-phase'), progMsg: $('prog-msg'),
     progBar: $('prog-bar'), progTrack: $('prog-track'),
-    verList: $('ver-list'), result: $('op-result'),
-    auto: $('chk-autoupdate'), interval: $('inp-interval'), check: $('btn-check'), checkResult: $('check-result'),
+    result: $('op-result'),
+    auto: $('chk-autoupdate'), check: $('btn-check'), checkResult: $('check-result'),
     logRefresh: $('btn-log-refresh'), logFollow: $('btn-log-follow'), logTail: $('log-tail'),
     banner: $('update-banner'), bannerText: $('update-banner-text'), bannerBtn: $('btn-banner-update'),
     appVer: $('app-ver'), ftHarness: $('ft-harness'), ftUrl: $('ft-url'),
@@ -474,49 +511,80 @@
     }
   }
 
+  function closePopovers() {
+    var ps = document.querySelectorAll('.pop.open');
+    for (var i = 0; i < ps.length; i++) ps[i].classList.remove('open');
+  }
   function renderVersions(s) {
-    var list = s.installedVersions || [];
-    sel.verList.innerHTML = '';
+    var list = (s.installedVersions || []).slice().sort();
+    sel.verTbody.innerHTML = '';
     if (!list.length) {
-      var e = document.createElement('div');
-      e.className = 'hint';
-      e.textContent = 'No versions installed.';
-      sel.verList.appendChild(e);
+      var empty = document.createElement('div');
+      empty.className = 'vrow';
+      empty.innerHTML = '<span class="hint">No versions installed — pick one above to install.</span>';
+      sel.verTbody.appendChild(empty);
       return;
     }
     list.forEach(function (v) {
-      var t = document.createElement('div');
-      t.className = 'ver-tile';
-      var ver = document.createElement('div');
-      ver.className = 'ver'; ver.textContent = 'v' + v;
-      var meta = document.createElement('div');
-      meta.className = 'meta';
+      var row = document.createElement('div');
+      row.className = 'vrow';
+      var ver = document.createElement('span');
+      ver.className = 'vc-ver'; ver.textContent = 'v' + v;
+      var tagCell = document.createElement('span');
+      tagCell.className = 'vc-tag';
+      var isActive = s.activeVersion === v;
       var tag = document.createElement('span');
-      if (s.activeVersion === v) tag.className = 'tag active', tag.textContent = 'Active';
+      if (isActive) tag.className = 'tag active', tag.textContent = 'Active';
       else if (s.previousVersion === v) tag.className = 'tag prev', tag.textContent = 'Previous';
       else tag.className = 'tag inst', tag.textContent = 'Installed';
-      meta.appendChild(tag);
+      tagCell.appendChild(tag);
+      var acts = document.createElement('span');
+      acts.className = 'vc-acts';
+      var def = document.createElement('button');
+      def.className = 'btn';
+      def.disabled = isActive;
+      def.title = isActive ? 'This is the default version' : 'Make this the default version';
+      def.textContent = isActive ? 'Default' : 'Set default';
+      def.addEventListener('click', function () {
+        withCmd(function () { return invoke('install_and_switch', { version: v }); }, 'Switched');
+      });
       var del = document.createElement('button');
-      del.className = 'btn icon del';
-      del.title = s.activeVersion === v ? 'Active version cannot be deleted' : 'Delete this version';
-      del.disabled = s.activeVersion === v;
-      del.innerHTML = '<svg class="ico sm" style="color:var(--err)"><use href="#i-trash"/></svg>';
-      del.addEventListener('click', function () {
-        if (del.getAttribute('data-arm') !== '1') {
-          del.setAttribute('data-arm', '1');
-          del.innerHTML = '<span class="hint" style="color:var(--err)">Delete?</span>';
-          setTimeout(function () {
-            del.removeAttribute('data-arm');
-            del.innerHTML = '<svg class="ico sm" style="color:var(--err)"><use href="#i-trash"/></svg>';
-          }, 3000);
-          return;
-        }
+      del.className = 'btn icon ghost-danger';
+      del.title = 'Delete this version';
+      del.disabled = isActive;
+      del.innerHTML = '<svg class="ico sm"><use href="#i-trash"/></svg>';
+      var pop = document.createElement('div');
+      pop.className = 'pop';
+      pop.setAttribute('role', 'dialog');
+      pop.setAttribute('aria-label', 'Delete version v' + v + '?');
+      pop.innerHTML = '<div class="pop-txt">Delete <b>v' + v + '</b>? This cannot be undone.</div>' +
+        '<div class="pop-acts">' +
+        '<button class="btn" data-act="cancel">Cancel</button>' +
+        '<button class="btn danger" data-act="confirm">Delete</button>' +
+        '</div>';
+      del.addEventListener('click', function (e) {
+        e.stopPropagation();
+        closePopovers();
+        pop.classList.add('open');
+        document.addEventListener('click', function outer(ev) {
+          if (!pop.contains(ev.target) && ev.target !== del) {
+            pop.classList.remove('open');
+            document.removeEventListener('click', outer);
+          }
+        });
+      });
+      pop.querySelector('[data-act="cancel"]').addEventListener('click', function () {
+        pop.classList.remove('open');
+      });
+      pop.querySelector('[data-act="confirm"]').addEventListener('click', function () {
+        pop.classList.remove('open');
         invoke('delete_version', { version: v }).then(function () { return refresh(); })
           .catch(function (e) { setResult(String(e && e.message || e), true); return refresh(); });
       });
-      meta.appendChild(del);
-      t.appendChild(ver); t.appendChild(meta);
-      sel.verList.appendChild(t);
+      acts.appendChild(def); acts.appendChild(del);
+      row.appendChild(ver); row.appendChild(tagCell); row.appendChild(acts);
+      row.appendChild(pop);
+      sel.verTbody.appendChild(row);
     });
   }
 
@@ -567,7 +635,7 @@
       sel.banner.style.display = 'none';
     }
 
-    fillVersions(s);
+    fillVersionSelects(s);
     renderVersions(s);
 
     if (s.currentOp) {
@@ -585,19 +653,40 @@
     }
   }
 
-  function fillVersions(s) {
+  var INTERVAL_OPTS = [
+    [6,'6 hours'],[7,'7 hours'],[8,'8 hours'],[9,'9 hours'],[10,'10 hours'],[11,'11 hours'],[12,'12 hours'],
+    [13,'13 hours'],[14,'14 hours'],[15,'15 hours'],[16,'16 hours'],[17,'17 hours'],[18,'18 hours'],
+    [19,'19 hours'],[20,'20 hours'],[21,'21 hours'],[22,'22 hours'],[23,'23 hours'],[24,'24 hours'],
+    [48,'1 day'],[96,'2 days'],[144,'3 days'],[192,'4 days'],[240,'5 days'],[288,'6 days'],[336,'7 days']
+  ];
+  function buildIntervalSelect() {
+    if (sel.intervalSel.options.length) return;
+    INTERVAL_OPTS.forEach(function (p) {
+      var o = document.createElement('option');
+      o.value = String(p[0]); o.textContent = p[1];
+      sel.intervalSel.appendChild(o);
+    });
+  }
+  function fillVersionSelects(s) {
+    buildIntervalSelect();
+    var iv = Number(s.autoUpdateIntervalHours);
+    if (iv > 0) {
+      var hit = INTERVAL_OPTS.filter(function (p) { return p[0] === iv; })[0];
+      if (hit) sel.intervalSel.value = String(iv);
+      else sel.intervalSel.value = '12';
+    } else sel.intervalSel.value = '12';
     var all = s.versions || [];
-    var cur = sel.verSel.value;
-    sel.verSel.innerHTML = '';
+    var cur = sel.installSel.value;
+    sel.installSel.innerHTML = '';
     (all.length ? all : (s.installedVersions || [])).forEach(function (v) {
       var o = document.createElement('option');
       o.value = v;
       o.textContent = 'v' + v + (s.installedVersions && s.installedVersions.indexOf(v) !== -1 ? '  ✓' : '');
-      sel.verSel.appendChild(o);
+      sel.installSel.appendChild(o);
     });
-    if (cur && all.indexOf(cur) !== -1) sel.verSel.value = cur;
-    else if (s.latestRemote && all.indexOf(s.latestRemote) !== -1) sel.verSel.value = s.latestRemote;
-    else if (s.activeVersion && all.indexOf(s.activeVersion) !== -1) sel.verSel.value = s.activeVersion;
+    if (cur && all.indexOf(cur) !== -1) sel.installSel.value = cur;
+    else if (s.latestRemote && all.indexOf(s.latestRemote) !== -1) sel.installSel.value = s.latestRemote;
+    else if (s.activeVersion && all.indexOf(s.activeVersion) !== -1) sel.installSel.value = s.activeVersion;
   }
 
   function refresh() {
@@ -639,14 +728,13 @@
   });
   sel.port.addEventListener('keydown', function (e) { if (e.key === 'Enter') sel.btnPort.click(); });
 
-  // versions
-  sel.update.addEventListener('click', function () { withCmd(function () { return invoke('update_to_latest', {}); }, 'Updated'); });
-  sel.rollback.addEventListener('click', function () { withCmd(function () { return invoke('rollback', {}); }, 'Rolled back'); });
-  sel.verSel.addEventListener('change', function () {
-    var v = sel.verSel.value;
+  // versions table
+  sel.btnInstall.addEventListener('click', function () {
+    var v = sel.installSel.value;
     if (!v) return;
     withCmd(function () { return invoke('install_and_switch', { version: v }); }, 'Installed');
   });
+  sel.installSel.addEventListener('change', function () { closePopovers(); });
   sel.pre.addEventListener('change', function () {
     invoke('set_prerelease', { include: sel.pre.checked }).then(refresh)
       .catch(function (e) { setResult(String(e.message || e), true); });
@@ -673,9 +761,10 @@
   sel.auto.addEventListener('change', function () {
     invoke('set_auto_update', { enabled: sel.auto.checked }).catch(function (e) { setResult(String(e.message || e), true); });
   });
-  sel.interval.addEventListener('change', function () {
-    var h = parseInt(sel.interval.value, 10);
-    if (h >= 1) invoke('set_auto_update', { intervalHours: h }).catch(function (e) { setResult(String(e.message || e), true); });
+  sel.intervalSel.addEventListener('change', function () {
+    var h = parseInt(sel.intervalSel.value, 10);
+    if (h >= 1) invoke('set_auto_update', { intervalHours: h }).then(refresh)
+      .catch(function (e) { setResult(String(e.message || e), true); });
   });
   sel.check.addEventListener('click', function () {
     sel.check.disabled = true;
