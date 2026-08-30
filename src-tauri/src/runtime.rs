@@ -280,7 +280,14 @@ pub fn start(
                     append_log(&runtime_dir_buf, &format!("[harness] pipe error: {e}"));
                 }
                 Ok(_) => {}
-                Err(_) => break,
+                // Heartbeat: the harness is alive but quiet (no output for 30s).
+                // Keep waiting — do NOT clear the process slot or report stopped,
+                // otherwise a long-running idle engine would be misreported as
+                // stopped and restarts would spawn a second harness on the port.
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
+                // The relay task ended: the child's stream closed (Terminated is
+                // normally delivered first). This is real termination.
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
             }
         }
         {
