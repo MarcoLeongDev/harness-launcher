@@ -80,40 +80,40 @@
   select { font-family: inherit; }
   .err { color: var(--err); }
   .ok2 { color: var(--ok); }
-  /* engine status */
-  .status-icon { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center;
-    justify-content: center; background: rgba(255,214,10,0.12); border: 1px solid rgba(255,214,10,0.4);
-    color: var(--warn); flex: none; }
-  .status-icon.ok { background: rgba(48,209,88,0.12); border-color: rgba(48,209,88,0.45); color: var(--ok); }
-  .status-icon.stop { background: rgba(93,108,140,0.15); border-color: rgba(93,108,140,0.4); color: var(--dim); }
-  .status-icon.err { background: rgba(255,69,58,0.12); border-color: rgba(255,69,58,0.45); color: var(--err); }
-  .status-icon.ok svg path.pulse { animation: pulse 1.8s ease-in-out infinite; }
-  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
-  .st-title { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; }
-  .st-sub { font-size: 12px; color: var(--dim); margin-top: 1px; }
-  .actions { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 8px; }
   /* engine card */
-  .ec-line1 { display: flex; align-items: center; gap: 20px; padding: 16px 16px 8px;
-    flex-wrap: wrap; }
-  .ec-status { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 220px; }
+  .ec-header { display: flex; align-items: center; gap: 14px; padding: 18px 18px 14px; }
+  .ec-status-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center;
+    justify-content: center; flex: none; background: rgba(93,108,140,0.15);
+    border: 1px solid rgba(93,108,140,0.4); color: var(--dim); }
+  .ec-status-icon svg { width: 18px; height: 18px; }
+  .ec-status-icon.running { background: rgba(48,209,88,0.12); border-color: rgba(48,209,88,0.45); color: var(--ok); }
+  .ec-status-icon.running svg { animation: spin-gear 3s linear infinite; }
+  .ec-status-icon.stopped { background: rgba(93,108,140,0.15); border-color: rgba(93,108,140,0.4); color: var(--dim); }
+  .ec-status-icon.error { background: rgba(255,69,58,0.12); border-color: rgba(255,69,58,0.45); color: var(--err); }
+  @keyframes spin-gear { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  .ec-info { flex: 1; min-width: 0; }
+  .ec-ver { font-family: var(--mono); font-size: 14px; font-weight: 600; }
+  .ec-link { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--faint);
+    text-decoration: none; cursor: pointer; transition: color .15s; }
+  .ec-link:hover { color: var(--text); font-weight: 600; }
+  .ec-link svg { width: 12px; height: 12px; }
+  .ec-controls { display: flex; align-items: center; gap: 10px; padding: 0 18px 16px; }
+  .ec-btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    height: 34px; padding: 0 16px; border-radius: 8px; font-size: 12.5px; font-weight: 600;
+    cursor: pointer; border: 1px solid var(--hair2); background: var(--cell); color: var(--text);
+    transition: all .15s; }
+  .ec-btn svg { width: 16px; height: 16px; }
+  .ec-btn:hover { background: var(--cell-hover); }
+  .ec-btn:active { transform: translateY(1px); }
+  .ec-btn:disabled { opacity: 0.4; cursor: default; transform: none; }
+  .ec-btn.start { background: var(--ok); border-color: var(--ok); color: #04231a; }
+  .ec-btn.start:hover { background: #4cd870; }
+  .ec-btn.stop { background: var(--err); border-color: var(--err); color: #fff; }
+  .ec-btn.stop:hover { background: #ff6259; }
+  .ec-btn.restart { background: transparent; }
   .ec-field { display: flex; flex-direction: column; gap: 4px; }
   .ec-field .flabel { font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px;
     color: var(--faint); font-weight: 650; }
-  .ec-line2 { display: flex; justify-content: space-evenly; gap: 12px; padding: 10px 12px 18px; }
-  .cbtn-wrap { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-  .cbtn { display: flex; align-items: center; justify-content: center;
-    width: 56px; height: 56px; border-radius: 50%; background: var(--cell);
-    border: 1px solid var(--hair2); color: var(--text); cursor: pointer;
-    transition: all .15s; }
-  .cbtn svg { width: 22px; height: 22px; }
-  .cbtn-lbl { font-size: 10px; font-weight: 600; color: var(--dim); }
-  .cbtn:hover { background: var(--cell-hover); }
-  .cbtn:disabled { opacity: 0.35; cursor: default; transform: none; }
-  .cbtn.primary { background: var(--ok); border-color: var(--ok); color: #04231a; }
-  .cbtn.primary:hover { background: #4cd870; }
-  .cbtn.subdued { color: var(--err); border-color: rgba(255,69,58,0.4); }
-  .cbtn.subdued:hover { background: rgba(255,69,58,0.12); }
-  .cbtn:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
   .ecterm-toggle { display: inline-flex; align-items: center; gap: 6px; background: none;
     border: none; color: var(--dim); font-size: 11.5px; cursor: pointer; padding: 8px 12px;
     border-radius: 6px; margin: 4px; }
@@ -240,13 +240,13 @@
   <!-- ============ ENGINE ============ -->
   <section class="tabpanel active" id="tab-engine" role="tabpanel" aria-labelledby="tab-btn-engine">
     <div class="group">
-      <div class="ec-line1">
-        <div class="ec-status">
-          <div class="status-icon stop" id="st-icon" aria-label="Engine status"></div>
-          <div>
-            <div class="st-title" id="st-title">Stopped</div>
-            <div class="st-sub" id="st-sub">The engine is not running</div>
-          </div>
+      <div class="ec-header">
+        <div class="ec-status-icon stopped" id="st-icon" aria-label="Engine status">
+          <i class="ico bi" data-ico="moon"></i>
+        </div>
+        <div class="ec-info">
+          <div class="ec-ver" id="st-title">v0.0.0</div>
+          <a class="ec-link" id="st-link" href="#" target="_blank" rel="noreferrer">127.0.0.1:0 <i class="ico bi" data-ico="box-arrow-up-right"></i></a>
         </div>
         <div class="ec-field">
           <span class="flabel">Version</span>
@@ -260,26 +260,10 @@
           </div>
         </div>
       </div>
-      <div class="ec-line2">
-        <div class="cbtn-wrap">
-          <button class="cbtn primary" id="btn-start"><i class="ico bi" data-ico="play-fill"></i></button>
-          <span class="cbtn-lbl">Start</span>
-        </div>
-        <div class="cbtn-wrap">
-          <button class="cbtn" id="btn-stop" disabled title="Stop the engine"><i class="ico bi" data-ico="pause-fill"></i></button>
-          <span class="cbtn-lbl">Stop</span>
-        </div>
-        <div class="cbtn-wrap">
-          <button class="cbtn" id="btn-restart" disabled title="Restart the engine"><i class="ico bi" data-ico="arrow-repeat"></i></button>
-          <span class="cbtn-lbl">Restart</span>
-        </div>
-        <div class="cbtn-wrap">
-          <button class="cbtn subdued" id="btn-force" title="Force restart — kill anything on the port"><i class="ico bi" data-ico="lightning-charge-fill"></i></button>
-          <span class="cbtn-lbl">Force</span>
-        </div>
-      </div>
-      <div class="cell" style="padding-top:0;padding-bottom:10px;border-top:none;min-height:0">
-        <span class="hint" id="port-hint"></span>
+      <div class="ec-controls">
+        <button class="ec-btn start" id="btn-toggle"><i class="ico bi" data-ico="play-fill"></i> Start</button>
+        <button class="ec-btn restart" id="btn-restart" disabled title="Restart the engine"><i class="ico bi" data-ico="arrow-repeat"></i> Restart</button>
+        <span class="hint" id="port-hint" style="margin-left:auto"></span>
       </div>
     </div>
 
@@ -413,6 +397,7 @@
     var icons = root.querySelectorAll('i.ico.bi[data-ico]');
     for (var i = 0; i < icons.length; i++) {
       (function (el) {
+        if (el.getAttribute('data-loaded')) return;
         var name = el.getAttribute('data-ico');
         if (!name) return;
         var url = 'dsh-ui://localhost/bootstrap-icons/' + name + '.svg';
@@ -429,6 +414,7 @@
           if (el.classList.contains('sm')) svgEl.classList.add('sm');
           svgEl.removeAttribute('width');
           svgEl.removeAttribute('height');
+          el.setAttribute('data-loaded', '1');
           el.parentNode.replaceChild(svgEl, el);
         }).catch(function () {});
       })(icons[i]);
@@ -436,8 +422,8 @@
   }
 
   var sel = {
-    stIcon: $('st-icon'), stTitle: $('st-title'), stSub: $('st-sub'),
-    start: $('btn-start'), stop: $('btn-stop'), restart: $('btn-restart'), force: $('btn-force'),
+    stIcon: $('st-icon'), stTitle: $('st-title'), stLink: $('st-link'),
+    toggle: $('btn-toggle'), restart: $('btn-restart'),
     engineVer: $('sel-version'),
     engineTerm: $('engine-term'), engineTermToggle: $('engine-term-toggle'), engineTermOut: $('engine-term-out'),
     port: $('inp-port'), btnPort: $('btn-port'), portHint: $('port-hint'),
@@ -496,7 +482,7 @@
     sel.checkResult.className = isErr ? 'err' : '';
   }
   function busy(on) {
-    [sel.start, sel.stop, sel.restart, sel.force, sel.btnPort, sel.check, sel.btnInstall, sel.engineVer]
+    [sel.toggle, sel.restart, sel.btnPort, sel.check, sel.btnInstall, sel.engineVer]
       .forEach(function (b) { b.disabled = on; });
   }
 
@@ -654,27 +640,37 @@
 
     var phase = s.enginePhase || (running ? 'running' : 'stopped');
 
-    var iconCls = 'stop';
-    if (phase === 'running') iconCls = 'ok';
-    else if (phase === 'stopped') iconCls = 'stop';
-    else iconCls = 'err';
-    sel.stIcon.className = 'status-icon ' + iconCls;
+    // Status icon
+    var iconCls = 'stopped';
+    var iconIco = 'moon';
+    if (phase === 'running') { iconCls = 'running'; iconIco = 'gear'; }
+    else if (phase === 'stopped') { iconCls = 'stopped'; iconIco = 'moon'; }
+    else { iconCls = 'error'; iconIco = 'exclamation-circle-fill'; }
+    sel.stIcon.className = 'ec-status-icon ' + iconCls;
+    sel.stIcon.innerHTML = '<i class="ico bi" data-ico="' + iconIco + '"></i>';
 
+    // Version and link
+    var verText = s.activeVersion ? 'v' + s.activeVersion : 'v0.0.0';
+    sel.stTitle.textContent = verText;
+    var port = s.actualPort || 0;
+    var url = 'http://127.0.0.1:' + port;
+    sel.stLink.textContent = '';
+    sel.stLink.innerHTML = '127.0.0.1:' + port + ' <i class="ico bi" data-ico="box-arrow-up-right"></i>';
+    sel.stLink.href = url;
+
+    // Toggle button state
     var runningLike = phase !== 'stopped';
-    sel.stTitle.textContent = phase === 'running' ? 'Running' : (phase === 'stopped' ? 'Stopped' : phase);
-    if (phase === 'running' || running) {
-      sel.stSub.textContent = 'Runs at http://127.0.0.1:' + s.actualPort + ' · v' + (s.activeVersion || '?');
-    } else if (phase === 'stopped') {
-      sel.stSub.textContent = 'Idle — press Start to launch.';
+    if (runningLike) {
+      sel.toggle.className = 'ec-btn stop';
+      sel.toggle.innerHTML = '<i class="ico bi" data-ico="pause-fill"></i> Stop';
     } else {
-      sel.stSub.textContent = phase + '…';
+      sel.toggle.className = 'ec-btn start';
+      sel.toggle.innerHTML = '<i class="ico bi" data-ico="play-fill"></i> Start';
     }
+    sel.toggle.disabled = false;
+    sel.restart.disabled = !runningLike;
 
     // card controls: version + port are locked while the engine is running
-    sel.start.disabled = runningLike;
-    sel.stop.disabled = !runningLike;
-    sel.restart.disabled = !runningLike;
-    sel.force.disabled = false; // force recovery is always available
     sel.engineVer.disabled = runningLike;
     sel.port.disabled = runningLike;
     sel.btnPort.disabled = runningLike;
@@ -761,7 +757,10 @@
   }
 
   function refresh() {
-    return invoke('get_status').then(renderStatus).catch(function (e) {
+    return invoke('get_status').then(function (s) {
+      renderStatus(s);
+      loadIconsIn(sel.stIcon);
+    }).catch(function (e) {
       setResult(String(e && e.message || e), true);
     });
   }
@@ -805,10 +804,15 @@
     if (!v) return;
     withCmd(function () { return invoke('install_and_switch', { version: v }); }, 'Switched');
   });
-  sel.start.addEventListener('click', function () { withCmd(function () { return invoke('engine_start', {}); }, 'Started'); });
-  sel.stop.addEventListener('click', function () { withCmd(function () { return invoke('engine_stop', {}); }, 'Stopped'); });
+  sel.toggle.addEventListener('click', function () {
+    var isRunning = sel.toggle.classList.contains('stop');
+    if (isRunning) {
+      withCmd(function () { return invoke('engine_stop', {}); }, 'Stopped');
+    } else {
+      withCmd(function () { return invoke('engine_start', {}); }, 'Started');
+    }
+  });
   sel.restart.addEventListener('click', function () { withCmd(function () { return invoke('engine_restart', {}); }, 'Restarted'); });
-  sel.force.addEventListener('click', function () { withCmd(function () { return invoke('engine_force_restart', {}); }, 'Force restarted'); });
 
   // port
   sel.btnPort.addEventListener('click', function () {
