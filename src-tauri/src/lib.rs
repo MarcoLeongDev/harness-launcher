@@ -86,6 +86,7 @@ pub fn run() {
             commands::engine_stop,
             commands::engine_restart,
             commands::engine_force_restart,
+            commands::set_version,
             commands::open_settings,
             commands::open_harness_window,
             commands::cancel_operation,
