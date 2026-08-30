@@ -21,11 +21,37 @@ use crate::state::AppState;
 
 pub fn run() {
     tauri::Builder::default()
-        .register_uri_scheme_protocol("dsh-ui", |_ctx, request| {
+        .register_uri_scheme_protocol("dsh-ui", |ctx, request| {
             // Launcher-owned pages: the settings/control panel, the "engine
             // stopped" placeholder and the brand logo, served from a custom
             // protocol so they work in dev and prod without the harness server.
             let path = request.uri().path().to_string();
+            // Bootstrap icon SVGs, bundled under resources/bootstrap-icons and
+            // served from the resource dir at runtime (raw files, never
+            // hardcoded; names are validated to prevent path traversal).
+            if let Some(name) = path.strip_prefix("/bootstrap-icons/") {
+                if name.contains("..") || name.contains('/') {
+                    return tauri::http::Response::builder()
+                        .status(404)
+                        .body(Vec::new())
+                        .unwrap();
+                }
+                if let Ok(rd) = ctx.app_handle().path().resource_dir() {
+                    let file = rd.join("resources").join("bootstrap-icons").join(name);
+                    if file.is_file() {
+                        if let Ok(bytes) = std::fs::read(&file) {
+                            return tauri::http::Response::builder()
+                                .header("Content-Type", "image/svg+xml")
+                                .body(bytes)
+                                .unwrap();
+                        }
+                    }
+                }
+                return tauri::http::Response::builder()
+                    .status(404)
+                    .body(Vec::new())
+                    .unwrap();
+            }
             match path.as_str() {
                 "/brand/logo.png" => tauri::http::Response::builder()
                     .header("Content-Type", "image/png")

@@ -11,12 +11,12 @@
 - [x] 2.4 Verify; bump to 0.1.11
 
 ## 3. Bootstrap icons + remove status pill (0.1.12)
-- [ ] 3.1 Copy bootstrap SVG files into resources; bundle them
-- [ ] 3.2 Serve icons via dsh-ui protocol handler
-- [ ] 3.3 Replace all inline icons with bootstrap img; remove header status pill
-- [ ] 3.4 Verify; bump to 0.1.12
+- [x] 3.1 Copy bootstrap SVG files into resources; bundle them
+- [x] 3.2 Serve icons via dsh-ui protocol handler
+- [x] 3.3 Replace all inline icons with bootstrap img; remove header status pill
+- [x] 3.4 Verify; bump to 0.1.12
 
 ## 4. Build, deploy & verify
-- [ ] 4.1 cargo test/lightspec pass; syntax + ID checks
+- [x] 4.1 cargo test/lightspec pass; syntax + ID checks
 - [ ] 4.2 Release build + deploy to /Applications
 - [ ] 4.3 Relaunch, confirm new version live; keep running
