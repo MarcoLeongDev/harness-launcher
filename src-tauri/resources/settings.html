@@ -250,14 +250,6 @@
           <svg id="ver-chevron" style="display:none" viewBox="0 0 16 16" fill="currentColor"><path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg>
         </div>
         <span class="ec-sep">:</span>
-        <div class="ec-select-wrap" id="host-wrap">
-          <select id="sel-host" class="ec-select" aria-label="Host" disabled>
-            <option value="127.0.0.1">127.0.0.1</option>
-            <option value="0.0.0.0">0.0.0.0</option>
-          </select>
-          <svg id="host-chevron" style="display:none" viewBox="0 0 16 16" fill="currentColor"><path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg>
-        </div>
-        <span class="ec-sep">:</span>
         <input id="inp-port" class="ec-port" type="number" min="1" max="65535" aria-label="Port" disabled />
         <div class="ec-actions">
           <button class="ec-btn icon-start" id="btn-toggle" title="Start"><i class="ico bi" data-ico="play-fill"></i></button>
@@ -424,7 +416,6 @@
     stIcon: $('st-icon'),
     toggle: $('btn-toggle'), restart: $('btn-restart'),
     engineVer: $('sel-version'), verWrap: $('ver-wrap'), verChevron: $('ver-chevron'),
-    host: $('sel-host'), hostWrap: $('host-wrap'), hostChevron: $('host-chevron'),
     engineTerm: $('engine-term'), engineTermToggle: $('engine-term-toggle'), engineTermOut: $('engine-term-out'),
     port: $('inp-port'),
     pre: $('chk-prerelease'),
@@ -452,6 +443,7 @@
   var elapsedTimer = null;
   var followOn = true;
   var stuckTimer = null;
+  var lastPhase = 'stopped';
 
   // ---------- tabs ----------
   var tabs = ['engine', 'versions', 'logs'];
@@ -652,6 +644,7 @@
     sel.ftHarness.textContent = s.activeVersion ? 'harness v' + s.activeVersion : 'harness —';
 
     var phase = s.enginePhase || (running ? 'running' : 'stopped');
+    lastPhase = phase;
 
     // Status icon
     var iconCls = 'stopped';
@@ -662,8 +655,8 @@
     sel.stIcon.className = 'ec-status-icon ' + iconCls;
     sel.stIcon.innerHTML = '<i class="ico bi" data-ico="' + iconIco + '"></i>';
 
-    // Running state: show version as text, host as text, port as text
-    // Stopped state: show version as dropdown, host as dropdown, port as input
+    // Running state: show version as text, port as text
+    // Stopped state: show version as dropdown, port as input
     var runningLike = phase !== 'stopped';
 
     if (runningLike) {
@@ -676,16 +669,6 @@
       sel.verWrap.innerHTML = '';
       sel.verWrap.appendChild(verText);
       sel.verWrap.style.cursor = 'default';
-
-      // Host as text
-      sel.host.style.display = 'none';
-      sel.hostChevron.style.display = 'none';
-      var hostText = document.createElement('span');
-      hostText.className = 'ec-ver';
-      hostText.textContent = '127.0.0.1';
-      sel.hostWrap.innerHTML = '';
-      sel.hostWrap.appendChild(hostText);
-      sel.hostWrap.style.cursor = 'default';
 
       // Port as text
       sel.port.type = 'text';
@@ -700,15 +683,6 @@
       sel.verChevron.style.display = '';
       sel.engineVer.disabled = false;
       sel.verWrap.style.cursor = 'pointer';
-
-      // Host as dropdown
-      sel.hostWrap.innerHTML = '';
-      sel.hostWrap.appendChild(sel.host);
-      sel.hostWrap.appendChild(sel.hostChevron);
-      sel.host.style.display = '';
-      sel.hostChevron.style.display = '';
-      sel.host.disabled = false;
-      sel.hostWrap.style.cursor = 'pointer';
 
       // Port as input
       sel.port.type = 'number';
@@ -853,11 +827,13 @@
   sel.engineVer.addEventListener('change', function () {
     var v = sel.engineVer.value;
     if (!v) return;
-    withCmd(function () { return invoke('install_and_switch', { version: v }); }, 'Switched');
+    // When stopped, selecting a version just records the choice (does not
+    // auto-launch); press Start to run it. When running we never show the
+    // dropdown, so this only fires in the stopped state.
+    withCmd(function () { return invoke('set_version', { version: v }); }, 'Version set');
   });
   sel.toggle.addEventListener('click', function () {
-    var isRunning = sel.toggle.classList.contains('stop');
-    if (isRunning) {
+    if (lastPhase === 'running') {
       withCmd(function () { return invoke('engine_stop', {}); }, 'Stopped');
     } else {
       withCmd(function () { return invoke('engine_start', {}); }, 'Started');
