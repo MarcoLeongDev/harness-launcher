@@ -24,3 +24,17 @@ Change: lightspec/changes/update-control-panel-and-branding (validated, all task
 
 ## Runtime note
 The currently running instance was left untouched during iteration (it hosts the session's harness on 127.0.0.1:3081). The final build v0.1.5 is installed; a relaunch swaps the old binary for the new one.
+---
+
+# Iteration 2 — Apple-style Control Panel (v0.1.7 → v0.1.9)
+
+Branch: feat/control-panel-apple-design (merged main after iteration 1; lightspec change archived)
+
+| # | Item | Fix | Commit | Version |
+|---|------|-----|--------|---------|
+| 1 | Engine/Port tab redesign — Apple-like | Full macOS Settings-style redesign: grouped translucent cells, SF-symbol-style inline icon set, icon-first engine controls (Start primary / Stop / Restart / Force subdued), status hero with animated running state, single port authority — the address appears exactly once (status line); port field shows supplementary text only when fallback applies. | 6c13e77 | 0.1.7 |
+| 2 | Version download felt fake / impossibly long | Root causes: installs ran warn-loglevel with progress disabled (silent for minutes) and no cache reuse, with 5-minute fetch timeouts (stalls/retries). Now prefer-offline (shared cache), fetch-retries=1, fetch-timeout=60000, http loglevel (real activity streams), live fetch counter as compact subtitle with ticking elapsed time, Apple-style download row (spinner, version, elapsed, Cancel) + collapsible Terminal. | c16d0a5 | 0.1.8 |
+| 3 | Logs tab — redundant log label | No Logs/Harness Logs title anywhere; tab name suffices. Minimal icon toolbar (refresh + follow) over output; removed text-y line-count status. | 35254e1 | 0.1.9 |
+
+Verification: cargo test 11/11, lightspec validate --all --strict 6/6, inline JS syntax + ID-wiring checks, npm flag smoke test on the registry, binary markers confirmed in the installed bundle.
+
