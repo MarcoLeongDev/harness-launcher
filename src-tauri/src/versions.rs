@@ -278,12 +278,12 @@ pub fn install_version(
             "--no-color",
             "--prefer-offline",
             "--fetch-retries=1",
-            "--fetch-timeout=60000",
+            "--fetch-timeout=30000",
             "--loglevel=http",
             "--progress=false",
             spec.as_str(),
         ],
-        Duration::from_secs(300),
+        Duration::from_secs(120),
         Some(&mut throttled_sink),
     )?;
     if crate::progress::cancel_requested(app) {
