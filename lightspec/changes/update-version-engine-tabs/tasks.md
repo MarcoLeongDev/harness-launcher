@@ -18,5 +18,5 @@
 
 ## 4. Build, deploy & verify
 - [x] 4.1 cargo test/lightspec pass; syntax + ID checks
-- [ ] 4.2 Release build + deploy to /Applications
-- [ ] 4.3 Relaunch, confirm new version live; keep running
+- [x] 4.2 Release build + deploy to /Applications
+- [x] 4.3 Relaunch, confirm new version live; keep running
