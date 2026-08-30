@@ -6,3 +6,5 @@ src-tauri/icons/icon.icns
 web-dist/
 src-tauri/gen/
 .DS_Store
+# unrelated tooling that may be dropped into the tree; never commit
+nous-tags-proxy.mjs
