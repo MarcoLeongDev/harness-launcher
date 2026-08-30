@@ -81,28 +81,36 @@
   .err { color: var(--err); }
   .ok2 { color: var(--ok); }
   /* engine card */
-  .ec-header { display: flex; align-items: center; gap: 14px; padding: 18px 18px 14px; }
-  .ec-status-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center;
+  .ec-row { display: flex; align-items: center; gap: 12px; padding: 14px 16px; }
+  .ec-status-icon { width: 28px; height: 28px; border-radius: 7px; display: flex; align-items: center;
     justify-content: center; flex: none; background: rgba(93,108,140,0.15);
     border: 1px solid rgba(93,108,140,0.4); color: var(--dim); }
-  .ec-status-icon svg { width: 18px; height: 18px; }
+  .ec-status-icon svg { width: 16px; height: 16px; }
   .ec-status-icon.running { background: rgba(48,209,88,0.12); border-color: rgba(48,209,88,0.45); color: var(--ok); }
   .ec-status-icon.running svg { animation: spin-gear 3s linear infinite; }
   .ec-status-icon.stopped { background: rgba(93,108,140,0.15); border-color: rgba(93,108,140,0.4); color: var(--dim); }
   .ec-status-icon.error { background: rgba(255,69,58,0.12); border-color: rgba(255,69,58,0.45); color: var(--err); }
   @keyframes spin-gear { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-  .ec-info { flex: 1; min-width: 0; }
-  .ec-ver { font-family: var(--mono); font-size: 14px; font-weight: 600; }
-  .ec-link { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--faint);
-    text-decoration: none; cursor: pointer; transition: color .15s; }
-  .ec-link:hover { color: var(--text); font-weight: 600; }
-  .ec-link svg { width: 12px; height: 12px; }
-  .ec-controls { display: flex; align-items: center; gap: 10px; padding: 0 18px 16px; }
-  .ec-btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-    height: 34px; padding: 0 16px; border-radius: 8px; font-size: 12.5px; font-weight: 600;
+  .ec-ver { font-family: var(--mono); font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .ec-select { background: none; border: none; color: var(--text); font-family: var(--mono);
+    font-size: 13px; font-weight: 600; cursor: pointer; padding: 0; appearance: none;
+    -webkit-appearance: none; }
+  .ec-select:focus { outline: none; }
+  .ec-select-wrap { display: inline-flex; align-items: center; gap: 2px; cursor: pointer; }
+  .ec-select-wrap svg { width: 10px; height: 10px; color: var(--faint); transition: transform .15s; }
+  .ec-sep { color: var(--faint); font-size: 13px; }
+  .ec-port { font-family: var(--mono); font-size: 13px; background: transparent; border: none;
+    color: var(--text); width: 50px; padding: 0; }
+  .ec-port:focus { outline: none; border-bottom: 1px solid var(--accent); }
+  .ec-link { font-family: var(--mono); font-size: 13px; color: var(--faint); text-decoration: none;
+    cursor: pointer; transition: color .15s; }
+  .ec-link:hover { color: var(--text); }
+  .ec-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+  .ec-btn { display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+    height: 30px; padding: 0 12px; border-radius: 7px; font-size: 12px; font-weight: 600;
     cursor: pointer; border: 1px solid var(--hair2); background: var(--cell); color: var(--text);
     transition: all .15s; }
-  .ec-btn svg { width: 16px; height: 16px; }
+  .ec-btn svg { width: 14px; height: 14px; }
   .ec-btn:hover { background: var(--cell-hover); }
   .ec-btn:active { transform: translateY(1px); }
   .ec-btn:disabled { opacity: 0.4; cursor: default; transform: none; }
@@ -111,9 +119,11 @@
   .ec-btn.stop { background: var(--err); border-color: var(--err); color: #fff; }
   .ec-btn.stop:hover { background: #ff6259; }
   .ec-btn.restart { background: transparent; }
-  .ec-field { display: flex; flex-direction: column; gap: 4px; }
-  .ec-field .flabel { font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px;
-    color: var(--faint); font-weight: 650; }
+  .ec-apply { display: inline-flex; align-items: center; justify-content: center;
+    width: 24px; height: 24px; border-radius: 5px; border: 1px solid var(--hair2);
+    background: var(--cell); color: var(--text); cursor: pointer; transition: all .15s; }
+  .ec-apply svg { width: 12px; height: 12px; }
+  .ec-apply:hover { background: var(--cell-hover); }
   .ecterm-toggle { display: inline-flex; align-items: center; gap: 6px; background: none;
     border: none; color: var(--dim); font-size: 11.5px; cursor: pointer; padding: 8px 12px;
     border-radius: 6px; margin: 4px; }
@@ -240,30 +250,29 @@
   <!-- ============ ENGINE ============ -->
   <section class="tabpanel active" id="tab-engine" role="tabpanel" aria-labelledby="tab-btn-engine">
     <div class="group">
-      <div class="ec-header">
+      <div class="ec-row">
         <div class="ec-status-icon stopped" id="st-icon" aria-label="Engine status">
           <i class="ico bi" data-ico="moon"></i>
         </div>
-        <div class="ec-info">
-          <div class="ec-ver" id="st-title">v0.0.0</div>
-          <a class="ec-link" id="st-link" href="#" target="_blank" rel="noreferrer">127.0.0.1:0 <i class="ico bi" data-ico="box-arrow-up-right"></i></a>
+        <div class="ec-select-wrap" id="ver-wrap">
+          <select id="sel-version" class="ec-select" aria-label="Engine version" disabled></select>
+          <svg id="ver-chevron" style="display:none" viewBox="0 0 16 16" fill="currentColor"><path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg>
         </div>
-        <div class="ec-field">
-          <span class="flabel">Version</span>
-          <select id="sel-version" aria-label="Engine version" disabled></select>
+        <span class="ec-sep">:</span>
+        <div class="ec-select-wrap" id="host-wrap">
+          <select id="sel-host" class="ec-select" aria-label="Host" disabled>
+            <option value="127.0.0.1">127.0.0.1</option>
+            <option value="0.0.0.0">0.0.0.0</option>
+          </select>
+          <svg id="host-chevron" style="display:none" viewBox="0 0 16 16" fill="currentColor"><path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg>
         </div>
-        <div class="ec-field">
-          <span class="flabel">Port</span>
-          <div style="display:flex; gap:6px; align-items:center">
-            <input id="inp-port" type="number" min="1" max="65535" style="width:82px" aria-label="Local port" disabled />
-            <button class="btn" id="btn-port" disabled>Apply</button>
-          </div>
+        <span class="ec-sep">:</span>
+        <input id="inp-port" class="ec-port" type="number" min="1" max="65535" aria-label="Port" disabled />
+        <button class="ec-apply" id="btn-port" disabled title="Apply port"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425z"/></svg></button>
+        <div class="ec-actions">
+          <button class="ec-btn start" id="btn-toggle"><i class="ico bi" data-ico="play-fill"></i> Start</button>
+          <button class="ec-btn restart" id="btn-restart" disabled title="Restart"><i class="ico bi" data-ico="arrow-repeat"></i></button>
         </div>
-      </div>
-      <div class="ec-controls">
-        <button class="ec-btn start" id="btn-toggle"><i class="ico bi" data-ico="play-fill"></i> Start</button>
-        <button class="ec-btn restart" id="btn-restart" disabled title="Restart the engine"><i class="ico bi" data-ico="arrow-repeat"></i> Restart</button>
-        <span class="hint" id="port-hint" style="margin-left:auto"></span>
       </div>
     </div>
 
@@ -422,11 +431,12 @@
   }
 
   var sel = {
-    stIcon: $('st-icon'), stTitle: $('st-title'), stLink: $('st-link'),
+    stIcon: $('st-icon'),
     toggle: $('btn-toggle'), restart: $('btn-restart'),
-    engineVer: $('sel-version'),
+    engineVer: $('sel-version'), verWrap: $('ver-wrap'), verChevron: $('ver-chevron'),
+    host: $('sel-host'), hostWrap: $('host-wrap'), hostChevron: $('host-chevron'),
     engineTerm: $('engine-term'), engineTermToggle: $('engine-term-toggle'), engineTermOut: $('engine-term-out'),
-    port: $('inp-port'), btnPort: $('btn-port'), portHint: $('port-hint'),
+    port: $('inp-port'), btnPort: $('btn-port'),
     pre: $('chk-prerelease'),
     intervalSel: $('sel-interval'), installSel: $('sel-install-ver'), btnInstall: $('btn-install'),
     verTbody: $('ver-tbody'),
@@ -451,6 +461,7 @@
   var opKey = null;
   var elapsedTimer = null;
   var followOn = true;
+  var stuckTimer = null;
 
   // ---------- tabs ----------
   var tabs = ['engine', 'versions', 'logs'];
@@ -518,15 +529,27 @@
         sel.dlVer.textContent = 'Installing DeepSeek Harness v' + (p.version || '');
         sel.dlCmd.textContent = 'npm install @deepseek-ai/dsh@' + (p.version || '…');
         sel.dlStatus.textContent = 'preparing…';
+        // Reset stuck timer on new operation
+        if (stuckTimer) clearTimeout(stuckTimer);
+        stuckTimer = null;
       }
       sel.dlRow.hidden = false;
       sel.dlDetail.hidden = false;
       if (p && p.message) sel.dlStatus.textContent = p.message;
       tickElapsed();
+      // Start stuck detection timer (60 seconds without progress)
+      if (stuckTimer) clearTimeout(stuckTimer);
+      stuckTimer = setTimeout(function () {
+        if (sel.dlRow && !sel.dlRow.hidden) {
+          sel.dlStatus.textContent = 'stuck? click Cancel to retry';
+          sel.dlStatus.style.color = 'var(--warn)';
+        }
+      }, 60000);
     } else {
       sel.dlRow.hidden = true;
       sel.dlDetail.hidden = true;
       clearElapsed();
+      if (stuckTimer) { clearTimeout(stuckTimer); stuckTimer = null; }
     }
   }
 
@@ -649,17 +672,63 @@
     sel.stIcon.className = 'ec-status-icon ' + iconCls;
     sel.stIcon.innerHTML = '<i class="ico bi" data-ico="' + iconIco + '"></i>';
 
-    // Version and link
-    var verText = s.activeVersion ? 'v' + s.activeVersion : 'v0.0.0';
-    sel.stTitle.textContent = verText;
-    var port = s.actualPort || 0;
-    var url = 'http://127.0.0.1:' + port;
-    sel.stLink.textContent = '';
-    sel.stLink.innerHTML = '127.0.0.1:' + port + ' <i class="ico bi" data-ico="box-arrow-up-right"></i>';
-    sel.stLink.href = url;
-
-    // Toggle button state
+    // Running state: show version as text, host as text, port as text
+    // Stopped state: show version as dropdown, host as dropdown, port as input
     var runningLike = phase !== 'stopped';
+
+    if (runningLike) {
+      // Version as text
+      sel.engineVer.style.display = 'none';
+      sel.verChevron.style.display = 'none';
+      var verText = document.createElement('span');
+      verText.className = 'ec-ver';
+      verText.textContent = s.activeVersion ? 'v' + s.activeVersion : 'v0.0.0';
+      sel.verWrap.innerHTML = '';
+      sel.verWrap.appendChild(verText);
+      sel.verWrap.style.cursor = 'default';
+
+      // Host as text
+      sel.host.style.display = 'none';
+      sel.hostChevron.style.display = 'none';
+      var hostText = document.createElement('span');
+      hostText.className = 'ec-ver';
+      hostText.textContent = '127.0.0.1';
+      sel.hostWrap.innerHTML = '';
+      sel.hostWrap.appendChild(hostText);
+      sel.hostWrap.style.cursor = 'default';
+
+      // Port as text
+      sel.port.type = 'text';
+      sel.port.readOnly = true;
+      sel.port.value = s.actualPort || 0;
+      sel.btnPort.disabled = true;
+    } else {
+      // Version as dropdown
+      sel.verWrap.innerHTML = '';
+      sel.verWrap.appendChild(sel.engineVer);
+      sel.verWrap.appendChild(sel.verChevron);
+      sel.engineVer.style.display = '';
+      sel.verChevron.style.display = '';
+      sel.engineVer.disabled = false;
+      sel.verWrap.style.cursor = 'pointer';
+
+      // Host as dropdown
+      sel.hostWrap.innerHTML = '';
+      sel.hostWrap.appendChild(sel.host);
+      sel.hostWrap.appendChild(sel.hostChevron);
+      sel.host.style.display = '';
+      sel.hostChevron.style.display = '';
+      sel.host.disabled = false;
+      sel.hostWrap.style.cursor = 'pointer';
+
+      // Port as input
+      sel.port.type = 'number';
+      sel.port.readOnly = false;
+      sel.port.disabled = false;
+      sel.btnPort.disabled = false;
+    }
+
+    // Toggle button
     if (runningLike) {
       sel.toggle.className = 'ec-btn stop';
       sel.toggle.innerHTML = '<i class="ico bi" data-ico="pause-fill"></i> Stop';
@@ -670,10 +739,18 @@
     sel.toggle.disabled = false;
     sel.restart.disabled = !runningLike;
 
-    // card controls: version + port are locked while the engine is running
-    sel.engineVer.disabled = runningLike;
-    sel.port.disabled = runningLike;
-    sel.btnPort.disabled = runningLike;
+    // version dropdown lists downloaded versions only
+    var inst = s.installedVersions || [];
+    var curV = s.activeVersion;
+    sel.engineVer.innerHTML = '';
+    inst.forEach(function (v) {
+      var o = document.createElement('option');
+      o.value = v; o.textContent = 'v' + v;
+      sel.engineVer.appendChild(o);
+    });
+    if (curV && inst.indexOf(curV) !== -1) sel.engineVer.value = curV;
+
+    if (!runningLike && sel.port.value === '') sel.port.value = String(s.port);
 
     // version dropdown lists downloaded versions only
     var inst = s.installedVersions || [];
@@ -838,12 +915,20 @@
   // download stop / terminal toggle
   sel.stopDown.addEventListener('click', function () {
     sel.stopDown.disabled = true;
+    sel.stopDown.textContent = 'Stopping…';
     appendTermLine('info', 'Stopping download…');
     invoke('cancel_operation').then(function (res) {
       appendTermLine('info', (res && res.message) || 'stop requested');
+      sel.dlStatus.textContent = 'cancelled';
+      sel.dlStatus.style.color = '';
     }).catch(function (e) {
       appendTermLine('err', String(e && e.message || e));
-    }).finally(function () { setTimeout(function () { sel.stopDown.disabled = false; }, 1500); });
+    }).finally(function () {
+      setTimeout(function () {
+        sel.stopDown.disabled = false;
+        sel.stopDown.textContent = 'Cancel';
+      }, 2000);
+    });
   });
   sel.termToggle.addEventListener('click', function () {
     termOpen = !termOpen;
