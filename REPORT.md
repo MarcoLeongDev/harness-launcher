@@ -38,3 +38,18 @@ Branch: feat/control-panel-apple-design (merged main after iteration 1; lightspe
 
 Verification: cargo test 11/11, lightspec validate --all --strict 6/6, inline JS syntax + ID-wiring checks, npm flag smoke test on the registry, binary markers confirmed in the installed bundle.
 
+
+---
+
+# Iteration 3 — Versions table + Engine card (v0.1.10 → v0.1.12)
+
+Branch: feat/control-panel-version-engine-overhaul (merged main; previous change archived)
+
+| # | Item | What was done | Commit | Version |
+|---|------|---------------|--------|---------|
+| 1 | Version tab → table view | Installed versions as a table: per-row status tag, Set default (picks the active version), trash button with an anchored confirmation popover before deletion. Table header: Auto update toggle, Check for update now, and a Check-every dropdown (6–24 hours then 1–7 days, default 12h). Update banner + Install-version row (with pre-release toggle) retained. | 727e1fd | 0.1.10 |
+| 2 | Engine tab → collection/card view | First line: status icon (running/stopped/errored), version dropdown (enabled only while stopped; downloaded versions only), port field (enabled only while stopped). Second line: circular icon-only buttons with text underneath — Start/Stop (play/pause) and Restart (circular arrow), plus subdued Force. Run-time output terminal collapsed by default. | f09bec3 | 0.1.11 |
+| 3 | Bootstrap icons + remove status pill | 22 Bootstrap icon SVG files copied as real files into resources/bootstrap-icons, bundled and served via dsh-ui:// handler at runtime (raw files, never hardcoded); panel icons load from them; the header status pill (colored dot) removed — status is shown by the Engine card's bootstrap status icon. | fc516bc | 0.1.12 |
+
+Verification: cargo test 11/11, lightspec validate --all --strict 6/6, JS syntax + ID-wiring checks per item, icon presence at runtime bundle path (22 files), binary markers per version, bundle version 0.1.10 → 0.1.12 confirmed after each deploy.
+
