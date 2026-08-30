@@ -4,15 +4,15 @@
 TBD - created by archiving change add-dsh-launcher. Update Purpose after archive.
 ## Requirements
 ### Requirement: Menubar-Only Presence
-The launcher SHALL run as a macOS menu-bar (tray) application: it SHALL show a tray icon, SHALL NOT show a Dock icon, and SHALL keep running when all windows are closed, so closing the window never quits the app.
+The launcher SHALL run as a macOS menu-bar (tray) application: it SHALL show a tray icon, SHALL NOT show a Dock icon, and SHALL keep running when all windows are closed, so closing the window never quits the app. The tray icon SHALL be a monochrome template glyph derived from the provided brand logo, and the application icon SHALL be derived from the provided brand logo at `logo/DSH Launcher.png`.
 
 #### Scenario: Launch
 - **WHEN** the app launches
 - **THEN** a tray icon appears and no Dock icon is shown
 
-#### Scenario: Window closed
-- **WHEN** the user closes the window
-- **THEN** the window hides, the app keeps running with the tray icon, and the harness keeps serving
+#### Scenario: Branded icons
+- **WHEN** the app is installed with the provided logo present in the repository
+- **THEN** the Finder/Dock application icon and the menu-bar icon visually match the provided logo (or its mark)
 
 ### Requirement: Tray Menu Controls
 The launcher SHALL provide a tray menu offering at least: show/hide the window, open the settings window, start/stop/restart/force-restart the engine, open the harness in the default browser, update the harness, and quit the app. Start/Stop items SHALL be enabled or disabled according to the current engine state.
