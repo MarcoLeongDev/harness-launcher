@@ -100,11 +100,13 @@
   .ec-field .flabel { font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px;
     color: var(--faint); font-weight: 650; }
   .ec-line2 { display: flex; justify-content: space-evenly; gap: 12px; padding: 10px 12px 18px; }
-  .cbtn { display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 5px; width: 66px; height: 66px; border-radius: 50%; background: var(--cell);
-    border: 1px solid var(--hair2); color: var(--text); cursor: pointer; font-size: 10.5px;
-    font-weight: 600; transition: all .15s; }
+  .cbtn-wrap { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .cbtn { display: flex; align-items: center; justify-content: center;
+    width: 56px; height: 56px; border-radius: 50%; background: var(--cell);
+    border: 1px solid var(--hair2); color: var(--text); cursor: pointer;
+    transition: all .15s; }
   .cbtn svg { width: 22px; height: 22px; }
+  .cbtn-lbl { font-size: 10px; font-weight: 600; color: var(--dim); }
   .cbtn:hover { background: var(--cell-hover); }
   .cbtn:disabled { opacity: 0.35; cursor: default; transform: none; }
   .cbtn.primary { background: var(--ok); border-color: var(--ok); color: #04231a; }
@@ -259,10 +261,22 @@
         </div>
       </div>
       <div class="ec-line2">
-        <button class="cbtn primary" id="btn-start"><i class="ico bi" data-ico="play-fill"></i> Start</button>
-        <button class="cbtn" id="btn-stop" disabled title="Stop the engine"><i class="ico bi" data-ico="pause-fill"></i> Stop</button>
-        <button class="cbtn" id="btn-restart" disabled title="Restart the engine"><i class="ico bi" data-ico="arrow-repeat"></i> Restart</button>
-        <button class="cbtn subdued" id="btn-force" title="Force restart — kill anything on the port"><i class="ico bi" data-ico="lightning-charge-fill"></i> Force</button>
+        <div class="cbtn-wrap">
+          <button class="cbtn primary" id="btn-start"><i class="ico bi" data-ico="play-fill"></i></button>
+          <span class="cbtn-lbl">Start</span>
+        </div>
+        <div class="cbtn-wrap">
+          <button class="cbtn" id="btn-stop" disabled title="Stop the engine"><i class="ico bi" data-ico="pause-fill"></i></button>
+          <span class="cbtn-lbl">Stop</span>
+        </div>
+        <div class="cbtn-wrap">
+          <button class="cbtn" id="btn-restart" disabled title="Restart the engine"><i class="ico bi" data-ico="arrow-repeat"></i></button>
+          <span class="cbtn-lbl">Restart</span>
+        </div>
+        <div class="cbtn-wrap">
+          <button class="cbtn subdued" id="btn-force" title="Force restart — kill anything on the port"><i class="ico bi" data-ico="lightning-charge-fill"></i></button>
+          <span class="cbtn-lbl">Force</span>
+        </div>
       </div>
       <div class="cell" style="padding-top:0;padding-bottom:10px;border-top:none;min-height:0">
         <span class="hint" id="port-hint"></span>
@@ -612,8 +626,6 @@
     sel.ftHarness.textContent = s.activeVersion ? 'harness v' + s.activeVersion : 'harness —';
 
     var phase = s.enginePhase || (running ? 'running' : 'stopped');
-    sel.phase.textContent = phase;
-    sel.dot.className = phase === 'running' ? 'ok' : (phase === 'stopped' ? 'stop' : 'err');
 
     var iconCls = 'stop';
     if (phase === 'running') iconCls = 'ok';
@@ -657,10 +669,8 @@
       : '';
 
     sel.auto.checked = !!s.autoUpdateHarness;
-    sel.interval.value = String(s.autoUpdateIntervalHours || 6);
+    sel.intervalSel.value = String(s.autoUpdateIntervalHours || 6);
     sel.pre.checked = !!s.includePrerelease;
-    sel.rollback.disabled = !s.previousVersion;
-    sel.rollback.title = s.previousVersion ? 'Roll back to v' + s.previousVersion : 'No previous version';
 
     if (s.updateAvailable && s.latestRemote) {
       sel.banner.style.display = '';
