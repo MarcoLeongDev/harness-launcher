@@ -1,0 +1,613 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>DeepSeek Harness Launcher - Control Panel</title>
+<style>
+  :root {
+    --bg0: #060b15; --bg1: #0a1120;
+    --panel: #101a2e; --panel2: #0c1524; --panel3: #0a101d;
+    --border: #1d2c47; --border2: #2a3d61;
+    --text: #e8eef8; --muted: #93a7c4; --dim: #5f7294;
+    --accent: #3b82f6; --accent2: #22d3ee; --accent-soft: rgba(59,130,246,0.14);
+    --ok: #34d399; --warn: #fbbf24; --err: #f87171; --danger: #ef4444;
+    --radius: 12px; --radius-sm: 8px;
+    --shadow: 0 10px 30px rgba(0,0,0,0.35);
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; color: var(--text);
+    font: 13px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background:
+      radial-gradient(1000px 500px at 85% -10%, rgba(34,211,238,0.09), transparent 60%),
+      radial-gradient(900px 500px at -10% 110%, rgba(59,130,246,0.10), transparent 55%),
+      linear-gradient(180deg, var(--bg1), var(--bg0));
+    min-height: 100vh; display: flex; flex-direction: column;
+  }
+  /* Brand header */
+  header { display: flex; align-items: center; gap: 12px;
+    padding: 14px 18px; border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, rgba(17,26,46,0.9), rgba(10,17,32,0.55));
+    backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 10; }
+  .logo { width: 40px; height: 40px; border-radius: 10px; overflow: hidden;
+    box-shadow: 0 2px 12px rgba(34,211,238,0.25); border: 1px solid var(--border2); flex: none; }
+  .logo img { width: 100%; height: 100%; display: block; object-fit: cover; }
+  .brand h1 { margin: 0; font-size: 14.5px; font-weight: 650; letter-spacing: 0.2px;
+    background: linear-gradient(90deg, #fff, #bfe9ff);
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  .brand .sub { color: var(--muted); font-size: 11px; margin-top: 1px; }
+  header .spacer { flex: 1; }
+  .ver-chip { font-family: var(--mono); font-size: 10.5px; color: var(--accent2);
+    background: var(--accent-soft); border: 1px solid rgba(34,211,238,0.3);
+    padding: 3px 9px; border-radius: 999px; }
+  .live-dot { display: inline-flex; align-items: center; gap: 6px; font-size: 11px;
+    color: var(--muted); border: 1px solid var(--border); background: var(--panel2);
+    padding: 4px 10px; border-radius: 999px; }
+  .live-dot i { width: 8px; height: 8px; border-radius: 50%; background: var(--warn); display: inline-block; }
+  .live-dot i.ok { background: var(--ok); box-shadow: 0 0 8px rgba(52,211,153,0.8); }
+  .live-dot i.stop { background: var(--dim); }
+  .live-dot i.err { background: var(--err); }
+  main { flex: 1; padding: 16px 18px 22px; display: grid; gap: 14px;
+    grid-template-columns: 1fr 1fr; align-content: start; }
+  main .full { grid-column: 1 / -1; }
+  .card { background: linear-gradient(180deg, rgba(16,26,46,0.85), rgba(12,21,36,0.85));
+    border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px;
+    box-shadow: var(--shadow); }
+  .card h2 { margin: 0 0 12px; font-size: 11px; text-transform: uppercase;
+    letter-spacing: 1.1px; color: var(--dim); font-weight: 700;
+    display: flex; align-items: center; gap: 8px; }
+  .card h2::before { content: ""; width: 3px; height: 12px; border-radius: 2px;
+    background: linear-gradient(180deg, var(--accent), var(--accent2)); }
+  .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 7px 0; }
+  .big { font-weight: 650; }
+  .muted { color: var(--muted); font-size: 11.5px; }
+  .dim { color: var(--dim); font-size: 11px; }
+  .badge { padding: 2px 10px; border-radius: 999px; font-size: 10.5px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.5px; background: var(--panel3);
+    border: 1px solid var(--border2); color: var(--muted); }
+  .badge.ok { color: #0a2318; background: var(--ok); border-color: transparent; }
+  .badge.busy { color: var(--warn); border-color: rgba(251,191,36,0.4); }
+  .badge.stop { color: var(--dim); }
+  input[type=number], input[type=text], select {
+    background: var(--panel2); color: var(--text); border: 1px solid var(--border2);
+    border-radius: var(--radius-sm); padding: 6px 9px; font-size: 12.5px; min-width: 0;
+    transition: border-color .15s, box-shadow .15s; }
+  input:focus, select:focus { outline: none; border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.18); }
+  button { background: var(--accent); border: none; color: #fff; border-radius: var(--radius-sm);
+    padding: 6px 13px; font-size: 12.5px; font-weight: 550; cursor: pointer;
+    transition: background .15s, transform .05s, box-shadow .15s, opacity .15s; }
+  button:hover { background: #2f6fed; box-shadow: 0 3px 12px rgba(59,130,246,0.35); }
+  button:active { transform: translateY(1px); }
+  button:disabled { opacity: 0.4; cursor: default; box-shadow: none; }
+  button.ghost { background: transparent; border: 1px solid var(--border2); color: #c7d6ec; }
+  button.ghost:hover { background: rgba(59,130,246,0.12); border-color: var(--accent); box-shadow: none; }
+  button.danger { background: var(--danger); }
+  button.danger:hover { background: #dc2626; box-shadow: 0 3px 12px rgba(239,68,68,0.3); }
+  button.ok { background: linear-gradient(135deg, #10b981, #34d399); color: #04231a; }
+  button.ok:hover { background: linear-gradient(135deg, #059669, #10b981); box-shadow: 0 3px 12px rgba(52,211,153,0.3); }
+  button.sm { padding: 3px 9px; font-size: 11.5px; }
+  a { color: #7dd3fc; }
+  .err { color: var(--err); }
+  .ok-text { color: var(--ok); }
+  /* Status hero */
+  .hero { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+  .hero .engine-state { display: flex; align-items: center; gap: 12px; }
+  .hero .dot { width: 13px; height: 13px; border-radius: 50%; background: var(--warn);
+    box-shadow: 0 0 12px rgba(251,191,36,0.5); }
+  .hero .dot.ok { background: var(--ok); box-shadow: 0 0 12px rgba(52,211,153,0.6); }
+  .hero .dot.stop { background: var(--dim); box-shadow: none; }
+  .hero .dot.err { background: var(--err); box-shadow: 0 0 12px rgba(239,68,68,0.5); }
+  .hero .sep { width: 1px; height: 26px; background: var(--border2); }
+  .hero .btn-group { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+  /* Progress */
+  .progress { margin-top: 10px; }
+  .progress.hidden { display: none; }
+  .bar-track { height: 8px; border-radius: 5px; background: #0a111f; overflow: hidden;
+    position: relative; border: 1px solid var(--border); }
+  .bar-fill { height: 100%; width: 0%; border-radius: 5px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    transition: width 0.25s ease; }
+  .bar-track.indet .bar-fill { width: 34%; animation: slide 1.2s ease-in-out infinite; }
+  @keyframes slide { 0% { margin-left: -34%; } 100% { margin-left: 100%; } }
+  .prog-phase { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.9px;
+    color: var(--accent2); font-weight: 700; }
+  .prog-msg { margin-top: 4px; font-size: 11.5px; color: var(--muted); word-break: break-word; }
+  /* Terminal (only while downloading) */
+  .terminal { margin-top: 12px; border: 1px solid #12233c; border-radius: 10px; overflow: hidden;
+    background: #04080f; box-shadow: inset 0 1px 0 rgba(255,255,255,0.03); }
+  .terminal.hidden { display: none; }
+  .term-head { display: flex; align-items: center; gap: 8px; padding: 7px 12px;
+    background: #0a1322; border-bottom: 1px solid #12233c; }
+  .term-head .lights { display: flex; gap: 5px; }
+  .term-head .lights i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  .term-head .lights i:nth-child(1) { background: #f87171; }
+  .term-head .lights i:nth-child(2) { background: #fbbf24; }
+  .term-head .lights i:nth-child(3) { background: #34d399; }
+  .term-title { font-family: var(--mono); font-size: 10.5px; color: var(--muted);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .term-spinner { width: 11px; height: 11px; border: 2px solid #1e3a5f; border-top-color: var(--accent2);
+    border-radius: 50%; animation: spin 0.7s linear infinite; margin-left: auto; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .term-body { position: relative; }
+  .term-out { margin: 0; padding: 10px 12px 44px; max-height: 240px; overflow: auto;
+    font: 11px/1.55 var(--mono); color: #9fd0c9; white-space: pre-wrap; word-break: break-all; }
+  .term-out .ln { display: block; }
+  .term-out .ln.out { color: #a5e3ff; }
+  .term-out .ln.info { color: #8ecdf7; font-weight: 600; }
+  .term-out .ln.err { color: #ff8a8a; }
+  .stop-btn { position: absolute; right: 10px; bottom: 10px; display: inline-flex;
+    align-items: center; gap: 6px; background: rgba(239,68,68,0.92); color: #fff;
+    border: 1px solid rgba(255,255,255,0.18); border-radius: 7px; padding: 5px 12px;
+    font-size: 12px; font-weight: 650; cursor: pointer; box-shadow: 0 4px 14px rgba(239,68,68,0.4); }
+  .stop-btn:hover { background: #ff5252; }
+  .stop-btn:disabled { opacity: 0.55; cursor: default; }
+  .stop-btn .sq { width: 8px; height: 8px; background: #fff; border-radius: 1.5px; display: inline-block; }
+  /* Installed versions list */
+  .inst-list { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+  .inst-row { display: flex; align-items: center; gap: 8px; padding: 7px 10px;
+    background: var(--panel2); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+  .inst-row .ver { font-family: var(--mono); font-size: 12px; font-weight: 600; }
+  .inst-row .flags { display: flex; gap: 5px; }
+  .inst-row .tag { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px;
+    padding: 1px 7px; border-radius: 999px; }
+  .inst-row .tag.active { background: rgba(52,211,153,0.16); color: var(--ok); border: 1px solid rgba(52,211,153,0.35); }
+  .inst-row .tag.prev { background: rgba(251,191,36,0.12); color: var(--warn); border: 1px solid rgba(251,191,36,0.3); }
+  .inst-row .tag.none { color: var(--dim); }
+  .inst-row .size { color: var(--dim); font-size: 10.5px; }
+  .inst-row .del { margin-left: auto; }
+  pre.logs { background: var(--panel3); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 10px; font: 11px/1.45 var(--mono); color: #8fd0b0; max-height: 220px; overflow: auto;
+    white-space: pre-wrap; word-break: break-all; margin: 4px 0 0; }
+  footer { padding: 12px 18px; border-top: 1px solid var(--border);
+    display: flex; gap: 8px; align-items: center; background: rgba(10,17,32,0.6); }
+  .check-result { font-size: 11px; }
+  @media (max-width: 760px) { main { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><img id="brand-logo" src="dsh-ui://localhost/brand/logo.png" alt="DeepSeek Harness Launcher logo" /></div>
+  <div class="brand">
+    <h1>DeepSeek Harness Launcher</h1>
+    <div class="sub">Control Panel &middot; manage the DeepSeek Harness engine</div>
+  </div>
+  <div class="spacer"></div>
+  <span class="live-dot"><i id="st-dot"></i><span id="st-phase">stopped</span></span>
+  <span id="app-ver" class="ver-chip">app v0.1.0</span>
+</header>
+
+<main>
+  <section class="card full">
+    <h2>Engine</h2>
+    <div class="hero">
+      <div class="engine-state">
+        <span id="st-dot-lg" class="dot stop"></span>
+        <div>
+          <div class="big" id="st-version">no version installed</div>
+          <div class="muted" id="st-port">port: —</div>
+        </div>
+      </div>
+      <div class="sep"></div>
+      <div class="muted">
+        <a id="st-url" href="#" target="_blank" rel="noreferrer">—</a>
+      </div>
+      <div class="btn-group">
+        <button id="btn-start" class="ok">Start</button>
+        <button id="btn-stop" class="ghost">Stop</button>
+        <button id="btn-restart" class="ghost">Restart</button>
+        <button id="btn-force" class="danger">Force Restart</button>
+        <button id="btn-open-harness" class="ghost">Open Harness</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="card full">
+    <h2>Version &amp; Update</h2>
+    <div class="row">
+      <select id="sel-version" style="flex:1"></select>
+      <button id="btn-install">Install &amp; Switch</button>
+      <button id="btn-update" class="ghost">Update to latest</button>
+      <button id="btn-rollback" class="ghost">Rollback</button>
+      <label class="muted" style="display:flex;align-items:center;gap:5px;margin-left:auto">
+        <input type="checkbox" id="chk-prerelease"> Pre-release
+      </label>
+    </div>
+    <div class="progress hidden" id="prog">
+      <div class="prog-phase" id="prog-phase">preparing</div>
+      <div class="prog-msg" id="prog-msg">…</div>
+      <div class="bar-track" id="prog-track"><div class="bar-fill" id="prog-bar"></div></div>
+    </div>
+    <!-- Terminal: visible only while a version is downloading -->
+    <div class="terminal hidden" id="term">
+      <div class="term-head">
+        <span class="lights"><i></i><i></i><i></i></span>
+        <span class="term-title" id="term-title">npm install @deepseek-ai/dsh@…</span>
+        <span class="term-spinner"></span>
+      </div>
+      <div class="term-body">
+        <pre class="term-out" id="term-out"></pre>
+        <button class="stop-btn" id="btn-stop-download"><span class="sq"></span> Stop</button>
+      </div>
+    </div>
+    <div class="inst-list" id="inst-list"></div>
+    <div class="row muted" id="op-result"></div>
+  </section>
+
+  <section class="card">
+    <h2>Port (localhost)</h2>
+    <div class="row">
+      <input id="inp-port" type="number" min="1" max="65535" style="width:105px" title="Desired loopback port" />
+      <button id="btn-port" class="ghost">Apply</button>
+    </div>
+    <div class="row muted" id="port-actual"></div>
+  </section>
+
+  <section class="card">
+    <h2>Auto-Update</h2>
+    <div class="row">
+      <label class="muted" style="display:flex;align-items:center;gap:5px">
+        <input type="checkbox" id="chk-autoupdate"> Auto-check every
+      </label>
+      <input id="inp-interval" type="number" min="1" max="720" style="width:64px" /> h
+      <button id="btn-check" class="ghost" style="margin-left:auto">Check now</button>
+    </div>
+    <div class="row check-result muted" id="check-result"></div>
+  </section>
+
+  <section class="card full">
+    <h2>Harness Logs</h2>
+    <div class="row">
+      <button id="btn-log-refresh" class="ghost">Refresh tail</button>
+      <label class="muted" style="display:flex;align-items:center;gap:5px;margin-left:auto">
+        <input type="checkbox" id="chk-log-follow" checked> Auto-follow
+      </label>
+    </div>
+    <pre class="logs" id="log-tail">(no logs yet)</pre>
+  </section>
+</main>
+
+<footer>
+  <button id="btn-browser" class="ghost">Open in Browser</button>
+  <button id="btn-quit" class="danger" style="margin-left:auto">Quit DeepSeek Harness Launcher</button>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+  if (window.__DSH_CP__) return;
+  window.__DSH_CP__ = true;
+
+  function invoke(cmd, args) {
+    var core = window.__TAURI__ && window.__TAURI__.core;
+    if (core && typeof core.invoke === 'function') return core.invoke(cmd, args || {});
+    if (window.__TAURI_INTERNALS__ && typeof window.__TAURI_INTERNALS__.invoke === 'function')
+      return window.__TAURI_INTERNALS__.invoke(cmd, args || {}, undefined);
+    return Promise.reject(new Error('Tauri IPC unavailable in this context'));
+  }
+  function listen(evt, cb) {
+    var ev = window.__TAURI__ && window.__TAURI__.event;
+    if (ev && typeof ev.listen === 'function') {
+      return ev.listen(evt, function (e) { cb(e.payload); });
+    }
+    return Promise.resolve();
+  }
+
+  var $ = function (id) { return document.getElementById(id); };
+  var sel = {
+    dot: $('st-dot'), dotLg: $('st-dot-lg'), phase: $('st-phase'), version: $('st-version'), port: $('st-port'),
+    url: $('st-url'), start: $('btn-start'), stop: $('btn-stop'), restart: $('btn-restart'),
+    force: $('btn-force'), openHarness: $('btn-open-harness'),
+    verSel: $('sel-version'), install: $('btn-install'), update: $('btn-update'), rollback: $('btn-rollback'),
+    pre: $('chk-prerelease'),
+    prog: $('prog'), progPhase: $('prog-phase'), progMsg: $('prog-msg'),
+    progBar: $('prog-bar'), progTrack: $('prog-track'),
+    term: $('term'), termTitle: $('term-title'), termOut: $('term-out'), stopDown: $('btn-stop-download'),
+    instList: $('inst-list'), result: $('op-result'),
+    port: $('inp-port'), btnPort: $('btn-port'), portActual: $('port-actual'),
+    auto: $('chk-autoupdate'), interval: $('inp-interval'), check: $('btn-check'),
+    checkResult: $('check-result'), logRefresh: $('btn-log-refresh'), logFollow: $('chk-log-follow'),
+    logTail: $('log-tail'), browser: $('btn-browser'), quit: $('btn-quit'), appVer: $('app-ver')
+  };
+
+  var downloadingOps = { install: 1, update: 1, rollback: 1 };
+  var downloadingPhases = { registry: 1, installing: 1, verifying: 1 };
+  var termVisible = false;
+  var termOpKey = null;
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function setResult(text, isErr) {
+    sel.result.textContent = text || '';
+    sel.result.className = isErr ? 'err' : 'ok-text';
+    if (text) setTimeout(function () { sel.result.textContent = ''; }, 8000);
+  }
+  function setCheckResult(text, isErr) {
+    sel.checkResult.textContent = text || '';
+    sel.checkResult.className = isErr ? 'err' : 'muted';
+  }
+  function busy(on) {
+    var btns = [sel.start, sel.stop, sel.restart, sel.force, sel.install, sel.update, sel.rollback, sel.btnPort, sel.check];
+    btns.forEach(function (b) { b.disabled = on; });
+  }
+
+  function isDownloading(p) {
+    return !!(p && downloadingOps[p.op] && downloadingPhases[p.phase]);
+  }
+
+  function showTerminal(show, op) {
+    termVisible = !!show;
+    sel.term.classList.toggle('hidden', !show);
+    if (show && op) {
+      sel.termTitle.textContent = 'npm install @deepseek-ai/dsh@' + (op.version || '…');
+      sel.termOut.innerHTML = '';
+    }
+  }
+
+  function appendTermLine(stream, text) {
+    if (!termVisible) return;
+    var ln = document.createElement('span');
+    ln.className = 'ln ' + (stream === 'err' ? 'err' : stream === 'info' ? 'info' : 'out');
+    ln.textContent = text;
+    sel.termOut.appendChild(ln);
+    // keep ~400 lines for performance
+    while (sel.termOut.childElementCount > 400) sel.termOut.removeChild(sel.termOut.firstChild);
+    sel.termOut.scrollTop = sel.termOut.scrollHeight;
+  }
+
+  function applyPhase(p) {
+    if (!p) { sel.prog.classList.add('hidden'); showTerminal(false); busy(false); return; }
+    sel.prog.classList.remove('hidden');
+    sel.progPhase.textContent = p.phase || '';
+    sel.progMsg.textContent = p.message || '';
+    if (typeof p.percent === 'number') {
+      sel.progTrack.classList.remove('indet');
+      sel.progBar.style.width = Math.max(0, Math.min(100, p.percent)) + '%';
+    } else {
+      sel.progTrack.classList.add('indet');
+    }
+    busy(true);
+    if (isDownloading(p)) {
+      var key = p.op + ':' + (p.version || '');
+      if (termOpKey !== key) { termOpKey = key; showTerminal(true, p); }
+      else { showTerminal(true); }
+    } else if (p.phase === 'done' || p.phase === 'failed' || p.phase === 'cancelled') {
+      setTimeout(function () { showTerminal(false); }, 2500);
+    } else if (!downloadingOps[p.op]) {
+      showTerminal(false);
+    }
+    if (p.phase === 'done' || p.phase === 'failed' || p.phase === 'stopped' || p.phase === 'running') {
+      setTimeout(refresh, 700);
+    }
+  }
+
+  function renderInstalled(s) {
+    var list = s.installedVersions || [];
+    sel.instList.innerHTML = '';
+    if (!list.length) {
+      var empty = document.createElement('div');
+      empty.className = 'muted dim';
+      empty.textContent = 'No versions installed yet — pick one above and Install & Switch.';
+      sel.instList.appendChild(empty);
+      return;
+    }
+    list.forEach(function (v) {
+      var row = document.createElement('div');
+      row.className = 'inst-row';
+      var flags = document.createElement('span');
+      flags.className = 'flags';
+      if (s.activeVersion === v) {
+        flags.innerHTML = '<span class="tag active">Active</span>';
+      } else if (s.previousVersion === v) {
+        flags.innerHTML = '<span class="tag prev">Previous</span>';
+      } else {
+        flags.innerHTML = '<span class="tag none">Installed</span>';
+      }
+      var ver = document.createElement('span');
+      ver.className = 'ver';
+      ver.textContent = 'v' + v;
+      var del = document.createElement('button');
+      del.className = 'danger sm del';
+      del.textContent = 'Delete';
+      del.title = s.activeVersion === v ? 'The active version cannot be deleted' : 'Remove this installed version';
+      del.disabled = s.activeVersion === v;
+      del.addEventListener('click', function () {
+        if (del.getAttribute('data-arm') !== '1') {
+          del.setAttribute('data-arm', '1');
+          del.textContent = 'Confirm?';
+          setTimeout(function () { del.removeAttribute('data-arm'); del.textContent = 'Delete'; }, 3000);
+          return;
+        }
+        invoke('delete_version', { version: v }).then(function (res) {
+          setResult((res && res.message) || 'version deleted', false);
+          return refresh();
+        }).catch(function (e) {
+          setResult(String(e && e.message || e), true);
+          return refresh();
+        });
+      });
+      row.appendChild(ver);
+      row.appendChild(flags);
+      row.appendChild(del);
+      sel.instList.appendChild(row);
+    });
+  }
+
+  function renderStatus(s) {
+    var running = !!s.running;
+    sel.appVer.textContent = s.launcherVersion ? 'app v' + s.launcherVersion : '';
+    sel.version.textContent = s.activeVersion ? 'v' + s.activeVersion : '(no version installed)';
+    sel.port.textContent = 'port: ' + s.actualPort + (s.portChanged ? ' (fallback from ' + s.port + ')' : '');
+    var url = 'http://127.0.0.1:' + s.actualPort;
+    sel.url.textContent = url.replace('http://', '');
+    sel.url.href = url;
+
+    var phase = s.enginePhase || (running ? 'running' : 'stopped');
+    sel.phase.textContent = phase;
+    var cls = phase === 'running' ? 'ok' : (phase === 'stopped' ? 'stop' : 'err');
+    sel.dot.className = cls;
+    sel.dotLg.className = 'dot ' + cls;
+
+    var runningLike = phase !== 'stopped';
+    sel.start.disabled = runningLike;
+    sel.stop.disabled = !runningLike;
+    sel.restart.disabled = !runningLike;
+    sel.force.disabled = !runningLike;
+
+    if (sel.port.value === '') sel.port.value = String(s.port);
+    var act = 'in use: ' + s.actualPort;
+    if (s.actualPort === s.port) act += ' (desired)';
+    else act += ' (fallback)';
+    sel.portActual.textContent = act;
+
+    sel.auto.checked = !!s.autoUpdateHarness;
+    sel.interval.value = String(s.autoUpdateIntervalHours || 6);
+    sel.pre.checked = !!s.includePrerelease;
+
+    sel.rollback.disabled = !s.previousVersion;
+    sel.rollback.title = s.previousVersion ? 'Rollback to v' + s.previousVersion : 'No previous version installed';
+
+    fillVersions(s);
+    renderInstalled(s);
+
+    if (s.currentOp) {
+      applyPhase(s.currentOp);
+      // A window opened mid-download: seed the terminal with the snapshot.
+      if (isDownloading(s.currentOp) && !sel.termOut.childElementCount && s.console && s.console.length) {
+        showTerminal(true, s.currentOp);
+        s.console.forEach(function (line) { appendTermLine(line.stream || 'out', line.text); });
+      }
+    } else {
+      busy(false);
+      sel.prog.classList.add('hidden');
+      showTerminal(false);
+    }
+  }
+
+  function fillVersions(s) {
+    var all = s.versions || [];
+    var cur = sel.verSel.value;
+    sel.verSel.innerHTML = '';
+    (all.length ? all : (s.installedVersions || [])).forEach(function (v) {
+      var o = document.createElement('option');
+      o.value = v;
+      o.textContent = 'v' + v + (s.installedVersions && s.installedVersions.indexOf(v) !== -1 ? ' (installed)' : '');
+      sel.verSel.appendChild(o);
+    });
+    if (cur && all.indexOf(cur) !== -1) sel.verSel.value = cur;
+    else if (s.latestRemote && all.indexOf(s.latestRemote) !== -1) sel.verSel.value = s.latestRemote;
+    else if (s.activeVersion && all.indexOf(s.activeVersion) !== -1) sel.verSel.value = s.activeVersion;
+  }
+
+  function refresh() {
+    return invoke('get_status').then(renderStatus).catch(function (e) {
+      setResult(String(e && e.message || e), true);
+    });
+  }
+
+  function withCmd(fn, label) {
+    var t0 = Date.now();
+    fn().then(function (res) {
+      setResult((res && res.message) || label + ' done', false);
+      return refresh();
+    }).catch(function (e) {
+      setResult(String(e && e.message || e), true);
+      return refresh();
+    }).then(function () {
+      if (Date.now() - t0 > 2000) refreshLog();
+    });
+  }
+
+  function refreshLog() {
+    invoke('tail_logs', { lines: 300 }).then(function (text) {
+      var pre = sel.logTail;
+      var follow = sel.logFollow.checked;
+      var atBottom = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 40;
+      pre.textContent = text || '(no logs yet)';
+      if (follow || atBottom) pre.scrollTop = pre.scrollHeight;
+    }).catch(function (e) { /* ignore */ });
+  }
+
+  sel.start.addEventListener('click', function () { withCmd(function () { return invoke('engine_start', {}); }, 'Start'); });
+  sel.stop.addEventListener('click', function () { withCmd(function () { return invoke('engine_stop', {}); }, 'Stop'); });
+  sel.restart.addEventListener('click', function () { withCmd(function () { return invoke('engine_restart', {}); }, 'Restart'); });
+  sel.force.addEventListener('click', function () { withCmd(function () { return invoke('engine_force_restart', {}); }, 'Force restart'); });
+
+  sel.install.addEventListener('click', function () {
+    var v = sel.verSel.value;
+    if (!v) return setResult('select a version', true);
+    showTerminal(false);
+    withCmd(function () { return invoke('install_and_switch', { version: v }); }, 'Install');
+  });
+  sel.update.addEventListener('click', function () {
+    showTerminal(false);
+    withCmd(function () { return invoke('update_to_latest', {}); }, 'Update');
+  });
+  sel.rollback.addEventListener('click', function () {
+    showTerminal(false);
+    withCmd(function () { return invoke('rollback', {}); }, 'Rollback');
+  });
+  sel.pre.addEventListener('change', function () {
+    invoke('set_prerelease', { include: sel.pre.checked }).then(refresh).catch(function (e) { setResult(String(e.message || e), true); });
+  });
+
+  // Stop the in-flight download from the terminal overlay button.
+  sel.stopDown.addEventListener('click', function () {
+    sel.stopDown.disabled = true;
+    appendTermLine('err', 'Stopping download…');
+    invoke('cancel_operation').then(function (res) {
+      appendTermLine('info', (res && res.message) || 'stop requested');
+    }).catch(function (e) {
+      appendTermLine('err', String(e && e.message || e));
+    }).finally(function () {
+      setTimeout(function () { sel.stopDown.disabled = false; }, 1500);
+    });
+  });
+
+  sel.btnPort.addEventListener('click', function () {
+    var p = parseInt(sel.port.value, 10);
+    if (!p || p < 1 || p > 65535) return setResult('invalid port', true);
+    withCmd(function () { return invoke('set_port', { port: p }); }, 'Set port');
+  });
+
+  sel.auto.addEventListener('change', function () {
+    invoke('set_auto_update', { enabled: sel.auto.checked }).catch(function (e) { setResult(String(e.message || e), true); });
+  });
+  sel.interval.addEventListener('change', function () {
+    var h = parseInt(sel.interval.value, 10);
+    if (h >= 1) invoke('set_auto_update', { intervalHours: h }).catch(function (e) { setResult(String(e.message || e), true); });
+  });
+  sel.check.addEventListener('click', function () {
+    sel.check.disabled = true;
+    setCheckResult('checking…', false);
+    invoke('check_updates', {}).then(function (r) {
+      setCheckResult(r && r.message || r, false);
+    }).catch(function (e) { setCheckResult(String(e && e.message || e), true); })
+      .finally(function () { sel.check.disabled = false; });
+  });
+
+  sel.logRefresh.addEventListener('click', refreshLog);
+  sel.openHarness.addEventListener('click', function () { invoke('open_harness_window', {}).catch(function (e) { setResult(String(e.message || e), true); }); });
+  sel.browser.addEventListener('click', function () { invoke('open_in_browser', {}).catch(function (e) { setResult(String(e.message || e), true); }); });
+  sel.quit.addEventListener('click', function () { invoke('quit_app', {}); });
+
+  listen('launcher://progress', function (p) { if (p) applyPhase(p); });
+  listen('launcher://console', function (line) {
+    if (line && line.text) appendTermLine(line.stream || 'out', line.text);
+  });
+  listen('launcher://status', function () { refresh(); });
+
+  refresh();
+  refreshLog();
+  setInterval(refresh, 3000);
+  setInterval(refreshLog, 5000);
+})();
+</script>
+</body>
+</html>

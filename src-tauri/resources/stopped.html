@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Engine Stopped - DeepSeek Harness Launcher</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; height: 100vh; display: flex; align-items: center; justify-content: center;
+    background:
+      radial-gradient(700px 400px at 80% -10%, rgba(34,211,238,0.10), transparent 60%),
+      radial-gradient(700px 400px at 0% 110%, rgba(59,130,246,0.12), transparent 55%),
+      #0a1120;
+    color: #e8eef8;
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  .card { text-align: center; max-width: 440px; padding: 30px 34px; }
+  .logo { width: 76px; height: 76px; border-radius: 18px; overflow: hidden; margin: 0 auto 16px;
+    border: 1px solid #2a3d61; box-shadow: 0 8px 30px rgba(0,0,0,0.45), 0 0 40px rgba(34,211,238,0.15); }
+  .logo img { width: 100%; height: 100%; display: block; object-fit: cover; }
+  h1 { font-size: 19px; margin: 0 0 8px; font-weight: 650; letter-spacing: 0.2px; }
+  .sub { color: #5f7294; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+  p { color: #93a7c4; margin: 0 0 20px; font-size: 12.5px; }
+  button { background: linear-gradient(135deg, #2563eb, #3b82f6); border: none; color: #fff; border-radius: 9px;
+    padding: 10px 20px; font-size: 13.5px; font-weight: 600; cursor: pointer; margin: 4px; }
+  button:hover { filter: brightness(1.1); }
+  button.ghost { background: transparent; border: 1px solid #2a3d61; color: #c7d6ec; }
+  button.ghost:hover { background: rgba(59,130,246,0.12); }
+  .hint { margin-top: 18px; font-size: 11px; color: #5f7294; min-height: 16px; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo"><img id="brand-logo" src="dsh-ui://localhost/brand/logo.png" alt="DeepSeek Harness Launcher logo" /></div>
+    <h1>DeepSeek Harness Launcher</h1>
+    <div class="sub">The harness engine is stopped</div>
+    <p>The DeepSeek Harness background engine is not running. Start it to open the harness UI, or open the Control Panel to manage versions, updates, port and logs.</p>
+    <button id="btn-start">Start Engine</button>
+    <button id="btn-settings" class="ghost">Open Control Panel</button>
+    <div class="hint" id="hint"></div>
+  </div>
+<script>
+(function () {
+  'use strict';
+  function invoke(cmd, args) {
+    var core = window.__TAURI__ && window.__TAURI__.core;
+    if (core && typeof core.invoke === 'function') return core.invoke(cmd, args || {});
+    if (window.__TAURI_INTERNALS__ && typeof window.__TAURI_INTERNALS__.invoke === 'function')
+      return window.__TAURI_INTERNALS__.invoke(cmd, args || {}, undefined);
+    return Promise.reject(new Error('Tauri IPC unavailable'));
+  }
+  var hint = document.getElementById('hint');
+  function run(fn) {
+    hint.textContent = '…';
+    fn().then(function (r) {
+      hint.textContent = (r && r.message) || 'done';
+      setTimeout(function () { hint.textContent = ''; }, 4000);
+    }).catch(function (e) {
+      hint.textContent = String(e && e.message || e);
+    });
+  }
+  document.getElementById('btn-start').addEventListener('click', function () {
+    run(function () { return invoke('engine_start', {}); });
+  });
+  document.getElementById('btn-settings').addEventListener('click', function () {
+    run(function () { return invoke('open_settings', {}); });
+  });
+})();
+</script>
+</body>
+</html>
