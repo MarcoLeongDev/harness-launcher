@@ -33,17 +33,17 @@ The launcher SHALL expose Rust commands to the panel through the Tauri IPC layer
 - **THEN** the command result is returned to the overlay and unauthorized commands are rejected
 
 ### Requirement: Settings Window
-The launcher SHALL provide a dedicated native Settings window (opened from the tray or the overlay) that aggregates harness status, engine control, version & update management with live progress, port configuration, auto-update settings, and recent logs, served from a launcher-owned custom protocol origin (`dsh-ui://`) so it works in development and production without the harness server. The window SHALL organize its content into tabs — Engine (engine status, controls and port), Versions (version & update management, auto-update and progress) and Logs (harness log tail) — using a visual, non-text-heavy design, and SHALL display the provided brand logo in its header.
+The launcher SHALL provide a dedicated native Settings window (opened from the tray or the overlay) that aggregates harness status, engine control, version & update management with live progress, port configuration, auto-update settings, and recent logs, served from a launcher-owned custom protocol origin (`dsh-ui://`) so it works in development and production without the harness server. The window SHALL organize its content into tabs — Engine (engine status, controls and port), Versions (version & update management, auto-update and progress) and Logs (harness log tail) — using a visual, minimal, icon-driven design (macOS-style grouped rows) and SHALL display the provided brand logo in its header. The Engine tab SHALL surface the effective port exactly once ("Runs at http://127.0.0.1:<port>"), provide a single port field, and use icon-first engine controls (Start/Stop primary, Restart secondary, Force subdued). The Logs tab SHALL NOT repeat a "Logs" label and SHALL present the log output with a minimal icon toolbar.
 
 #### Scenario: Open settings window
 - **WHEN** the user selects Settings from the tray menu or the overlay panel
 - **THEN** a settings window opens (or focuses if already open) showing the tabbed control panel
 
-#### Scenario: Live operation progress
-- **WHEN** an install / update / rollback / engine / port operation is in progress
-- **THEN** the settings window and overlay show a live progress bar with phase and message, and reopening the UI mid-operation still shows the in-flight operation
+#### Scenario: Engine tab port authority
+- **WHEN** the engine is running
+- **THEN** the Engine tab shows exactly one running address ("Runs at http://127.0.0.1:3080") and one port field, with no duplicated port text elsewhere
 
-#### Scenario: Tab navigation
-- **WHEN** the user activates the Engine, Versions or Logs tab
-- **THEN** the corresponding panel is shown, the active tab is indicated, and the window header keeps the brand logo visible
+#### Scenario: Logs tab
+- **WHEN** the user opens the Logs tab
+- **THEN** the tab shows the recent harness output with icon-only toolbar actions (refresh, follow), without a redundant title
 
