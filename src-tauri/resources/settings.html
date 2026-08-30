@@ -92,6 +92,34 @@
   .st-title { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; }
   .st-sub { font-size: 12px; color: var(--dim); margin-top: 1px; }
   .actions { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 8px; }
+  /* engine card */
+  .ec-line1 { display: flex; align-items: center; gap: 20px; padding: 16px 16px 8px;
+    flex-wrap: wrap; }
+  .ec-status { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 220px; }
+  .ec-field { display: flex; flex-direction: column; gap: 4px; }
+  .ec-field .flabel { font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px;
+    color: var(--faint); font-weight: 650; }
+  .ec-line2 { display: flex; justify-content: space-evenly; gap: 12px; padding: 10px 12px 18px; }
+  .cbtn { display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 5px; width: 66px; height: 66px; border-radius: 50%; background: var(--cell);
+    border: 1px solid var(--hair2); color: var(--text); cursor: pointer; font-size: 10.5px;
+    font-weight: 600; transition: all .15s; }
+  .cbtn svg { width: 22px; height: 22px; }
+  .cbtn:hover { background: var(--cell-hover); }
+  .cbtn:disabled { opacity: 0.35; cursor: default; transform: none; }
+  .cbtn.primary { background: var(--ok); border-color: var(--ok); color: #04231a; }
+  .cbtn.primary:hover { background: #4cd870; }
+  .cbtn.subdued { color: var(--err); border-color: rgba(255,69,58,0.4); }
+  .cbtn.subdued:hover { background: rgba(255,69,58,0.12); }
+  .cbtn:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
+  .ecterm-toggle { display: inline-flex; align-items: center; gap: 6px; background: none;
+    border: none; color: var(--dim); font-size: 11.5px; cursor: pointer; padding: 8px 12px;
+    border-radius: 6px; margin: 4px; }
+  .ecterm-toggle:hover { color: var(--text); background: var(--cell-hover); }
+  .ecterm-toggle svg { transition: transform .2s; }
+  .ecterm-toggle.open svg { transform: rotate(180deg); }
+  .ecterm { border-top: 1px solid var(--hair); background: rgba(0,0,0,0.35); display: none; }
+  .ecterm.open { display: block; }
   /* download row */
   .dl-row { align-items: center; }
   .dl-spin { width: 16px; height: 16px; flex: none; border: 2px solid rgba(64,169,255,0.25);
@@ -199,6 +227,7 @@
   <symbol id="i-follow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5V16"/><path d="M7.5 12 12 16.5 16.5 12"/><path d="M4 21h16"/></symbol>
   <symbol id="i-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9.5 12 15.5 18 9.5"/></symbol>
   <symbol id="i-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5.5v13l10-6.5z"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M9 4v16M15 4v16"/></symbol>
   <symbol id="i-network" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5c2.5 2.3 3.8 5.2 3.8 8.5s-1.3 6.2-3.8 8.5c-2.5-2.3-3.8-5.2-3.8-8.5s1.3-6.2 3.8-8.5z"/></symbol>
   <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5 10 18 19.5 7"/></symbol>
   <symbol id="i-log" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h9"/></symbol>
@@ -229,37 +258,45 @@
   <!-- ============ ENGINE ============ -->
   <section class="tabpanel active" id="tab-engine" role="tabpanel" aria-labelledby="tab-btn-engine">
     <div class="group">
-      <div class="cell">
-        <div class="status-icon stop" id="st-icon"><svg class="ico"><use href="#i-power"/></svg></div>
-        <div>
-          <div class="st-title" id="st-title">Stopped</div>
-          <div class="st-sub" id="st-sub">The engine is not running</div>
+      <div class="ec-line1">
+        <div class="ec-status">
+          <div class="status-icon stop" id="st-icon"><svg class="ico"><use href="#i-power"/></svg></div>
+          <div>
+            <div class="st-title" id="st-title">Stopped</div>
+            <div class="st-sub" id="st-sub">The engine is not running</div>
+          </div>
+        </div>
+        <div class="ec-field">
+          <span class="flabel">Version</span>
+          <select id="sel-version" aria-label="Engine version" disabled></select>
+        </div>
+        <div class="ec-field">
+          <span class="flabel">Port</span>
+          <div style="display:flex; gap:6px; align-items:center">
+            <input id="inp-port" type="number" min="1" max="65535" style="width:82px" aria-label="Local port" disabled />
+            <button class="btn" id="btn-port" disabled>Apply</button>
+          </div>
         </div>
       </div>
-      <div class="cell actions" style="padding:10px 12px">
-        <button class="btn primary" id="btn-start"><svg class="ico sm"><use href="#i-play"/></svg> Start</button>
-        <button class="btn" id="btn-stop" disabled><svg class="ico sm"><use href="#i-power"/></svg> Stop</button>
-        <button class="btn" id="btn-restart" disabled title="Restart the engine"><svg class="ico sm"><use href="#i-restart"/></svg> Restart</button>
-        <button class="btn warn" id="btn-force" disabled title="Force restart — kill anything on the port"><svg class="ico sm"><use href="#i-bolt"/></svg> Force</button>
+      <div class="ec-line2">
+        <button class="cbtn primary" id="btn-start"><svg class="ico"><use href="#i-play"/></svg> Start</button>
+        <button class="cbtn" id="btn-stop" disabled title="Stop the engine"><svg class="ico"><use href="#i-pause"/></svg> Stop</button>
+        <button class="cbtn" id="btn-restart" disabled title="Restart the engine"><svg class="ico"><use href="#i-restart"/></svg> Restart</button>
+        <button class="cbtn subdued" id="btn-force" title="Force restart — kill anything on the port"><svg class="ico"><use href="#i-bolt"/></svg> Force</button>
+      </div>
+      <div class="cell" style="padding-top:0;padding-bottom:10px;border-top:none;min-height:0">
+        <span class="hint" id="port-hint"></span>
       </div>
     </div>
 
-    <div class="group">
-      <div class="cell" style="gap:16px">
-        <svg class="ico" style="color:var(--dim)"><use href="#i-network"/></svg>
-        <div style="flex:1; display:flex; gap:10px; align-items:center">
-          <span class="lbl">Local port</span>
-          <input id="inp-port" type="number" min="1" max="65535" style="width:88px" aria-label="Local port" />
-          <button class="btn" id="btn-port">Apply</button>
-        </div>
-      </div>
-      <div class="cell" style="padding-top:6px;padding-bottom:10px;border-top:none;min-height:0">
-        <span class="hint" id="port-hint"></span>
+    <div class="group" style="overflow:visible">
+      <button class="ecterm-toggle" id="engine-term-toggle"><svg class="ico sm"><use href="#i-chev"/></svg> Run output</button>
+      <div class="ecterm" id="engine-term">
+        <pre class="term-out" id="engine-term-out">No output yet.</pre>
       </div>
     </div>
   </section>
 
-  <!-- ============ VERSIONS ============ -->
   <section class="tabpanel" id="tab-versions" role="tabpanel" aria-labelledby="tab-btn-versions" hidden>
     <div class="group" id="update-banner" style="display:none">
       <div class="cell">
@@ -381,6 +418,8 @@
     dot: $('st-dot'), phase: $('st-phase'),
     stIcon: $('st-icon'), stTitle: $('st-title'), stSub: $('st-sub'),
     start: $('btn-start'), stop: $('btn-stop'), restart: $('btn-restart'), force: $('btn-force'),
+    engineVer: $('sel-version'),
+    engineTerm: $('engine-term'), engineTermToggle: $('engine-term-toggle'), engineTermOut: $('engine-term-out'),
     port: $('inp-port'), btnPort: $('btn-port'), portHint: $('port-hint'),
     pre: $('chk-prerelease'),
     intervalSel: $('sel-interval'), installSel: $('sel-install-ver'), btnInstall: $('btn-install'),
@@ -437,7 +476,7 @@
     sel.checkResult.className = isErr ? 'err' : '';
   }
   function busy(on) {
-    [sel.start, sel.stop, sel.restart, sel.force, sel.update, sel.rollback, sel.btnPort, sel.check]
+    [sel.start, sel.stop, sel.restart, sel.force, sel.btnPort, sel.check, sel.btnInstall, sel.engineVer]
       .forEach(function (b) { b.disabled = on; });
   }
 
@@ -605,18 +644,34 @@
 
     var runningLike = phase !== 'stopped';
     sel.stTitle.textContent = phase === 'running' ? 'Running' : (phase === 'stopped' ? 'Stopped' : phase);
-    if (running) {
-      sel.stSub.textContent = 'Runs at http://127.0.0.1:' + s.actualPort + ' · harness v' + (s.activeVersion || '?');
+    if (phase === 'running' || running) {
+      sel.stSub.textContent = 'Runs at http://127.0.0.1:' + s.actualPort + ' · v' + (s.activeVersion || '?');
+    } else if (phase === 'stopped') {
+      sel.stSub.textContent = 'Idle — press Start to launch.';
     } else {
-      sel.stSub.textContent = 'The engine is not running — press Start to launch it.';
+      sel.stSub.textContent = phase + '…';
     }
+
+    // card controls: version + port are locked while the engine is running
     sel.start.disabled = runningLike;
     sel.stop.disabled = !runningLike;
     sel.restart.disabled = !runningLike;
-    sel.force.disabled = !runningLike;
+    sel.force.disabled = false; // force recovery is always available
+    sel.engineVer.disabled = runningLike;
+    sel.port.disabled = runningLike;
+    sel.btnPort.disabled = runningLike;
 
-    // single port authority: the address is only shown in the status line;
-    // the port field shows supplementary info only when it matters (fallback).
+    // version dropdown lists downloaded versions only
+    var inst = s.installedVersions || [];
+    var curV = s.activeVersion;
+    sel.engineVer.innerHTML = '';
+    inst.forEach(function (v) {
+      var o = document.createElement('option');
+      o.value = v; o.textContent = 'v' + v;
+      sel.engineVer.appendChild(o);
+    });
+    if (curV && inst.indexOf(curV) !== -1) sel.engineVer.value = curV;
+
     if (sel.port.value === '') sel.port.value = String(s.port);
     sel.portHint.textContent = s.portChanged
       ? 'Port ' + s.port + ' is in use — serving on ' + s.actualPort + '.'
@@ -714,7 +769,26 @@
     }).catch(function () {});
   }
 
+  // engine run terminal (collapsed by default)
+  var engineTermOpen = false;
+  sel.engineTermToggle.addEventListener('click', function () {
+    engineTermOpen = !engineTermOpen;
+    sel.engineTerm.classList.toggle('open', engineTermOpen);
+    sel.engineTermToggle.classList.toggle('open', engineTermOpen);
+  });
+  function refreshEngineTerm() {
+    invoke('tail_logs', { lines: 120 }).then(function (text) {
+      sel.engineTermOut.textContent = text || 'No output yet.';
+      sel.engineTermOut.scrollTop = sel.engineTermOut.scrollHeight;
+    }).catch(function () {});
+  }
+
   // engine
+  sel.engineVer.addEventListener('change', function () {
+    var v = sel.engineVer.value;
+    if (!v) return;
+    withCmd(function () { return invoke('install_and_switch', { version: v }); }, 'Switched');
+  });
   sel.start.addEventListener('click', function () { withCmd(function () { return invoke('engine_start', {}); }, 'Started'); });
   sel.stop.addEventListener('click', function () { withCmd(function () { return invoke('engine_stop', {}); }, 'Stopped'); });
   sel.restart.addEventListener('click', function () { withCmd(function () { return invoke('engine_restart', {}); }, 'Restarted'); });
@@ -798,8 +872,10 @@
 
   refresh();
   refreshLog();
+  refreshEngineTerm();
   setInterval(refresh, 3000);
   setInterval(refreshLog, 5000);
+  setInterval(refreshEngineTerm, 5000);
 })();
 </script>
 </body>

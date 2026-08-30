@@ -5,10 +5,10 @@
 - [x] 1.4 Keep update banner + install-new row; verify; bump to 0.1.10
 
 ## 2. Engine card view (0.1.11)
-- [ ] 2.1 First line: status icon + version dropdown (stopped-only, downloaded-only) + port (stopped-only)
-- [ ] 2.2 Second line: circular Start/Stop (play/pause) + Restart (circular arrow) with text underneath (+ subdued Force)
-- [ ] 2.3 Run-time terminal collapsed by default
-- [ ] 2.4 Verify; bump to 0.1.11
+- [x] 2.1 First line: status icon + version dropdown (stopped-only, downloaded-only) + port (stopped-only)
+- [x] 2.2 Second line: circular Start/Stop (play/pause) + Restart (circular arrow) with text underneath (+ subdued Force)
+- [x] 2.3 Run-time terminal collapsed by default
+- [x] 2.4 Verify; bump to 0.1.11
 
 ## 3. Bootstrap icons + remove status pill (0.1.12)
 - [ ] 3.1 Copy bootstrap SVG files into resources; bundle them
