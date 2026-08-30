@@ -11,9 +11,9 @@
 - [x] 2.4 cargo test + syntax checks; bump to 0.1.8
 
 ## 3. Logs tab minimalism (0.1.9)
-- [ ] 3.1 Remove redundant "Harness Logs" label
-- [ ] 3.2 Icon toolbar (refresh/follow) over minimal log output
-- [ ] 3.3 checks; bump to 0.1.9
+- [x] 3.1 Remove redundant "Harness Logs" label
+- [x] 3.2 Icon toolbar (refresh/follow) over minimal log output
+- [x] 3.3 checks; bump to 0.1.9
 
 ## 4. Build, deploy & verify
 - [ ] 4.1 cargo test/build clean; lightspec validate passes

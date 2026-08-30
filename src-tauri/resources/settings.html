@@ -308,9 +308,9 @@
       <div class="cell log-toolbar" style="padding:8px 10px">
         <button class="btn icon" id="btn-log-refresh" title="Refresh"><svg class="ico sm"><use href="#i-refresh"/></svg></button>
         <button class="btn icon" id="btn-log-follow" title="Follow output" aria-pressed="true"><svg class="ico sm"><use href="#i-follow"/></svg></button>
-        <span class="hint" id="log-status" style="margin-left:auto; opacity:.7"></span>
+        <span style="flex:1"></span>
       </div>
-      <pre class="log-view" id="log-tail">(no logs yet)</pre>
+      <pre class="log-view" id="log-tail">No output yet</pre>
     </div>
   </section>
 </main>
@@ -356,7 +356,7 @@
     progBar: $('prog-bar'), progTrack: $('prog-track'),
     verList: $('ver-list'), result: $('op-result'),
     auto: $('chk-autoupdate'), interval: $('inp-interval'), check: $('btn-check'), checkResult: $('check-result'),
-    logRefresh: $('btn-log-refresh'), logFollow: $('btn-log-follow'), logTail: $('log-tail'), logStatus: $('log-status'),
+    logRefresh: $('btn-log-refresh'), logFollow: $('btn-log-follow'), logTail: $('log-tail'),
     banner: $('update-banner'), bannerText: $('update-banner-text'), bannerBtn: $('btn-banner-update'),
     appVer: $('app-ver'), ftHarness: $('ft-harness'), ftUrl: $('ft-url'),
     browser: $('btn-browser'), quit: $('btn-quit')
@@ -622,8 +622,6 @@
       var atBottom = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 40;
       pre.textContent = text || '(no logs yet)';
       if (followOn || atBottom) pre.scrollTop = pre.scrollHeight;
-      var lines = text ? text.split('\n').length : 0;
-      sel.logStatus.textContent = lines + ' lines';
     }).catch(function () {});
   }
 
