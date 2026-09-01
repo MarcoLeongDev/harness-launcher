@@ -314,7 +314,7 @@
     busy(btn, true);
     try {
       const res = await fn();
-      setMsg(res && res.message ? res.message : 'done', false);
+      setMsg(res || 'done', false);
       await refreshStatus();
       return res;
     } catch (e) {

@@ -361,6 +361,9 @@
       </div>
       <div class="cell" id="op-result-cell" style="gap:8px;flex-wrap:wrap;display:none">
       </div>
+      <div class="cell" style="padding-top:4px;padding-bottom:6px">
+        <span class="hint" id="op-result" style="flex:1"></span>
+      </div>
     </div>
   </section>
 
@@ -745,7 +748,7 @@
 
   function withCmd(fn, label) {
     fn().then(function (res) {
-      setResult((res && res.message) || label + ' ✓', false);
+      setResult(res || label + ' ✓', false);
       return refresh();
     }).catch(function (e) {
       setResult(String(e && e.message || e), true);
@@ -803,18 +806,6 @@
   });
   sel.bannerBtn.addEventListener('click', function () { withCmd(function () { return invoke('update_to_latest', {}); }, 'Updated'); });
 
-  // Cancel the in-flight download via the circular overlay button.
-  sel.stopDown.addEventListener('click', function () {
-    sel.stopDown.disabled = true;
-    invoke('cancel_operation').then(function (res) {
-      setResult((res && res.message) || 'stop requested', false);
-    }).catch(function (e) {
-      setResult(String(e && e.message || e), true);
-    }).finally(function () {
-      setTimeout(function () { sel.stopDown.disabled = false; }, 2000);
-    });
-  });
-
   // auto-update
   sel.auto.addEventListener('change', function () {
     invoke('set_auto_update', { enabled: sel.auto.checked }).catch(function (e) { setResult(String(e.message || e), true); });
@@ -828,7 +819,7 @@
     sel.check.disabled = true;
     setCheckResult('Checking…');
     invoke('check_updates', {}).then(function (r) {
-      setCheckResult((r && r.message) || 'Up to date');
+      setCheckResult(r || 'Up to date');
     }).catch(function (e) { setCheckResult(String(e && e.message || e), true); })
       .finally(function () { sel.check.disabled = false; });
   });

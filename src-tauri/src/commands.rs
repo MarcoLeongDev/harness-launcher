@@ -2,7 +2,7 @@
 use std::time::Duration;
 
 use serde::Serialize;
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Manager};
 use tauri_plugin_updater::UpdaterExt;
 
 use crate::port;
@@ -177,7 +177,12 @@ fn switch_version_inner(app: &AppHandle, version: &str, op: &str) -> Result<Stri
 }
 
 #[tauri::command]
-pub fn get_status(app: AppHandle, st: State<'_, AppState>) -> Result<StatusPayload, String> {
+pub async fn get_status(app: AppHandle) -> Result<StatusPayload, String> {
+    // Async + spawn_blocking: the version-list refresh shells out to npm and
+    // must never block the main thread, or every window freezes for seconds
+    // (panel shows no data and button clicks are dropped).
+    tauri::async_runtime::spawn_blocking(move || {
+    let st = app.state::<AppState>();
     let settings = state::read_settings(&app);
     let status = st.runtime.status();
     let actual = *st.effective_port.lock().unwrap();
@@ -251,6 +256,9 @@ pub fn get_status(app: AppHandle, st: State<'_, AppState>) -> Result<StatusPaylo
         console,
         web_url: st.runtime.captured_web_url(),
     })
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -463,13 +471,17 @@ pub fn open_in_browser(app: AppHandle) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn restart_harness(app: AppHandle) -> Result<String, String> {
-    with_progress_cleanup(&app, || {
-        let actual = restart_engine(&app, "engine", None, false)?;
-        let _ = window::navigate(&app, &harness_web_url(&app, actual, Some(Duration::from_secs(10))));
-        progress::clear(&app);
-        Ok(format!("harness restarted on port {actual}"))
+pub async fn restart_harness(app: AppHandle) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        with_progress_cleanup(&app, || {
+            let actual = restart_engine(&app, "engine", None, false)?;
+            let _ = window::navigate(&app, &harness_web_url(&app, actual, Some(Duration::from_secs(10))));
+            progress::clear(&app);
+            Ok(format!("harness restarted on port {actual}"))
+        })
     })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 // ---- Engine lifecycle ----
@@ -552,23 +564,29 @@ pub fn open_settings(app: AppHandle) -> Result<String, String> {
 /// next Start (or auto-launch) runs it. Used by the stopped-state version
 /// dropdown so picking a version persists the choice instead of auto-launching.
 #[tauri::command]
-pub fn set_version(app: AppHandle, version: String) -> Result<String, String> {
-    let rd = state::runtime_dir(&app);
-    ensure_runtime_dirs(&app).map_err(|e| format!("runtime dirs: {e}"))?;
-    let st = app.state::<AppState>();
-    if st.runtime.is_running() {
-        return Err("stop the engine before switching versions".into());
-    }
-    if !versions::is_installed(&rd, &version) {
-        versions::install_version(&app, &rd, &version, "select")?;
-    }
-    let previous = state::read_settings(&app).current_version.clone();
-    state::update_settings(&app, |s| {
-        s.previous_version = previous;
-        s.current_version = Some(version.clone());
-    });
-    crate::tray::refresh(&app);
-    Ok(format!("active version set to {version}"))
+pub async fn set_version(app: AppHandle, version: String) -> Result<String, String> {
+    // Async: selecting a version that is not installed yet shells out to npm
+    // (install) and must never block the main thread.
+    tauri::async_runtime::spawn_blocking(move || {
+        let rd = state::runtime_dir(&app);
+        ensure_runtime_dirs(&app).map_err(|e| format!("runtime dirs: {e}"))?;
+        let st = app.state::<AppState>();
+        if st.runtime.is_running() {
+            return Err("stop the engine before switching versions".into());
+        }
+        if !versions::is_installed(&rd, &version) {
+            versions::install_version(&app, &rd, &version, "select")?;
+        }
+        let previous = state::read_settings(&app).current_version.clone();
+        state::update_settings(&app, |s| {
+            s.previous_version = previous;
+            s.current_version = Some(version.clone());
+        });
+        crate::tray::refresh(&app);
+        Ok(format!("active version set to {version}"))
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
