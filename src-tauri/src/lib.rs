@@ -91,6 +91,7 @@ pub fn run() {
             commands::open_harness_window,
             commands::cancel_operation,
             commands::delete_version,
+            commands::open_version_dir,
             commands::quit_app
         ])
         .manage(AppState::default())

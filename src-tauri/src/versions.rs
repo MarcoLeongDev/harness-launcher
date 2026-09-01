@@ -208,6 +208,46 @@ pub fn version_dir(runtime_dir: &Path, version: &str) -> PathBuf {
     runtime_dir.join("versions").join(version)
 }
 
+/// Guard for anything that turns a user-supplied version string into a path
+/// (directory open, delete, …): a version must be a plain npm dist/semver
+/// name, never a path segment, so traversal and absolute paths are rejected.
+pub fn is_valid_version_name(version: &str) -> bool {
+    !version.is_empty()
+        && version.len() <= 64
+        && version != "."
+        && version != ".."
+        && !version.contains(['/', '\\'])
+        && version
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_' | '+' | '~'))
+}
+
+#[cfg(test)]
+mod name_tests {
+    use super::is_valid_version_name;
+
+    #[test]
+    fn accepts_npm_version_names() {
+        assert!(is_valid_version_name("0.1.29"));
+        assert!(is_valid_version_name("0.1.2-alpha.3"));
+        assert!(is_valid_version_name("0.1.0-rc.7"));
+        assert!(is_valid_version_name("v1.2.3+build.4_meta~x"));
+    }
+
+    #[test]
+    fn rejects_path_traversal_and_invalid_names() {
+        assert!(!is_valid_version_name(""));
+        assert!(!is_valid_version_name("."));
+        assert!(!is_valid_version_name(".."));
+        assert!(!is_valid_version_name("../evil"));
+        assert!(!is_valid_version_name("a/b"));
+        assert!(!is_valid_version_name("a\\b"));
+        assert!(!is_valid_version_name("/absolute/path"));
+        assert!(!is_valid_version_name("has space"));
+        assert!(!is_valid_version_name(&"x".repeat(65)));
+    }
+}
+
 pub fn harness_entry(runtime_dir: &Path, version: &str) -> Option<PathBuf> {
     let p = version_dir(runtime_dir, version)
         .join("node_modules")
