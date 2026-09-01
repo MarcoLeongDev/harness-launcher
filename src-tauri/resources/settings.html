@@ -203,7 +203,17 @@
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .vc-tag { width: 92px; flex: none; }
   .vc-tag .tag { display: inline-block; }
-  .vc-acts { display: flex; gap: 7px; align-items: center; }
+  .vc-acts { width: 72px; flex: none; display: flex; align-items: center; justify-content: center; }
+  /* Delete action: circular red button, white icon, no border, centred
+     under the ACTIONS column header. */
+  .btn.del { width: 30px; height: 30px; padding: 0; border-radius: 50%;
+    border: none; background: var(--err); color: #fff;
+    display: inline-flex; align-items: center; justify-content: center; }
+  .btn.del svg { width: 15px; height: 15px; }
+  .btn.del:hover { background: #ff6259; }
+  .btn.del:active { transform: translateY(1px); }
+  .btn.del:disabled { opacity: 0.4; cursor: default; transform: none; }
+  .btn.del:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
   .vc-def { width: 64px; flex: none; display: flex; align-items: center; justify-content: center; }
   /* custom radio for the "Default" (active) version selector */
   .vc-radio { appearance: none; -webkit-appearance: none; width: 16px; height: 16px;
@@ -224,7 +234,7 @@
     color: var(--err); }
   .btn.ghost-danger:hover { background: rgba(255,69,58,0.12); }
   /* delete confirmation popover */
-  .pop { position: absolute; right: 16px; top: calc(100% - 2px); z-index: 40;
+  .pop { position: absolute; right: 40px; top: calc(100% - 2px); z-index: 40;
     background: #141b2c; border: 1px solid var(--hair2); border-radius: 11px;
     box-shadow: 0 12px 32px rgba(0,0,0,0.55); padding: 11px 12px; min-width: 200px;
     display: none; }
@@ -622,11 +632,11 @@
         tagCell.appendChild(ptag);
       }
 
-      // Actions column: trash button with confirmation popover.
+      // Actions column: circular red trash button with confirmation popover.
       var acts = document.createElement('span');
       acts.className = 'vc-acts';
       var del = document.createElement('button');
-      del.className = 'btn icon ghost-danger';
+      del.className = 'btn del';
       del.title = 'Delete this version';
       del.disabled = isActive || !!s.currentOp;
       del.innerHTML = '<i class="ico sm bi" data-ico="trash-fill"></i>';
