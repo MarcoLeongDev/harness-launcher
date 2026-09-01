@@ -200,8 +200,17 @@
     letter-spacing: 0.7px; font-weight: 650; padding: 8px 16px; }
   .vc-ver { flex: 1; font-family: var(--mono); font-size: 12.5px; min-width: 0;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .vc-tag { width: 92px; flex: none; }
-  .vc-tag .tag { display: inline-block; }
+  .vc-dir { width: 64px; flex: none; display: flex; align-items: center; justify-content: center; }
+  /* Folder link: circular borderless button revealing the version directory */
+  .btn.dir { width: 30px; height: 30px; padding: 0; border-radius: 50%;
+    border: none; background: transparent; color: var(--dim);
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: background .15s, color .15s; }
+  .btn.dir svg { width: 15px; height: 15px; }
+  .btn.dir:hover { background: var(--cell-hover); color: var(--accent2); }
+  .btn.dir:active { transform: translateY(1px); }
+  .btn.dir:disabled { opacity: 0.4; cursor: default; transform: none; }
+  .btn.dir:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
   .vc-acts { width: 72px; flex: none; display: flex; align-items: center; justify-content: center; }
   /* Delete action: circular borderless button with a white trash glyph;
      hovering turns the disc red and keeps the glyph white. In light mode the
@@ -230,9 +239,6 @@
     border-radius: 50%; background: #04231a; left: 50%; top: 50%; transform: translate(-50%,-50%); }
   .vc-radio:disabled { opacity: 0.35; cursor: default; }
   .vc-radio:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
-  /* green checkmark used for installed/healthy rows */
-  .vc-check { color: var(--ok); display: inline-flex; align-items: center; justify-content: center; }
-  .vc-check svg { width: 16px; height: 16px; }
   .btn.danger { background: var(--err); border-color: var(--err); color: #fff; }
   .btn.danger:hover { background: #ff6259; }
   .btn.ghost-danger { background: transparent; border-color: rgba(255,69,58,0.45);
@@ -345,7 +351,7 @@
         <div class="vrow vhead-row">
           <span class="vc-def" title="Default version">Default</span>
           <span class="vc-ver">Version</span>
-          <span class="vc-tag">Status</span>
+          <span class="vc-dir" title="Open the version folder">Folder</span>
           <span class="vc-acts">Actions</span>
         </div>
         <div id="ver-tbody"></div>
@@ -550,15 +556,20 @@
       var ver = document.createElement('span');
       ver.className = 'vc-ver'; ver.textContent = 'v' + v;
 
-      // Status column: green checkmark for every installed version.
-      var tagCell = document.createElement('span');
-      tagCell.className = 'vc-tag';
-      var status = document.createElement('span');
-      status.className = 'vc-check';
-      status.title = isActive ? 'Active' : 'Installed';
-      status.innerHTML = '<i class="ico sm bi" data-ico="check-lg"></i>';
-      tagCell.appendChild(status);
-      // Previous tag removed
+      // Folder column: opens the directory this version is installed in.
+      var dirCell = document.createElement('span');
+      dirCell.className = 'vc-dir';
+      var dirBtn = document.createElement('button');
+      dirBtn.className = 'btn dir';
+      dirBtn.title = 'Open the folder for v' + v;
+      dirBtn.setAttribute('aria-label', 'Open the folder for v' + v);
+      dirBtn.innerHTML = '<i class="ico sm bi" data-ico="folder2-open"></i>';
+      dirBtn.addEventListener('click', function () {
+        invoke('open_version_dir', { version: v }).catch(function (e) {
+          setResult(String(e && e.message || e), true);
+        });
+      });
+      dirCell.appendChild(dirBtn);
 
       // Actions column: circular red trash button with confirmation popover.
       var acts = document.createElement('span');
@@ -597,7 +608,7 @@
           .catch(function (e) { setResult(String(e && e.message || e), true); return refresh(); });
       });
       acts.appendChild(del);
-      row.appendChild(defCell); row.appendChild(ver); row.appendChild(tagCell); row.appendChild(acts);
+      row.appendChild(defCell); row.appendChild(ver); row.appendChild(dirCell); row.appendChild(acts);
       row.appendChild(pop);
       sel.verTbody.appendChild(row);
     });

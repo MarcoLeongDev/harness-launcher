@@ -706,6 +706,26 @@ pub async fn delete_version(app: AppHandle, version: String) -> Result<String, S
     .await
     .map_err(|e| e.to_string())?}
 
+/// Open the installation directory of an installed harness version in the
+/// system file manager (Finder). The version name is validated first so it
+/// can never escape the versions directory.
+#[tauri::command]
+pub fn open_version_dir(app: AppHandle, version: String) -> Result<String, String> {
+    if !versions::is_valid_version_name(&version) {
+        return Err(format!("invalid version name: {version}"));
+    }
+    let rd = state::runtime_dir(&app);
+    let dir = versions::version_dir(&rd, &version);
+    if !dir.is_dir() {
+        return Err(format!("version {version} is not installed"));
+    }
+    std::process::Command::new("open")
+        .arg(&dir)
+        .spawn()
+        .map_err(|e| format!("failed to open directory: {e}"))?;
+    Ok(format!("opened {}", dir.display()))
+}
+
 #[tauri::command]
 pub fn quit_app(app: AppHandle) -> Result<(), String> {
     let st = app.state::<AppState>();
