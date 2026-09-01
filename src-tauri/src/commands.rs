@@ -172,7 +172,7 @@ fn switch_version_inner(app: &AppHandle, version: &str, op: &str) -> Result<Stri
     versions::install_version(app, &rd, version, op)?;
     invalidate_version_cache(app);
 
-    progress::emit(app, op, Some(version), "done", &format!("Installed {version} — select it from the Control Panel"), Some(100));
+    progress::finish(app, op, Some(version), &format!("Installed {version} — select it from the Control Panel"));
     Ok(format!("installed {version} — select it from the Control Panel"))
 }
 
@@ -555,6 +555,10 @@ pub fn open_settings(app: AppHandle) -> Result<String, String> {
 pub fn set_version(app: AppHandle, version: String) -> Result<String, String> {
     let rd = state::runtime_dir(&app);
     ensure_runtime_dirs(&app).map_err(|e| format!("runtime dirs: {e}"))?;
+    let st = app.state::<AppState>();
+    if st.runtime.is_running() {
+        return Err("stop the engine before switching versions".into());
+    }
     if !versions::is_installed(&rd, &version) {
         versions::install_version(&app, &rd, &version, "select")?;
     }
