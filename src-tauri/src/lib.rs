@@ -76,7 +76,6 @@ pub fn run() {
             commands::update_to_latest,
             commands::rollback,
             commands::set_port,
-            commands::set_host,
             commands::set_prerelease,
             commands::set_auto_update,
             commands::check_updates,
@@ -169,6 +168,11 @@ fn boot_inner(app: &AppHandle) -> Result<u16, String> {
         settings::log(&data_dir, "installing default (latest) harness version…");
         let latest = versions::latest_dist_tag(app, &rd)?;
         versions::install_version(app, &rd, &latest, "install")?;
+        {
+            let st = app.state::<AppState>();
+            let mut vc = st.version_cache.lock().unwrap();
+            vc.fetched_at = None;
+        }
         state::update_settings(app, |s| s.current_version = Some(latest));
     }
     let version = state::active_version(app).ok_or("no harness version installed")?;
@@ -186,7 +190,7 @@ fn boot_inner(app: &AppHandle) -> Result<u16, String> {
     }
 
     let st = app.state::<AppState>();
-    runtime::start(app, &st.runtime, &rd, &version, actual, &settings_snapshot.host)?;
+    runtime::start(app, &st.runtime, &rd, &version, actual)?;
     let served = port::wait_until_serving(actual, Duration::from_secs(30));
     if !served {
         return Err(format!("harness {version} did not answer on 127.0.0.1:{actual} within 30s"));
