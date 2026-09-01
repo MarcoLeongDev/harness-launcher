@@ -304,57 +304,7 @@ pub fn install_version(
         std::thread::sleep(Duration::from_millis(800));
     }
     if is_installed(runtime_dir, version) {
-        crate::progress::push_console(app, "info", "Install finished — completing missing peer packages…");
-        crate::progress::emit(app, op, Some(version), "installing", "Completing missing peer packages…", Some(82));
-        // Some published alpha/rc builds move key modules to peerDependencies
-        // of the top-level @deepseek-ai tree. With --legacy-peer-deps npm does
-        // not auto-install those peers, leaving the harness unable to boot
-        // (ERR_MODULE_NOT_FOUND). Detect missing @deepseek-ai/* peers from the
-        // installed tree and install dsh + the missing peers in one npm pass.
-        let extra = missing_peer_specs(runtime_dir, version)?;
-        let extra_count = extra.len();
-        if !extra_count > 0 {
-            let mut args: Vec<String> = vec![
-                "install".into(),
-                "--prefix".into(),
-                dir.to_string_lossy().into_owned(),
-                "--no-save".into(),
-                "--no-audit".into(),
-                "--no-fund".into(),
-                "--no-color".into(),
-                "--legacy-peer-deps".into(),
-                "--fetch-retries=2".into(),
-                "--fetch-timeout=120000".into(),
-                "--loglevel=http".into(),
-                "--progress=false".into(),
-                spec.clone(),
-            ];
-            args.extend(extra);
-            crate::progress::push_console(
-                app,
-                "info",
-                &format!("$ npm install {spec} (+{} peer packages)", extra_count),
-            );
-            let _ = run_npm(
-                app,
-                runtime_dir,
-                &args.iter().map(|s| s.as_str()).collect::<Vec<&str>>(),
-                Duration::from_secs(120),
-                Some(&mut throttled_sink),
-            )?;
-            // A peer-completion pass can occasionally leave the tree in a
-            // transient state; re-run once if the harness entry vanished.
-            if !is_installed(runtime_dir, version) {
-                crate::progress::push_console(app, "info", "Retrying peer completion…");
-                let _ = run_npm(
-                    app,
-                    runtime_dir,
-                    &args.iter().map(|s| s.as_str()).collect::<Vec<&str>>(),
-                    Duration::from_secs(120),
-                    Some(&mut throttled_sink),
-                )?;
-            }
-        }
+        ensure_peer_completion(app, runtime_dir, version, op)?;
     }
     crate::progress::push_console(app, "info", "Install finished — verifying…");
     crate::progress::emit(app, op, Some(version), "verifying", "Verifying installation…", Some(85));
@@ -414,8 +364,12 @@ fn missing_peer_specs(runtime_dir: &Path, version: &str) -> Result<Vec<String>, 
                     let short = name.trim_start_matches(prefix);
                     let present = scope.join(short).is_dir();
                     if !present {
+                        let range_str = range
+                            .as_str()
+                            .map(|s| s.to_string())
+                            .unwrap_or_else(|| range.to_string());
                         peers.entry(name.clone())
-                             .or_insert_with(|| format!("{}@{}", name, range));
+                             .or_insert_with(|| format!("{}@{}", name, range_str));
                     }
                 }
             }
@@ -423,3 +377,72 @@ fn missing_peer_specs(runtime_dir: &Path, version: &str) -> Result<Vec<String>, 
     }
     Ok(peers.into_values().collect())
 }
+/// Ensure an installed harness tree has all of its @deepseek-ai/* peer
+/// packages materialised. Published alpha/rc builds move runtime-required
+/// modules to peerDependencies; with --legacy-peer-deps npm skips peer
+/// auto-install, leaving the updated tree unbootable (ERR_MODULE_NOT_FOUND).
+/// Runs an idempotent npm install of dsh + the missing peers when needed.
+pub fn ensure_peer_completion(
+    app: &AppHandle,
+    runtime_dir: &Path,
+    version: &str,
+    op: &str,
+) -> Result<(), String> {
+    if !is_installed(runtime_dir, version) {
+        return Ok(());
+    }
+    let extra = missing_peer_specs(runtime_dir, version)?;
+    if extra.is_empty() {
+        return Ok(());
+    }
+    let dir = version_dir(runtime_dir, version);
+    let spec = format!("{}@{}", PACKAGE, version);
+    crate::progress::push_console(
+        app,
+        "info",
+        &format!("Installing {} missing peer packages...", extra.len()),
+    );
+    crate::progress::emit(
+        app,
+        op,
+        Some(version),
+        "installing",
+        "Completing missing peer packages...",
+        Some(88),
+    );
+    let mut args: Vec<String> = vec![
+        "install".into(),
+        "--prefix".into(),
+        dir.to_string_lossy().into_owned(),
+        "--no-save".into(),
+        "--no-audit".into(),
+        "--no-fund".into(),
+        "--no-color".into(),
+        "--legacy-peer-deps".into(),
+        "--fetch-retries=2".into(),
+        "--fetch-timeout=120000".into(),
+        "--loglevel=http".into(),
+        "--progress=false".into(),
+        spec,
+    ];
+    args.extend(extra);
+    let npm_args: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+    let mut sink = |stream: &str, line: &str| {
+        let line = line.trim();
+        if !line.is_empty() {
+            crate::progress::push_console(app, stream, &line.chars().take(600).collect::<String>());
+        }
+    };
+    run_npm(app, runtime_dir, &npm_args, Duration::from_secs(120), Some(&mut sink))?;
+    crate::progress::push_console(app, "info", "Peer packages complete - verifying...");
+    crate::progress::emit(app, op, Some(version), "verifying", "Verifying installation...", Some(95));
+    if !is_installed(runtime_dir, version) {
+        std::thread::sleep(Duration::from_millis(800));
+    }
+    if !is_installed(runtime_dir, version) {
+        return Err(format!("peer completion did not leave a usable harness for {}", version));
+    }
+    Ok(())
+}
+
+
