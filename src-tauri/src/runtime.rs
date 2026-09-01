@@ -78,10 +78,6 @@ impl HarnessRuntime {
     pub fn clear_web_url(&self) {
         *self.web_url.lock().unwrap() = None;
     }
-
-    fn store_web_url(&self, url: String) {
-        *self.web_url.lock().unwrap() = Some(url);
-    }
 }
 
 pub struct ChildState {
