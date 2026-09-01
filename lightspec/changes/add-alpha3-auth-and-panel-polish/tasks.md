@@ -1,8 +1,8 @@
 ## 1. Authenticated harness URL (alpha 2/3 token)
-- [ ] 1.1 runtime.rs: parse the `dsh web: <url>` stdout line, store the latest authenticated URL on the runtime, clear it on (re)start, emit status on capture (+ unit tests)
-- [ ] 1.2 commands.rs: `harness_web_url` helper (wait briefly for the token URL, fall back to the plain URL); use it for window navigation, boot, tray open and open-in-browser
-- [ ] 1.3 overlay.js: link/anchor uses the captured URL from status
-- [ ] 1.4 Verify: engine boots on alpha.3 and the harness window renders the WebUI (no 401)
+- [x] 1.1 runtime.rs: parse the `dsh web: <url>` stdout line, store the latest authenticated URL on the runtime, clear it on (re)start, emit status on capture (+ unit tests)
+- [x] 1.2 commands.rs: `harness_web_url` helper (wait briefly for the token URL, fall back to the plain URL); use it for window navigation, boot, tray open and open-in-browser
+- [x] 1.3 overlay.js: link/anchor uses the captured URL from status
+- [x] 1.4 Verify: engine boots on alpha.3 and the harness window renders the WebUI (no 401) — plain URL 401s, token URL 303→cookie→200; v0.1.21 deployed & running
 
 ## 2. System-theme following windows
 - [ ] 2.1 settings.html + stopped.html: full light/dark `prefers-color-scheme` palettes (native titlebar already follows the system; no theme is forced)
