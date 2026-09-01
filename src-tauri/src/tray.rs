@@ -144,7 +144,10 @@ pub fn show_main_window(app: &AppHandle) -> Result<(), String> {
         return Ok(());
     }
     if running {
-        crate::window::ensure_window(app, &crate::commands::harness_url(current_port(app)))
+        crate::window::ensure_window(
+            app,
+            &crate::commands::harness_web_url(app, current_port(app), Some(std::time::Duration::from_secs(5))),
+        )
     } else {
         crate::window::ensure_window(app, "dsh-ui://localhost/stopped")
     }
