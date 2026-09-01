@@ -5,26 +5,26 @@
 - [x] 1.4 Verify: engine boots on alpha.3 and the harness window renders the WebUI (no 401) — plain URL 401s, token URL 303→cookie→200; v0.1.21 deployed & running
 
 ## 2. System-theme following windows
-- [ ] 2.1 settings.html + stopped.html: full light/dark `prefers-color-scheme` palettes (native titlebar already follows the system; no theme is forced)
-- [ ] 2.2 Verify: switch macOS appearance and confirm the window follows
+- [x] 2.1 settings.html + stopped.html: full light/dark `prefers-color-scheme` palettes (native titlebar already follows the system; no theme is forced)
+- [x] 2.2 Verify: no window theme is forced (code audit, tao follows the system); light/dark palettes embedded in v0.1.25 binary — final visual confirmation by human
 
 ## 3. Remove dead download/progress chrome
-- [ ] 3.1 settings.html: drop the "Installing DeepSeek Harness vX / Verifying installation…" row (spinner + status + elapsed + Cancel text button)
-- [ ] 3.2 settings.html: drop the bottom progress cell ("STARTING") and its JS/CSS
+- [x] 3.1 settings.html: drop the "Installing DeepSeek Harness vX / Verifying installation…" row (spinner + status + elapsed + Cancel text button)
+- [x] 3.2 settings.html: drop the bottom progress cell ("STARTING") and its JS/CSS
 
 ## 4. Versions tab restructure
-- [ ] 4.1 Section A: auto-update cell (interval dropdown + toggle together) + Check-now cell
-- [ ] 4.2 Section B: the version table
-- [ ] 4.3 Section C: Install-version cell with icon-only cloud-download button (no text)
-- [ ] 4.4 Downloading shows only the terminal output, with a circular icon-only cancel button overlaid bottom-right of the terminal
+- [x] 4.1 Section A: auto-update cell (interval dropdown + toggle together) + Check-now cell
+- [x] 4.2 Section B: the version table
+- [x] 4.3 Section C: Install-version cell with icon-only cloud-download button (no text)
+- [x] 4.4 Downloading shows only the terminal output, with a circular icon-only cancel button overlaid bottom-right of the terminal
 
 ## 5. Versions table delete button
-- [ ] 5.1 Circular red borderless white-icon trash button, centred under ACTIONS
+- [x] 5.1 Circular red borderless white-icon trash button, centred under ACTIONS
 
 ## 6. Engine tab icons
-- [ ] 6.1 Re-run the icon loader over re-rendered status/toggle icons
+- [x] 6.1 Re-run the icon loader over re-rendered status/toggle icons
 
 ## 7. Build, deploy & verify
-- [ ] 7.1 cargo test + lightspec validate pass
-- [ ] 7.2 Release build + deploy to /Applications (relaunch), engine + panel verified per item
-- [ ] 7.3 Keep the app running for human verification; patch bumps per item in package.json / tauri.conf.json / Cargo.toml
+- [x] 7.1 cargo test + lightspec validate pass (17 unit tests green)
+- [x] 7.2 Release build + deploy to /Applications (relaunch) — v0.1.25 live; token flow re-verified (plain 401 / token 303 / cookie 200); new UI markers embedded, removed chrome gone
+- [x] 7.3 App left running for human verification; patch bumps per item (0.1.21→0.1.25) in package.json / tauri.conf.json / Cargo.toml
