@@ -166,14 +166,79 @@ fn restart_engine(app: &AppHandle, op: &str, version: Option<&str>, force: bool)
     Ok(actual)
 }
 
+/// Human-readable feedback for a switch operation. The radio in the versions
+/// table IS the designed way to switch, so the message must describe what the
+/// switch did — never bounce the user back to the Control Panel.
+fn switch_feedback(version: &str, was_installed: bool, already_active: bool) -> String {
+    if already_active {
+        format!("v{version} is already the default version")
+    } else if was_installed {
+        format!("v{version} is now the default version — press Start to run it")
+    } else {
+        format!("installed v{version} and set it as the default version")
+    }
+}
+
+/// Install `version` when missing and make it the active (default) version.
+/// This is the switch path behind the versions-table radio and the install
+/// button: switching only records the default (it never starts the engine),
+/// and it is refused while the engine is running so the running binary and
+/// the recorded default stay consistent.
 fn switch_version_inner(app: &AppHandle, version: &str, op: &str) -> Result<String, String> {
     ensure_runtime_dirs(app).map_err(|e| format!("runtime dirs: {e}"))?;
+    {
+        let st = app.state::<AppState>();
+        if st.runtime.is_running() {
+            return Err("stop the engine before switching versions".into());
+        }
+    }
     let rd = state::runtime_dir(app);
+    let was_installed = versions::is_installed(&rd, version);
     versions::install_version(app, &rd, version, op)?;
     invalidate_version_cache(app);
 
-    progress::finish(app, op, Some(version), &format!("Installed {version} — select it from the Control Panel"));
-    Ok(format!("installed {version} — select it from the Control Panel"))
+    let settings = state::read_settings(app);
+    let already_active = settings.current_version.as_deref() == Some(version);
+    if !already_active {
+        let previous = settings.current_version.clone();
+        state::update_settings(app, |s| {
+            s.previous_version = previous;
+            s.current_version = Some(version.to_string());
+        });
+        crate::tray::refresh(app);
+    }
+    let msg = switch_feedback(version, was_installed, already_active);
+    progress::finish(app, op, Some(version), &msg);
+    Ok(msg)
+}
+
+#[cfg(test)]
+mod switch_tests {
+    use super::switch_feedback;
+
+    #[test]
+    fn feedback_describes_the_switch_not_the_panel() {
+        assert_eq!(
+            switch_feedback("0.1.2", false, false),
+            "installed v0.1.2 and set it as the default version"
+        );
+        assert_eq!(
+            switch_feedback("0.1.2", true, false),
+            "v0.1.2 is now the default version — press Start to run it"
+        );
+        assert_eq!(
+            switch_feedback("0.1.2", true, true),
+            "v0.1.2 is already the default version"
+        );
+    }
+
+    #[test]
+    fn feedback_never_bounces_the_user_back_to_the_panel() {
+        for (was_installed, already_active) in [(false, false), (true, false), (false, true)] {
+            let msg = switch_feedback("0.1.0-rc.7", was_installed, already_active);
+            assert!(!msg.contains("select it from the Control Panel"), "{msg}");
+        }
+    }
 }
 
 #[tauri::command]
