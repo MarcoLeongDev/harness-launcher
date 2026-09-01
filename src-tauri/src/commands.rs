@@ -39,10 +39,34 @@ pub struct StatusPayload {
     /// Terminal lines of the current download (only meaningful while a
     /// version download is in progress).
     pub console: Vec<progress::ConsoleLine>,
+    /// Authenticated WebUI URL captured from the engine (`?token=…`), if any.
+    pub web_url: Option<String>,
 }
 
 pub fn harness_url(actual_port: u16) -> String {
     format!("http://127.0.0.1:{actual_port}")
+}
+
+/// Port of a captured harness URL, if it parses.
+fn url_port(url: &str) -> Option<u16> {
+    url::Url::parse(url).ok()?.port_or_known_default()
+}
+
+/// The URL the harness window / browser should open: the authenticated
+/// `?token=…` URL the running engine printed at boot when one has been
+/// captured for this port, otherwise the plain URL (pre-token engines).
+/// With `wait` set, briefly waits for the engine to print the URL right
+/// after a (re)start; call only from blocking (non-main) contexts.
+pub fn harness_web_url(app: &AppHandle, port: u16, wait: Option<Duration>) -> String {
+    let runtime = &app.state::<AppState>().runtime;
+    let captured = match wait {
+        Some(t) => runtime.wait_for_web_url(t),
+        None => runtime.captured_web_url(),
+    };
+    match captured {
+        Some(url) if url_port(&url) == Some(port) => url,
+        _ => harness_url(port),
+    }
 }
 
 fn ensure_runtime_dirs(app: &AppHandle) -> std::io::Result<()> {
@@ -157,7 +181,7 @@ fn switch_version_inner(app: &AppHandle, version: &str, op: &str) -> Result<Stri
 
     progress::emit(app, op, Some(version), "switching", "Switching active version…", Some(90));
     let actual = restart_engine(app, op, Some(version), false)?;
-    let _ = window::navigate(app, &harness_url(actual));
+    let _ = window::navigate(app, &harness_web_url(app, actual, Some(Duration::from_secs(10))));
     progress::finish(app, op, Some(version), &format!("Switched to {version} on port {actual}"));
     Ok(format!("switched to {version} on port {actual}"))
 }
@@ -235,6 +259,7 @@ pub fn get_status(app: AppHandle, st: State<'_, AppState>) -> Result<StatusPaylo
         boot_error,
         current_op,
         console,
+        web_url: st.runtime.captured_web_url(),
     })
 }
 
@@ -325,7 +350,7 @@ pub async fn set_port(app: AppHandle, port: u16) -> Result<String, String> {
         progress::emit(&app, "port", None, "restarting", &format!("Restarting engine on port {actual}…"), Some(40));
         match restart_engine(&app, "port", None, false) {
             Ok(actual2) => {
-                let _ = window::navigate(&app, &harness_url(actual2));
+                let _ = window::navigate(&app, &harness_web_url(&app, actual2, Some(Duration::from_secs(10))));
                 progress::finish(&app, "port", None, &format!("Port set to {port}, engine on {actual2}"));
                 Ok(format!(
                     "port set to {port}{} — harness on {actual2}",
@@ -436,7 +461,10 @@ pub fn tail_logs(app: AppHandle, lines: Option<usize>) -> Result<String, String>
 #[tauri::command]
 pub fn open_in_browser(app: AppHandle) -> Result<String, String> {
     let actual = *app.state::<AppState>().effective_port.lock().unwrap();
-    let url = harness_url(actual);
+    let running = app.state::<AppState>().runtime.is_running();
+    // A running token engine prints its URL right after binding, so a short
+    // wait is enough; a stopped engine opens the plain URL immediately.
+    let url = harness_web_url(&app, actual, running.then(|| Duration::from_secs(5)));
     std::process::Command::new("open")
         .arg(&url)
         .spawn()
@@ -448,7 +476,7 @@ pub fn open_in_browser(app: AppHandle) -> Result<String, String> {
 pub fn restart_harness(app: AppHandle) -> Result<String, String> {
     with_progress_cleanup(&app, || {
         let actual = restart_engine(&app, "engine", None, false)?;
-        let _ = window::navigate(&app, &harness_url(actual));
+        let _ = window::navigate(&app, &harness_web_url(&app, actual, Some(Duration::from_secs(10))));
         progress::clear(&app);
         Ok(format!("harness restarted on port {actual}"))
     })
@@ -465,7 +493,7 @@ pub async fn engine_start(app: AppHandle) -> Result<String, String> {
             }
             let actual = start_engine(&app, "engine")?;
             state::update_settings(&app, |s| s.start_on_launch = true);
-            let _ = window::navigate(&app, &harness_url(actual));
+            let _ = window::navigate(&app, &harness_web_url(&app, actual, Some(Duration::from_secs(10))));
             progress::clear(&app);
             Ok(format!("engine started on port {actual}"))
         })
@@ -495,7 +523,7 @@ pub async fn engine_restart(app: AppHandle) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
         with_progress_cleanup(&app, || {
             let actual = restart_engine(&app, "engine", None, false)?;
-            let _ = window::navigate(&app, &harness_url(actual));
+            let _ = window::navigate(&app, &harness_web_url(&app, actual, Some(Duration::from_secs(10))));
             progress::clear(&app);
             Ok(format!("engine restarted on port {actual}"))
         })
@@ -514,7 +542,7 @@ pub async fn engine_force_restart(app: AppHandle) -> Result<String, String> {
                 return Ok("engine is stopped; use Start to launch it".into());
             }
             let actual = restart_engine(&app, "engine", None, true)?;
-            let _ = window::navigate(&app, &harness_url(actual));
+            let _ = window::navigate(&app, &harness_web_url(&app, actual, Some(Duration::from_secs(10))));
             progress::clear(&app);
             Ok(format!("engine force-restarted on port {actual}"))
         })
