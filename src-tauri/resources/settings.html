@@ -693,6 +693,9 @@
     else { iconCls = 'error'; iconIco = 'exclamation-circle-fill'; }
     sel.stIcon.className = 'ec-status-icon ' + iconCls;
     sel.stIcon.innerHTML = '<i class="ico bi" data-ico="' + iconIco + '"></i>';
+    // innerHTML replacement discards any previously swapped-in SVG; re-run the
+    // loader so the status icon renders on every status update.
+    loadIconsIn(sel.stIcon);
 
     // Running state: show version as text, port as text
     // Stopped state: show version as dropdown, port as input
@@ -729,7 +732,8 @@
       sel.port.disabled = false;
     }
 
-    // Toggle button (icon only, circular)
+    // Toggle button (icon only, circular). innerHTML resets the icon to a
+    // placeholder <i>; re-run the loader or the Start/Stop glyph vanishes.
     if (runningLike) {
       sel.toggle.className = 'ec-btn icon-stop';
       sel.toggle.innerHTML = '<i class="ico bi" data-ico="pause-fill"></i>';
@@ -739,6 +743,7 @@
       sel.toggle.innerHTML = '<i class="ico bi" data-ico="play-fill"></i>';
       sel.toggle.title = 'Start';
     }
+    loadIconsIn(sel.toggle);
     sel.toggle.disabled = false;
     sel.restart.disabled = !runningLike;
 
@@ -821,7 +826,6 @@
   function refresh() {
     return invoke('get_status').then(function (s) {
       renderStatus(s);
-      loadIconsIn(sel.stIcon);
     }).catch(function (e) {
       setResult(String(e && e.message || e), true);
     });
