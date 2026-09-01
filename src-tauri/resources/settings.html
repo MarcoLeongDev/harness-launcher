@@ -192,6 +192,20 @@
   .vc-tag { width: 92px; flex: none; }
   .vc-tag .tag { display: inline-block; }
   .vc-acts { display: flex; gap: 7px; align-items: center; }
+  .vc-def { width: 64px; flex: none; display: flex; align-items: center; justify-content: center; }
+  /* custom radio for the "Default" (active) version selector */
+  .vc-radio { appearance: none; -webkit-appearance: none; width: 16px; height: 16px;
+    border: 1.5px solid var(--hair2); border-radius: 50%; background: transparent;
+    cursor: pointer; position: relative; transition: border-color .15s, background .15s; flex: none; }
+  .vc-radio:hover { border-color: var(--accent2); }
+  .vc-radio:checked { border-color: var(--ok); background: var(--ok); }
+  .vc-radio:checked::after { content: ""; position: absolute; width: 6px; height: 6px;
+    border-radius: 50%; background: #04231a; left: 50%; top: 50%; transform: translate(-50%,-50%); }
+  .vc-radio:disabled { opacity: 0.35; cursor: default; }
+  .vc-radio:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
+  /* green checkmark used for installed/healthy rows */
+  .vc-check { color: var(--ok); display: inline-flex; align-items: center; justify-content: center; }
+  .vc-check svg { width: 16px; height: 16px; }
   .btn.danger { background: var(--err); border-color: var(--err); color: #fff; }
   .btn.danger:hover { background: #ff6259; }
   .btn.ghost-danger { background: transparent; border-color: rgba(255,69,58,0.45);
@@ -252,11 +266,7 @@
         </div>
         <span class="ec-sep">:</span>
         <div class="ec-select-wrap" id="host-wrap">
-          <select id="sel-host" class="ec-select" aria-label="Host" disabled>
-            <option value="127.0.0.1">127.0.0.1</option>
-            <option value="0.0.0.0">0.0.0.0</option>
-          </select>
-          <svg id="host-chevron" style="display:none" viewBox="0 0 16 16" fill="currentColor"><path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg>
+          <span id="host-text" class="ec-ver">127.0.0.1</span>
         </div>
         <span class="ec-sep">:</span>
         <input id="inp-port" class="ec-port" type="number" min="1" max="65535" aria-label="Port" disabled />
@@ -280,19 +290,17 @@
     <div class="group">
       <div class="vhead">
         <label class="hint" style="display:flex;align-items:center;gap:7px;flex:1">
-          Auto update
+          Auto update every
+          <select id="sel-interval" aria-label="Check every"></select>
           <span class="switch"><input type="checkbox" id="chk-autoupdate" /><span class="slider"></span></span>
         </label>
-        <span class="hint" style="display:flex;align-items:center;gap:7px">
-          Check every
-          <select id="sel-interval" aria-label="Check every"></select>
-        </span>
         <button class="btn" id="btn-check" title="Check for updates now">
-          <i class="ico sm bi" data-ico="arrow-clockwise"></i> Check
+          <i class="ico sm bi" data-ico="arrow-clockwise"></i> Check now
         </button>
       </div>
       <div class="vtable">
         <div class="vrow vhead-row">
+          <span class="vc-def" title="Default version">Default</span>
           <span class="vc-ver">Version</span>
           <span class="vc-tag">Status</span>
           <span class="vc-acts">Actions</span>
@@ -418,7 +426,7 @@
     stIcon: $('st-icon'),
     toggle: $('btn-toggle'), restart: $('btn-restart'),
     engineVer: $('sel-version'), verWrap: $('ver-wrap'), verChevron: $('ver-chevron'),
-    host: $('sel-host'), hostWrap: $('host-wrap'), hostChevron: $('host-chevron'),
+    host: $('host-text'), hostWrap: $('host-wrap'),
     port: $('inp-port'),
     pre: $('chk-prerelease'),
     intervalSel: $('sel-interval'), installSel: $('sel-install-ver'), btnInstall: $('btn-install'),
@@ -580,30 +588,53 @@
     list.forEach(function (v) {
       var row = document.createElement('div');
       row.className = 'vrow';
+      var isActive = s.activeVersion === v;
+
+      // Default column: a radio that selects this version as the active one.
+      var defCell = document.createElement('span');
+      defCell.className = 'vc-def';
+      var radio = document.createElement('input');
+      radio.type = 'radio';
+      radio.name = 'dsh-default-version';
+      radio.className = 'vc-radio';
+      radio.checked = isActive;
+      radio.disabled = isActive || !!s.currentOp;
+      radio.title = isActive ? 'This is the default version' : 'Make v' + v + ' the default version';
+      radio.addEventListener('change', function () {
+        if (radio.checked && !isActive) {
+          withCmd(function () { return invoke('install_and_switch', { version: v }); }, 'Switched');
+        }
+      });
+      defCell.appendChild(radio);
+
       var ver = document.createElement('span');
       ver.className = 'vc-ver'; ver.textContent = 'v' + v;
+
+      // Status column: green checkmark for every installed version.
       var tagCell = document.createElement('span');
       tagCell.className = 'vc-tag';
-      var isActive = s.activeVersion === v;
-      var tag = document.createElement('span');
-      if (isActive) tag.className = 'tag active', tag.textContent = 'Active';
-      else if (s.previousVersion === v) tag.className = 'tag prev', tag.textContent = 'Previous';
-      else tag.className = 'tag inst', tag.textContent = 'Installed';
-      tagCell.appendChild(tag);
+      var status = document.createElement('span');
+      status.className = 'vc-check';
+      status.title = isActive ? 'Active' : (s.previousVersion === v ? 'Previous' : 'Installed');
+      status.innerHTML = '<i class="ico sm bi" data-ico="check-lg"></i>';
+      tagCell.appendChild(status);
+      if (isActive) {
+        var tag = document.createElement('span');
+        tag.className = 'tag active'; tag.textContent = 'Active';
+        tagCell.appendChild(tag);
+      } else if (s.previousVersion === v) {
+        var ptag = document.createElement('span');
+        ptag.className = 'tag prev'; ptag.textContent = 'Previous';
+        tagCell.appendChild(ptag);
+      }
+
+      // Actions column: trash button with confirmation popover.
       var acts = document.createElement('span');
       acts.className = 'vc-acts';
-      var def = document.createElement('button');
-      def.className = 'btn';
-      def.disabled = isActive;
-      def.title = isActive ? 'This is the default version' : 'Make this the default version';
-      def.textContent = isActive ? 'Default' : 'Set default';
-      def.addEventListener('click', function () {
-        withCmd(function () { return invoke('install_and_switch', { version: v }); }, 'Switched');
-      });
       var del = document.createElement('button');
       del.className = 'btn icon ghost-danger';
       del.title = 'Delete this version';
-      del.disabled = isActive;
+      del.disabled = isActive || !!s.currentOp;
       del.innerHTML = '<i class="ico sm bi" data-ico="trash-fill"></i>';
       var pop = document.createElement('div');
       pop.className = 'pop';
@@ -633,11 +664,13 @@
         invoke('delete_version', { version: v }).then(function () { return refresh(); })
           .catch(function (e) { setResult(String(e && e.message || e), true); return refresh(); });
       });
-      acts.appendChild(def); acts.appendChild(del);
-      row.appendChild(ver); row.appendChild(tagCell); row.appendChild(acts);
+      acts.appendChild(del);
+      row.appendChild(defCell); row.appendChild(ver); row.appendChild(tagCell); row.appendChild(acts);
       row.appendChild(pop);
       sel.verTbody.appendChild(row);
     });
+    // Icons created above use data-ico; let the icon loader pick them up.
+    loadIconsIn(sel.verTbody);
   }
 
   function renderStatus(s) {
@@ -672,16 +705,6 @@
       sel.verWrap.appendChild(verText);
       sel.verWrap.style.cursor = 'default';
 
-      // Host as text
-      sel.host.style.display = 'none';
-      sel.hostChevron.style.display = 'none';
-      var hostText = document.createElement('span');
-      hostText.className = 'ec-ver';
-      hostText.textContent = s.host || '127.0.0.1';
-      sel.hostWrap.innerHTML = '';
-      sel.hostWrap.appendChild(hostText);
-      sel.hostWrap.style.cursor = 'default';
-
       // Port as text
       sel.port.type = 'text';
       sel.port.readOnly = true;
@@ -695,16 +718,6 @@
       sel.verChevron.style.display = '';
       sel.engineVer.disabled = false;
       sel.verWrap.style.cursor = 'pointer';
-
-      // Host as dropdown
-      sel.hostWrap.innerHTML = '';
-      sel.hostWrap.appendChild(sel.host);
-      sel.hostWrap.appendChild(sel.hostChevron);
-      sel.host.style.display = '';
-      sel.hostChevron.style.display = '';
-      sel.host.disabled = false;
-      sel.hostWrap.style.cursor = 'pointer';
-      if (s.host) sel.host.value = s.host;
 
       // Port as input
       sel.port.type = 'number';
@@ -768,10 +781,9 @@
   }
 
   var INTERVAL_OPTS = [
-    [6,'6 hours'],[7,'7 hours'],[8,'8 hours'],[9,'9 hours'],[10,'10 hours'],[11,'11 hours'],[12,'12 hours'],
-    [13,'13 hours'],[14,'14 hours'],[15,'15 hours'],[16,'16 hours'],[17,'17 hours'],[18,'18 hours'],
-    [19,'19 hours'],[20,'20 hours'],[21,'21 hours'],[22,'22 hours'],[23,'23 hours'],[24,'24 hours'],
-    [48,'1 day'],[96,'2 days'],[144,'3 days'],[192,'4 days'],[240,'5 days'],[288,'6 days'],[336,'7 days']
+    [1,'1 hour'],[2,'2 hours'],[3,'3 hours'],[4,'4 hours'],[5,'5 hours'],[6,'6 hours'],
+    [7,'7 hours'],[8,'8 hours'],[9,'9 hours'],[10,'10 hours'],[11,'11 hours'],[12,'12 hours'],
+    [18,'18 hours'],[24,'1 day'],[48,'2 days'],[72,'3 days'],[168,'1 week']
   ];
   function buildIntervalSelect() {
     if (sel.intervalSel.options.length) return;
@@ -858,14 +870,6 @@
   }
   sel.port.addEventListener('blur', applyPort);
   sel.port.addEventListener('keydown', function (e) { if (e.key === 'Enter') sel.port.blur(); });
-
-  // host: save on change (when stopped only — the dropdown is hidden while
-  // running, so this only fires in the stopped state).
-  sel.host.addEventListener('change', function () {
-    var h = sel.host.value;
-    if (!h) return;
-    withCmd(function () { return invoke('set_host', { host: h }); }, 'Host set');
-  });
 
   // versions table
   sel.btnInstall.addEventListener('click', function () {
