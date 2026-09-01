@@ -618,11 +618,7 @@
       status.title = isActive ? 'Active' : (s.previousVersion === v ? 'Previous' : 'Installed');
       status.innerHTML = '<i class="ico sm bi" data-ico="check-lg"></i>';
       tagCell.appendChild(status);
-      if (isActive) {
-        var tag = document.createElement('span');
-        tag.className = 'tag active'; tag.textContent = 'Active';
-        tagCell.appendChild(tag);
-      } else if (s.previousVersion === v) {
+      if (s.previousVersion === v) {
         var ptag = document.createElement('span');
         ptag.className = 'tag prev'; ptag.textContent = 'Previous';
         tagCell.appendChild(ptag);
