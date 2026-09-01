@@ -297,12 +297,18 @@ pub fn install_version(
         crate::progress::push_console(app, "err", "Download stopped by user");
         return Err("operation cancelled by user".into());
     }
-    crate::progress::push_console(app, "info", "Install finished — verifying…");
-    crate::progress::emit(app, op, Some(version), "verifying", "Verifying installation…", Some(85));
     if !is_installed(runtime_dir, version) {
         // npm may still be flushing files to disk; give it a brief grace period
         // before concluding the harness is missing (avoids a false failure on
         // slow filesystem writes).
+        std::thread::sleep(Duration::from_millis(800));
+    }
+    if is_installed(runtime_dir, version) {
+        ensure_peer_completion(app, runtime_dir, version, op)?;
+    }
+    crate::progress::push_console(app, "info", "Install finished — verifying…");
+    crate::progress::emit(app, op, Some(version), "verifying", "Verifying installation…", Some(85));
+    if !is_installed(runtime_dir, version) {
         std::thread::sleep(Duration::from_millis(800));
     }
     if !is_installed(runtime_dir, version) {
@@ -327,3 +333,116 @@ pub fn install_version(
     }
     Ok(())
 }
+/// Find @deepseek-ai/* packages referenced as peerDependencies somewhere in
+/// the installed tree but not actually present in node_modules/@deepseek-ai.
+///
+/// Published alpha/rc builds occasionally move runtime-required modules to
+/// peerDependencies of scoped packages. With --legacy-peer-deps npm skips
+/// peer auto-install, leaving the harness unable to boot
+/// (ERR_MODULE_NOT_FOUND). The launcher compensates by installing the
+/// missing peers explicitly alongside the harness package.
+fn missing_peer_specs(runtime_dir: &Path, version: &str) -> Result<Vec<String>, String> {
+    let scope = version_dir(runtime_dir, version)
+        .join("node_modules")
+        .join("@deepseek-ai");
+    let mut peers: std::collections::BTreeMap<String, String> = std::collections::BTreeMap::new();
+    let entries = std::fs::read_dir(&scope)
+        .map_err(|e| format!("read installed scope {}: {e}", scope.display()))?;
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("read dir entry: {e}"))?;
+        let pkg_bin = entry.path();
+        if !pkg_bin.is_dir() { continue; }
+        let manifest = pkg_bin.join("package.json");
+        if !manifest.exists() { continue; }
+        let Ok(text) = std::fs::read_to_string(&manifest) else { continue; };
+        let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) else { continue; };
+        if let Some(peers_map) = json.get("peerDependencies").and_then(|v| v.as_object()) {
+            for (name, range) in peers_map {
+                let name = name.to_string();
+                let prefix = "@deepseek-ai/";
+                if name.starts_with(prefix) {
+                    let short = name.trim_start_matches(prefix);
+                    let present = scope.join(short).is_dir();
+                    if !present {
+                        let range_str = range
+                            .as_str()
+                            .map(|s| s.to_string())
+                            .unwrap_or_else(|| range.to_string());
+                        peers.entry(name.clone())
+                             .or_insert_with(|| format!("{}@{}", name, range_str));
+                    }
+                }
+            }
+        }
+    }
+    Ok(peers.into_values().collect())
+}
+/// Ensure an installed harness tree has all of its @deepseek-ai/* peer
+/// packages materialised. Published alpha/rc builds move runtime-required
+/// modules to peerDependencies; with --legacy-peer-deps npm skips peer
+/// auto-install, leaving the updated tree unbootable (ERR_MODULE_NOT_FOUND).
+/// Runs an idempotent npm install of dsh + the missing peers when needed.
+pub fn ensure_peer_completion(
+    app: &AppHandle,
+    runtime_dir: &Path,
+    version: &str,
+    op: &str,
+) -> Result<(), String> {
+    if !is_installed(runtime_dir, version) {
+        return Ok(());
+    }
+    let extra = missing_peer_specs(runtime_dir, version)?;
+    if extra.is_empty() {
+        return Ok(());
+    }
+    let dir = version_dir(runtime_dir, version);
+    let spec = format!("{}@{}", PACKAGE, version);
+    crate::progress::push_console(
+        app,
+        "info",
+        &format!("Installing {} missing peer packages...", extra.len()),
+    );
+    crate::progress::emit(
+        app,
+        op,
+        Some(version),
+        "installing",
+        "Completing missing peer packages...",
+        Some(88),
+    );
+    let mut args: Vec<String> = vec![
+        "install".into(),
+        "--prefix".into(),
+        dir.to_string_lossy().into_owned(),
+        "--no-save".into(),
+        "--no-audit".into(),
+        "--no-fund".into(),
+        "--no-color".into(),
+        "--legacy-peer-deps".into(),
+        "--fetch-retries=2".into(),
+        "--fetch-timeout=120000".into(),
+        "--loglevel=http".into(),
+        "--progress=false".into(),
+        spec,
+    ];
+    args.extend(extra);
+    let npm_args: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+    let mut sink = |stream: &str, line: &str| {
+        let line = line.trim();
+        if !line.is_empty() {
+            crate::progress::push_console(app, stream, &line.chars().take(600).collect::<String>());
+        }
+    };
+    run_npm(app, runtime_dir, &npm_args, Duration::from_secs(120), Some(&mut sink))?;
+    crate::progress::push_console(app, "info", "Peer packages complete - verifying...");
+    crate::progress::emit(app, op, Some(version), "verifying", "Verifying installation...", Some(95));
+    if !is_installed(runtime_dir, version) {
+        std::thread::sleep(Duration::from_millis(800));
+    }
+    if !is_installed(runtime_dir, version) {
+        return Err(format!("peer completion did not leave a usable harness for {}", version));
+    }
+    Ok(())
+}
+
+
