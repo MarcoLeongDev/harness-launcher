@@ -165,6 +165,34 @@
   .ecterm-toggle.open svg { transform: rotate(180deg); }
   .ecterm { border-top: 1px solid var(--hair); background: rgba(0,0,0,0.35); display: none; }
   .ecterm.open { display: block; }
+  /* Operation feed: the single notification surface of the Versions tab,
+     appended as the LAST CELL of the installed-versions table group. Terminal
+     styling restored from v0.1.23: header with npm command + elapsed time,
+     mono output lines, and the circular stop button overlaid on the output
+     while a version downloads. Hidden whenever there is nothing to show. */
+  .op-feed { border-top: 1px solid var(--hair); background: rgba(0,0,0,0.35); }
+  .op-feed-head { display: flex; align-items: center; gap: 8px; padding: 10px 16px 6px; }
+  .op-feed-cmd { font-family: var(--mono); font-size: 10.5px; color: var(--faint);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+  .op-feed-elapsed { font-family: var(--mono); font-size: 11px; color: var(--faint);
+    min-width: 40px; text-align: right; }
+  .op-feed-body { position: relative; }
+  .term-out { margin: 0; padding: 8px 16px 46px; max-height: 220px; overflow: auto;
+    font: 10.5px/1.5 var(--mono); color: #9bd1c0; white-space: pre-wrap; word-break: break-all; }
+  .op-feed.idle .term-out { padding-bottom: 14px; }
+  .term-out .ln { display: block; }
+  .term-out .ln.out { color: #a9d5ff; }
+  .term-out .ln.info { color: #8ecdf7; font-weight: 600; }
+  .term-out .ln.err { color: #ff8a8a; }
+  .dl-cancel { position: absolute; right: 10px; bottom: 10px; width: 30px; height: 30px;
+    border-radius: 50%; border: none; background: var(--err); color: #fff; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center; padding: 0; flex: none;
+    box-shadow: 0 3px 10px rgba(255,69,58,0.45); transition: background .15s, opacity .15s; }
+  .dl-cancel svg { width: 15px; height: 15px; }
+  .dl-cancel:hover { background: #ff6259; }
+  .dl-cancel:active { transform: translateY(1px); }
+  .dl-cancel:disabled { opacity: 0.55; cursor: default; transform: none; }
+  .dl-cancel:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
   /* Logs tab now also surfaces the live engine run output (merged view) */
 
   /* version tiles */
@@ -355,6 +383,23 @@
           <span class="vc-acts">Actions</span>
         </div>
         <div id="ver-tbody"></div>
+        <!-- Operation feed: notifications for this tab (progress messages,
+             npm output, result/error lines) render here as the last cell of
+             the table section. The circular stop button overlays the output
+             only while a version download is in flight. -->
+        <div class="op-feed idle" id="op-feed" hidden>
+          <div class="op-feed-head" id="op-feed-head" hidden>
+            <i class="ico sm bi" style="color:var(--accent2)" data-ico="cloud-arrow-down-fill"></i>
+            <span class="op-feed-cmd" id="op-feed-cmd">npm install @deepseek-ai/dsh@…</span>
+            <span class="op-feed-elapsed" id="op-feed-elapsed">0:00</span>
+          </div>
+          <div class="op-feed-body">
+            <pre class="term-out" id="term-out" aria-live="polite"></pre>
+            <button class="dl-cancel" id="btn-stop-download" title="Stop download" aria-label="Stop download" hidden>
+              <i class="ico sm bi" data-ico="stop-circle"></i>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -372,11 +417,8 @@
           <span class="switch"><input type="checkbox" id="chk-prerelease" /><span class="slider"></span></span>
         </label>
       </div>
-      <div class="cell" id="op-result-cell" style="gap:8px;flex-wrap:wrap;display:none">
-      </div>
-      <div class="cell" style="padding-top:4px;padding-bottom:6px">
-        <span class="hint" id="op-result" style="flex:1"></span>
-      </div>
+      <!-- Result / progress notifications for this tab live in the terminal
+           cell at the end of the installed-versions table above. -->
     </div>
   </section>
 
@@ -455,8 +497,8 @@
     pre: $('chk-prerelease'),
     intervalSel: $('sel-interval'), installSel: $('sel-install-ver'), btnInstall: $('btn-install'),
     verTbody: $('ver-tbody'),
-    dlGroup: $('op-result-cell'),
-    result: $('op-result'),
+    feed: $('op-feed'), feedHead: $('op-feed-head'), feedCmd: $('op-feed-cmd'),
+    feedElapsed: $('op-feed-elapsed'), termOut: $('term-out'), stopDown: $('btn-stop-download'),
     auto: $('chk-autoupdate'), check: $('btn-check'), checkResult: $('check-result'),
     logRefresh: $('btn-log-refresh'), logFollow: $('btn-log-follow'), logTail: $('log-tail'),
     banner: $('update-banner'), bannerText: $('update-banner-text'), bannerBtn: $('btn-banner-update'),
@@ -466,6 +508,12 @@
 
   var followOn = true;
   var lastPhase = 'stopped';
+  // Operation feed state (the terminal cell of the versions table).
+  var opKey = null, opStart = null, lastFeedPhase = null, feedDownloading = false;
+  var elapsedTimer = null, stuckTimer = null, feedHideTimer = null;
+  var lastResultText = '', lastResultAt = 0;
+  var downloadingOps = { install: 1, update: 1, rollback: 1, select: 1 };
+  var downloadingPhases = { registry: 1, installing: 1, verifying: 1 };
 
   // ---------- tabs ----------
   var tabs = ['engine', 'versions', 'logs'];
@@ -487,11 +535,95 @@
     selectTab(tabs[next]); $('tab-btn-' + tabs[next]).focus();
   });
 
-  function setResult(text, isErr) {
-    sel.result.textContent = text || '';
-    sel.result.className = isErr ? 'err' : 'ok2';
-    if (text) setTimeout(function () { sel.result.textContent = ''; }, 8000);
+  // ---------- operation feed (terminal cell of the versions table) ----------
+  function fmtTime(secs) {
+    secs = Math.max(0, Math.floor(secs));
+    var m = Math.floor(secs / 60), s = secs % 60;
+    return m + ':' + (s < 10 ? '0' : '') + s;
   }
+  function clearElapsed() {
+    if (elapsedTimer) { clearInterval(elapsedTimer); elapsedTimer = null; }
+    sel.feedElapsed.textContent = '0:00';
+  }
+  function tickElapsed() {
+    if (elapsedTimer) return;
+    elapsedTimer = setInterval(function () {
+      if (opStart) sel.feedElapsed.textContent = fmtTime((Date.now() - opStart) / 1000);
+    }, 1000);
+  }
+  function appendTermLine(stream, text) {
+    var ln = document.createElement('span');
+    ln.className = 'ln ' + (stream === 'err' ? 'err' : stream === 'info' ? 'info' : 'out');
+    ln.textContent = text;
+    sel.termOut.appendChild(ln);
+    while (sel.termOut.childElementCount > 400) sel.termOut.removeChild(sel.termOut.firstChild);
+    sel.termOut.scrollTop = sel.termOut.scrollHeight;
+  }
+  function isDownloading(p) { return !!(p && downloadingOps[p.op] && downloadingPhases[p.phase]); }
+  // After 60 s with no progress output, surface a hint inside the terminal.
+  function armStuckTimer() {
+    if (stuckTimer) clearTimeout(stuckTimer);
+    stuckTimer = setTimeout(function () {
+      if (!sel.feed.hidden && feedDownloading) {
+        appendTermLine('info', 'no progress for 60s — still working? tap the stop button to cancel');
+      }
+    }, 60000);
+  }
+  function hideFeedSoon(ms) {
+    if (feedHideTimer) clearTimeout(feedHideTimer);
+    feedHideTimer = setTimeout(function () {
+      if (!feedDownloading) sel.feed.hidden = true;
+    }, ms);
+  }
+
+  // Notifications surface in the terminal cell — the last cell of the
+  // installed-versions table — instead of a stray line under the install row.
+  function setResult(text, isErr) {
+    if (!text) return;
+    var now = Date.now();
+    // The same final message often arrives twice (progress event + command
+    // result); appending both would duplicate the line.
+    if (text === lastResultText && now - lastResultAt < 2500) { lastResultAt = now; return; }
+    lastResultText = text; lastResultAt = now;
+    if (feedHideTimer) { clearTimeout(feedHideTimer); feedHideTimer = null; }
+    sel.feed.classList.toggle('idle', !feedDownloading);
+    sel.feed.hidden = false;
+    appendTermLine(isErr ? 'err' : 'info', text);
+    if (!feedDownloading) hideFeedSoon(8000);
+  }
+
+  function setDownloadState(p) {
+    var downloading = isDownloading(p);
+    feedDownloading = downloading;
+    sel.feed.classList.toggle('idle', !downloading);
+    if (downloading) {
+      if (feedHideTimer) { clearTimeout(feedHideTimer); feedHideTimer = null; }
+      var key = p.op + ':' + (p.version || '');
+      if (opKey !== key) {
+        opKey = key; opStart = Date.now(); lastFeedPhase = null;
+        sel.termOut.innerHTML = '';
+        sel.feedCmd.textContent = 'npm install @deepseek-ai/dsh@' + (p.version || '…');
+      }
+      sel.feed.hidden = false;
+      sel.feedHead.hidden = false;
+      sel.stopDown.hidden = false;
+      // Milestone messages (registry → installing → verifying) stream in as
+      // info lines so the terminal tells the whole story.
+      if (p.message && p.phase !== lastFeedPhase) {
+        lastFeedPhase = p.phase;
+        appendTermLine('info', p.message);
+      }
+      if (p.message) armStuckTimer();
+      tickElapsed();
+    } else {
+      sel.stopDown.hidden = true;
+      sel.feedHead.hidden = true;
+      clearElapsed();
+      if (stuckTimer) { clearTimeout(stuckTimer); stuckTimer = null; }
+      opKey = null; opStart = null; lastFeedPhase = null;
+    }
+  }
+
   function setCheckResult(text, isErr) {
     sel.checkResult.textContent = text || '';
     sel.checkResult.className = isErr ? 'err' : '';
@@ -505,7 +637,8 @@
 
 
   function applyProgress(p) {
-    if (!p) { busy(false); return; }
+    if (!p) { busy(false); setDownloadState(null); return; }
+    setDownloadState(p);
     busy(true);
     if (p.phase === 'done' || p.phase === 'failed' || p.phase === 'cancelled') {
       setTimeout(function () { busy(false); }, 2500);
@@ -716,6 +849,12 @@
 
     if (s.currentOp) {
       applyProgress(s.currentOp);
+      // Window (re)opened mid-download: seed the terminal with the snapshot
+      // so the feed tells the whole story from the start.
+      if (isDownloading(s.currentOp) && !sel.termOut.childElementCount && s.console && s.console.length) {
+        sel.feed.hidden = false;
+        s.console.forEach(function (line) { appendTermLine(line.stream || 'out', line.text); });
+      }
     } else {
       busy(false);
     }
@@ -824,6 +963,24 @@
   });
   sel.bannerBtn.addEventListener('click', function () { withCmd(function () { return invoke('update_to_latest', {}); }, 'Updated'); });
 
+  // Cancel the in-flight download via the circular stop overlay.
+  sel.stopDown.addEventListener('click', function () {
+    sel.stopDown.disabled = true;
+    appendTermLine('info', 'Stopping download…');
+    invoke('cancel_operation').then(function (res) {
+      appendTermLine('info', (res && res.message) || 'stop requested');
+      // Reflect the cancelled state immediately even if the backend's npm
+      // child takes a moment to actually exit.
+      setDownloadState(null);
+      appendTermLine('info', 'cancelled');
+      hideFeedSoon(4000);
+    }).catch(function (e) {
+      appendTermLine('err', String(e && e.message || e));
+    }).finally(function () {
+      setTimeout(function () { sel.stopDown.disabled = false; }, 2000);
+    });
+  });
+
   // auto-update
   sel.auto.addEventListener('change', function () {
     invoke('set_auto_update', { enabled: sel.auto.checked }).catch(function (e) { setResult(String(e.message || e), true); });
@@ -857,7 +1014,14 @@
 
   // events
   listen('launcher://progress', function (p) { if (p) applyProgress(p); });
-  listen('launcher://console', function (line) { if (line && line.text) { setResult(line.text, line.stream === 'err'); } });
+  listen('launcher://console', function (line) {
+    if (!line || !line.text) return;
+    // While the feed is open (e.g. a download running) npm output streams
+    // into the terminal; stray lines (like delete confirmations) surface as
+    // notifications instead of piling up invisibly.
+    if (sel.feed.hidden) { setResult(line.text, line.stream === 'err'); }
+    else { armStuckTimer(); appendTermLine(line.stream || 'out', line.text); }
+  });
   listen('launcher://status', function () { refresh(); });
 
   loadIconsIn(document);
