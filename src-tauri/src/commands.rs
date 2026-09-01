@@ -65,6 +65,13 @@ fn with_progress_cleanup<T>(app: &AppHandle, f: impl FnOnce() -> Result<T, Strin
     }
 }
 
+/// Invalidate the cached version list so the next `get_status` refreshes it.
+fn invalidate_version_cache(app: &AppHandle) {
+    let st = app.state::<AppState>();
+    let mut vc = st.version_cache.lock().unwrap();
+    vc.fetched_at = None;
+}
+
 /// Start the engine if it is not already running and wait until it serves.
 /// Emits progress under `op` and refreshes tray state. Returns the port.
 fn start_engine(app: &AppHandle, op: &str) -> Result<u16, String> {
@@ -73,7 +80,6 @@ fn start_engine(app: &AppHandle, op: &str) -> Result<u16, String> {
         .current_version
         .clone()
         .ok_or_else(|| "no active harness version installed".to_string())?;
-    let host = settings.host.clone();
     let st = app.state::<AppState>();
     let rd = state::runtime_dir(app);
     let actual = *st.effective_port.lock().unwrap();
@@ -83,17 +89,17 @@ fn start_engine(app: &AppHandle, op: &str) -> Result<u16, String> {
         return Ok(actual);
     }
 
-    progress::emit(app, op, Some(&version), "starting", &format!("Starting engine on {host}:{actual}…"), None);
-    runtime::start(app, &st.runtime, &rd, &version, actual, &host)?;
+    progress::emit(app, op, Some(&version), "starting", &format!("Starting engine on 127.0.0.1:{actual}…"), None);
+    runtime::start(app, &st.runtime, &rd, &version, actual)?;
     let served = port::wait_until_serving(actual, Duration::from_secs(30));
     if !served {
         runtime::stop(&st.runtime, &rd);
-        let msg = format!("harness did not answer on {host}:{actual} within 30s");
+        let msg = format!("harness did not answer on 127.0.0.1:{actual} within 30s");
         progress::emit(app, op, Some(&version), "failed", &msg, Some(0));
         return Err(msg);
     }
     st.runtime.mark_phase(runtime::PHASE_RUNNING);
-    progress::emit(app, op, Some(&version), "running", &format!("Engine running on {host}:{actual}"), Some(100));
+    progress::emit(app, op, Some(&version), "running", "Engine running", Some(100));
     crate::tray::refresh(app);
     Ok(actual)
 }
@@ -107,7 +113,6 @@ fn restart_engine(app: &AppHandle, op: &str, version: Option<&str>, force: bool)
         Some(v) => v.to_string(),
         None => state::active_version(app).ok_or_else(|| "no active harness version installed".to_string())?,
     };
-    let host = state::read_settings(app).host.clone();
     let actual = *st.effective_port.lock().unwrap();
 
     let had_child = if force {
@@ -118,10 +123,10 @@ fn restart_engine(app: &AppHandle, op: &str, version: Option<&str>, force: bool)
         runtime::stop(&st.runtime, &rd)
     };
     if !had_child && !force {
-        progress::emit(app, op, Some(&version), "starting", &format!("Starting engine on {host}:{actual}…"), None);
+        progress::emit(app, op, Some(&version), "starting", &format!("Starting engine on 127.0.0.1:{actual}…"), None);
     }
 
-    runtime::start(app, &st.runtime, &rd, &version, actual, &host)?;
+    runtime::start(app, &st.runtime, &rd, &version, actual)?;
     let served = port::wait_until_serving(actual, Duration::from_secs(30));
     if !served {
         runtime::stop(&st.runtime, &rd);
@@ -130,7 +135,7 @@ fn restart_engine(app: &AppHandle, op: &str, version: Option<&str>, force: bool)
         return Err(msg);
     }
     st.runtime.mark_phase(runtime::PHASE_RUNNING);
-    progress::emit(app, op, Some(&version), "running", &format!("Engine running on 127.0.0.1:{actual}"), Some(100));
+    progress::emit(app, op, Some(&version), "running", "Engine running", Some(100));
     crate::tray::refresh(app);
     Ok(actual)
 }
@@ -139,6 +144,7 @@ fn switch_version_inner(app: &AppHandle, version: &str, op: &str) -> Result<Stri
     ensure_runtime_dirs(app).map_err(|e| format!("runtime dirs: {e}"))?;
     let rd = state::runtime_dir(app);
     versions::install_version(app, &rd, version, op)?;
+    invalidate_version_cache(app);
 
     let settings = state::read_settings(app);
     let previous = settings.current_version.clone();
@@ -180,7 +186,29 @@ pub fn get_status(app: AppHandle, st: State<'_, AppState>) -> Result<StatusPaylo
         .map(|(latest, active)| update::is_newer(active, latest))
         .unwrap_or(false);
 
-    let version_list = versions::list_versions(&app, &rd, settings.include_prerelease).unwrap_or_default();
+    // Use cached version list to avoid spawning an npm process every 3 s.
+    // Refresh is triggered explicitly after installs/updates or on a 60 s TTL.
+    let version_list = {
+        let mut vc = st.version_cache.lock().unwrap();
+        let stale = vc
+            .fetched_at
+            .map(|t| t.elapsed().as_secs() >= 60)
+            .unwrap_or(true);
+        if stale || vc.include_prerelease != settings.include_prerelease {
+            match versions::list_versions(&app, &rd, settings.include_prerelease) {
+                Ok(v) => {
+                    vc.versions = v.clone();
+                    vc.include_prerelease = settings.include_prerelease;
+                    vc.fetched_at = Some(std::time::Instant::now());
+                    v
+                }
+                Err(_) => vc.versions.clone(),
+            }
+        } else {
+            vc.versions.clone()
+        }
+    };
+
     let boot_error = st.boot_error.lock().unwrap().clone();
     let current_op = st.current_op.lock().unwrap().clone();
     let console = progress::console_snapshot(&app);
@@ -314,36 +342,6 @@ pub async fn set_port(app: AppHandle, port: u16) -> Result<String, String> {
                 progress::emit(&app, "port", None, "failed", &e, Some(0));
                 Err(format!("{e} — reverted to port {previous_effective}"))
             }
-        }
-        })
-    })
-    .await
-    .map_err(|e| e.to_string())?
-}
-
-/// Set the bind host (e.g. "127.0.0.1" or "0.0.0.0"). Persisted; if the engine
-/// is running it is restarted on the new host, otherwise the change applies on
-/// the next start (mirrors the port behaviour).
-#[tauri::command]
-pub async fn set_host(app: AppHandle, host: String) -> Result<String, String> {
-    let h = if host.trim().is_empty() { "127.0.0.1".to_string() } else { host.trim().to_string() };
-    tauri::async_runtime::spawn_blocking(move || {
-        with_progress_cleanup(&app, || {
-        let st = app.state::<AppState>();
-        let running = st.runtime.is_running();
-        state::update_settings(&app, |s| s.host = h.clone());
-        if !running {
-            progress::finish(&app, "port", None, &format!("Host set to {h} (applies on next start)"));
-            return Ok(format!("host set to {h} — applies when you start the engine"));
-        }
-        progress::emit(&app, "port", None, "restarting", &format!("Restarting engine on {h}…"), Some(40));
-        match restart_engine(&app, "port", None, false) {
-            Ok(actual) => {
-                let _ = window::navigate(&app, &harness_url(actual));
-                progress::finish(&app, "port", None, &format!("Host set to {h}, engine on {actual}"));
-                Ok(format!("host set to {h} — harness on {actual}"))
-            }
-            Err(e) => Err(format!("{e} — host change reverted"))
         }
         })
     })
@@ -590,6 +588,7 @@ pub fn delete_version(app: AppHandle, version: String) -> Result<String, String>
         return Err(format!("cannot delete {version}: it is the active version"));
     }
     std::fs::remove_dir_all(&dir).map_err(|e| format!("delete {version}: {e}"))?;
+    invalidate_version_cache(&app);
     if settings.previous_version.as_deref() == Some(version.as_str()) {
         state::update_settings(&app, |s| s.previous_version = None);
     }

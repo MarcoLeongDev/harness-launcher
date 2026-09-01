@@ -64,17 +64,19 @@ pub fn run_npm(
         }
     });
 
+    let poll_interval = Duration::from_millis(250);
+    let deadline = std::time::Instant::now() + timeout;
     let mut stdout = String::new();
     let mut stderr = String::new();
     loop {
-        // Honour an explicit user cancellation (Stop button) as soon as it is
-        // observed, killing the child process so the download aborts.
+        // Honour an explicit user cancellation (Stop button) every 250ms so
+        // the UI stays responsive and cancel feels instant.
         if crate::progress::cancel_requested(app) {
             let _ = child.kill();
             crate::progress::push_console(app, "err", "Download stopped by user");
             return Err("operation cancelled by user".into());
         }
-        match rx.recv_timeout(timeout) {
+        match rx.recv_timeout(poll_interval) {
             Ok(CommandEvent::Stdout(line)) => {
                 let text = String::from_utf8_lossy(&line);
                 if let Some(s) = sink.as_mut() {
@@ -100,12 +102,17 @@ pub fn run_npm(
             }
             Ok(_) => {}
             Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
-                let _ = child.kill();
-                return Err(format!(
-                    "npm operation timed out after {}s: {}",
-                    timeout.as_secs(),
-                    npm_args.join(" ")
-                ));
+                // Only treat as a hard timeout once the cumulative deadline is
+                // exceeded.  A short poll_interval means we loop back and check
+                // cancel_requested every 250 ms even during silent npm phases.
+                if std::time::Instant::now() >= deadline {
+                    let _ = child.kill();
+                    return Err(format!(
+                        "npm operation timed out after {}s: {}",
+                        timeout.as_secs(),
+                        npm_args.join(" ")
+                    ));
+                }
             }
             Err(_) => break,
         }
@@ -276,9 +283,9 @@ pub fn install_version(
             "--no-audit",
             "--no-fund",
             "--no-color",
-            "--prefer-offline",
-            "--fetch-retries=1",
-            "--fetch-timeout=30000",
+            "--legacy-peer-deps",
+            "--fetch-retries=2",
+            "--fetch-timeout=120000",
             "--loglevel=http",
             "--progress=false",
             spec.as_str(),
@@ -293,8 +300,29 @@ pub fn install_version(
     crate::progress::push_console(app, "info", "Install finished — verifying…");
     crate::progress::emit(app, op, Some(version), "verifying", "Verifying installation…", Some(85));
     if !is_installed(runtime_dir, version) {
+        // npm may still be flushing files to disk; give it a brief grace period
+        // before concluding the harness is missing (avoids a false failure on
+        // slow filesystem writes).
+        std::thread::sleep(Duration::from_millis(800));
+    }
+    if !is_installed(runtime_dir, version) {
+        // Surface a clear, actionable error instead of leaving the UI in a
+        // perpetual stuck state. A peer-dependency conflict can make arborist
+        // silently skip reify (now mitigated by the --legacy-peer-deps flag on
+        // the install command), so call it out.
+        let marker = version_dir(runtime_dir, version)
+            .join("node_modules")
+            .join(PACKAGE);
+        let hint = if !marker.exists() {
+            format!(
+                "the harness package directory is missing at {} - npm likely skipped reify (peer-dependency conflict?). The launcher installs with --legacy-peer-deps to avoid this.",
+                marker.display()
+            )
+        } else {
+            format!("the harness package at {} is present but incomplete", marker.display())
+        };
         return Err(format!(
-            "install of {spec} did not produce a usable harness\nstdout: {out}\nstderr: {err}"
+            "install of {spec} did not produce a usable harness\n{hint}\nstdout: {out}\nstderr: {err}"
         ));
     }
     Ok(())
