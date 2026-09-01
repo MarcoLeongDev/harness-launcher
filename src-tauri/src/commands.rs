@@ -179,11 +179,8 @@ fn switch_version_inner(app: &AppHandle, version: &str, op: &str) -> Result<Stri
         s.current_version = Some(version.to_string());
     });
 
-    progress::emit(app, op, Some(version), "switching", "Switching active version…", Some(90));
-    let actual = restart_engine(app, op, Some(version), false)?;
-    let _ = window::navigate(app, &harness_web_url(app, actual, Some(Duration::from_secs(10))));
-    progress::finish(app, op, Some(version), &format!("Switched to {version} on port {actual}"));
-    Ok(format!("switched to {version} on port {actual}"))
+    progress::emit(app, op, Some(version), "done", &format!("Installed {version} — start it from the Control Panel"), Some(100));
+    Ok(format!("installed {version} — start it from the Control Panel"))
 }
 
 #[tauri::command]
