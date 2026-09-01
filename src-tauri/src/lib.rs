@@ -190,6 +190,7 @@ fn boot_inner(app: &AppHandle) -> Result<u16, String> {
     }
 
     let st = app.state::<AppState>();
+    versions::ensure_peer_completion(app, &rd, &version, "boot")?;
     runtime::start(app, &st.runtime, &rd, &version, actual)?;
     let served = port::wait_until_serving(actual, Duration::from_secs(30));
     if !served {
