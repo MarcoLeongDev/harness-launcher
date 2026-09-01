@@ -91,6 +91,7 @@ fn start_engine(app: &AppHandle, op: &str) -> Result<u16, String> {
 
     progress::emit(app, op, Some(&version), "starting", &format!("Starting engine on 127.0.0.1:{actual}…"), None);
     runtime::start(app, &st.runtime, &rd, &version, actual)?;
+    versions::ensure_peer_completion(app, &rd, &version, op)?;
     let served = port::wait_until_serving(actual, Duration::from_secs(30));
     if !served {
         runtime::stop(&st.runtime, &rd);
@@ -126,6 +127,7 @@ fn restart_engine(app: &AppHandle, op: &str, version: Option<&str>, force: bool)
         progress::emit(app, op, Some(&version), "starting", &format!("Starting engine on 127.0.0.1:{actual}…"), None);
     }
 
+    versions::ensure_peer_completion(app, &rd, &version, op)?;
     runtime::start(app, &st.runtime, &rd, &version, actual)?;
     let served = port::wait_until_serving(actual, Duration::from_secs(30));
     if !served {
