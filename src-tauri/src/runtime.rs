@@ -195,7 +195,6 @@ pub fn start(
     runtime_dir: &Path,
     version: &str,
     port: u16,
-    host: &str,
 ) -> Result<(), String> {
     let entry = versions::harness_entry(runtime_dir, version).ok_or_else(|| {
         format!("harness {version} is not installed (missing bin.js)")
@@ -210,7 +209,7 @@ pub fn start(
             "--profile".into(),
             "web".into(),
             "--host".into(),
-            host.to_string(),
+            "127.0.0.1".to_string(),
             "--port".into(),
             port.to_string(),
             "--no-open".into(),
