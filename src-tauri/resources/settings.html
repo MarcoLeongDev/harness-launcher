@@ -43,15 +43,28 @@
     font: 13px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
     background: linear-gradient(180deg, var(--bg2), var(--bg)); min-height: 100vh;
     display: flex; flex-direction: column; -webkit-font-smoothing: antialiased; }
+  /* Minimal iOS-style scroll bars */
+  *::-webkit-scrollbar { width: 3px; height: 3px; }
+  *::-webkit-scrollbar-track { background: transparent; }
+  *::-webkit-scrollbar-thumb { background: var(--faint); border-radius: 2px; }
+  *::-webkit-scrollbar-thumb:hover { background: var(--dim); }
+  * { scrollbar-width: thin; scrollbar-color: var(--faint) transparent; }
   svg.ico { width: 20px; height: 20px; flex: none; }
   svg.ico.sm { width: 16px; height: 16px; }
   /* header */
-  header { display: flex; align-items: center; gap: 12px; padding: 14px 22px 10px; }
+  header { display: flex; align-items: center; gap: 10px; padding: 14px 22px 10px; }
   .logo { width: 34px; height: 34px; border-radius: 9px; overflow: hidden; flex: none;
     border: 1px solid var(--hair2); background: #fff; }
   .logo img { width: 100%; height: 100%; display: block; object-fit: cover; }
   .header-title { font-size: 15px; font-weight: 650; letter-spacing: -0.2px; }
   header .spacer { flex: 1; }
+  .hdr-ver { font-size: 11.5px; color: var(--dim); background: var(--cell);
+    border: 1px solid var(--hair); padding: 3px 10px; border-radius: 999px; }
+  .hdr-quit { width: 28px; height: 28px; border-radius: 50%; border: none;
+    background: transparent; color: var(--dim); cursor: pointer; display: inline-flex;
+    align-items: center; justify-content: center; padding: 0; flex: none; }
+  .hdr-quit:hover { background: var(--cell-hover); }
+  .hdr-quit svg { width: 16px; height: 16px; }
   .pill { display: inline-flex; align-items: center; gap: 7px; padding: 3px 11px; border-radius: 999px;
     font-size: 11.5px; font-weight: 550; color: var(--dim); background: var(--cell);
     border: 1px solid var(--hair); }
@@ -102,6 +115,8 @@
   select { font-family: inherit; }
   .err { color: var(--err); }
   .ok2 { color: var(--ok); }
+  /* Hide empty result cells */
+  #check-result:empty { display: none; }
   /* engine card */
   .ec-row { display: flex; align-items: center; gap: 12px; padding: 14px 16px; flex-wrap: wrap; }
   .ec-status-icon { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center;
@@ -124,6 +139,11 @@
   .ec-port { font-family: var(--mono); font-size: 13px; background: transparent; border: none;
     color: var(--text); width: 64px; padding: 2px 0; text-align: left; }
   .ec-port:focus { outline: none; border-bottom: 1px solid var(--accent); }
+  .ec-open-btn { width: 28px; height: 28px; border-radius: 50%; border: none;
+    background: transparent; color: var(--dim); cursor: pointer; display: inline-flex;
+    align-items: center; justify-content: center; padding: 0; flex: none; }
+  .ec-open-btn:hover { background: var(--cell-hover); }
+  .ec-open-btn svg { width: 16px; height: 16px; }
   .ec-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
   .ec-btn { display: inline-flex; align-items: center; justify-content: center;
     width: 34px; height: 34px; border-radius: 50%; cursor: pointer; border: 1px solid var(--hair2);
@@ -204,13 +224,12 @@
   .vc-tag { width: 92px; flex: none; }
   .vc-tag .tag { display: inline-block; }
   .vc-acts { width: 72px; flex: none; display: flex; align-items: center; justify-content: center; }
-  /* Delete action: circular red button, white icon, no border, centred
-     under the ACTIONS column header. */
+  /* Delete action: circular button, no background, only backdrop on hover */
   .btn.del { width: 30px; height: 30px; padding: 0; border-radius: 50%;
-    border: none; background: var(--err); color: #fff;
+    border: none; background: transparent; color: var(--err);
     display: inline-flex; align-items: center; justify-content: center; }
   .btn.del svg { width: 15px; height: 15px; }
-  .btn.del:hover { background: #ff6259; }
+  .btn.del:hover { background: var(--cell-hover); }
   .btn.del:active { transform: translateY(1px); }
   .btn.del:disabled { opacity: 0.4; cursor: default; transform: none; }
   .btn.del:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
@@ -250,6 +269,8 @@
   footer { padding: 10px 22px 16px; display: flex; align-items: center; gap: 8px;
     margin: 0 auto; width: 100%; max-width: 640px; }
   footer .hint { margin-right: auto; }
+  .footer-empty { flex: 1; }
+  footer .hint { margin-right: auto; }
   @media (max-width: 560px) { .actions { grid-template-columns: 1fr 1fr; } }
 </style>
 </head>
@@ -257,9 +278,10 @@
 
 <header>
   <div class="logo"><img id="brand-logo" src="dsh-ui://localhost/brand/logo.png" alt="DeepSeek Harness Launcher" /></div>
-  <div class="header-title">Control Panel</div>
-  <div class="spacer"></div>
-  <span class="pill" id="app-ver">v0.1.7</span>
+  <span class="header-title">Harness Launcher</span>
+  <span class="hdr-ver" id="app-ver">v0.1.7</span>
+  <span class="hdr-ver" id="dsh-ver"></span>
+  <button class="hdr-quit" id="btn-quit" title="Quit"><i class="ico sm bi" data-ico="power"></i></button>
 </header>
 
 <nav class="tabs" role="tablist" aria-label="Sections">
@@ -292,6 +314,7 @@
         </div>
         <span class="ec-sep">:</span>
         <input id="inp-port" class="ec-port" type="number" min="1" max="65535" aria-label="Port" disabled />
+        <button class="ec-open-btn" id="btn-open" title="Open in browser" aria-label="Open in browser"><i class="ico sm bi" data-ico="globe2"></i></button>
         <div class="ec-actions">
           <button class="ec-btn icon-start" id="btn-toggle" title="Start"><i class="ico bi" data-ico="play-fill"></i></button>
           <button class="ec-btn icon-restart" id="btn-restart" disabled title="Restart"><i class="ico bi" data-ico="arrow-repeat"></i></button>
@@ -326,7 +349,7 @@
         </button>
       </div>
       <div class="cell" style="padding-top:9px;padding-bottom:11px">
-        <span class="hint" id="check-result"></span>
+        <span class="hint" id="check-result" hidden></span>
       </div>
     </div>
 
@@ -357,14 +380,20 @@
           <span class="switch"><input type="checkbox" id="chk-prerelease" /><span class="slider"></span></span>
         </label>
       </div>
-      <div class="cell" style="gap:8px;flex-wrap:wrap">
-        <span class="hint" id="op-result" style="flex:1"></span>
+      <div class="cell" id="op-result-cell" style="gap:8px;flex-wrap:wrap;display:none">
+        <div class="dl-head">
+          <i class="ico sm bi" style="color:var(--accent2)" data-ico="cloud-arrow-down-fill"></i>
+          <span class="dl-cmd" id="dl-cmd">npm install @deepseek-ai/dsh@…</span>
+          <span class="dl-elapsed" id="dl-elapsed">0:00</span>
+        </div>
+        <div class="dl-term-wrap">
+          <pre class="term-out" id="term-out" aria-live="polite"></pre>
+          <button class="dl-cancel" id="btn-stop-download" title="Cancel download" aria-label="Cancel download">
+            <i class="ico sm bi" data-ico="stop-circle"></i>
+          </button>
+        </div>
       </div>
     </div>
-
-    <!-- While a version downloads this terminal is the only feedback surface;
-         the circular ✕ overlays it at the bottom-right to cancel the download. -->
-    <div class="group" id="dl-term-group" hidden>
       <div class="dl-head">
         <i class="ico sm bi" style="color:var(--accent2)" data-ico="cloud-arrow-down-fill"></i>
         <span class="dl-cmd" id="dl-cmd">npm install @deepseek-ai/dsh@…</span>
@@ -394,9 +423,6 @@
 
 <footer>
   <span class="hint" id="ft-harness">harness v…</span>
-  <span class="spacer" style="flex:1"></span>
-  <button class="btn" id="btn-browser" title="Open in browser"><i class="ico sm bi" data-ico="globe2"></i><span id="ft-url">Open</span></button>
-  <button class="btn warn" id="btn-quit" title="Quit"><i class="ico sm bi" data-ico="power"></i> Quit</button>
 </footer>
 
 <script>
@@ -457,15 +483,15 @@
     pre: $('chk-prerelease'),
     intervalSel: $('sel-interval'), installSel: $('sel-install-ver'), btnInstall: $('btn-install'),
     verTbody: $('ver-tbody'),
-    dlGroup: $('dl-term-group'), dlElapsed: $('dl-elapsed'), dlCmd: $('dl-cmd'),
+    dlGroup: $('op-result-cell'), dlElapsed: $('dl-elapsed'), dlCmd: $('dl-cmd'),
     termOut: $('term-out'),
     stopDown: $('btn-stop-download'),
     result: $('op-result'),
     auto: $('chk-autoupdate'), check: $('btn-check'), checkResult: $('check-result'),
     logRefresh: $('btn-log-refresh'), logFollow: $('btn-log-follow'), logTail: $('log-tail'),
     banner: $('update-banner'), bannerText: $('update-banner-text'), bannerBtn: $('btn-banner-update'),
-    appVer: $('app-ver'), ftHarness: $('ft-harness'), ftUrl: $('ft-url'),
-    browser: $('btn-browser'), quit: $('btn-quit')
+    appVer: $('app-ver'), dshVer: $('dsh-ver'), ftHarness: $('ft-harness'),
+    browser: $('btn-open'), quit: $('btn-quit')
   };
 
   var downloadingOps = { install: 1, update: 1, rollback: 1 };
@@ -505,6 +531,8 @@
   function setCheckResult(text, isErr) {
     sel.checkResult.textContent = text || '';
     sel.checkResult.className = isErr ? 'err' : '';
+    // Show/hide the cell based on content (auto-update section)
+    sel.checkResult.parentElement.hidden = !text;
   }
   function busy(on) {
     [sel.toggle, sel.restart, sel.check, sel.btnInstall, sel.engineVer]
@@ -543,12 +571,12 @@
         sel.dlCmd.textContent = 'npm install @deepseek-ai/dsh@' + (p.version || '…');
         sel.stopDown.disabled = false;
       }
-      sel.dlGroup.hidden = false;
+      sel.dlGroup.style.display = '';
       // Progress messages double as liveness: every one defers the stuck hint.
       if (p && p.message) armStuckTimer();
       tickElapsed();
     } else {
-      sel.dlGroup.hidden = true;
+      sel.dlGroup.style.display = 'none';
       clearElapsed();
       if (stuckTimer) { clearTimeout(stuckTimer); stuckTimer = null; }
       opKey = null; opStart = null;
@@ -623,14 +651,10 @@
       tagCell.className = 'vc-tag';
       var status = document.createElement('span');
       status.className = 'vc-check';
-      status.title = isActive ? 'Active' : (s.previousVersion === v ? 'Previous' : 'Installed');
+      status.title = isActive ? 'Active' : 'Installed';
       status.innerHTML = '<i class="ico sm bi" data-ico="check-lg"></i>';
       tagCell.appendChild(status);
-      if (s.previousVersion === v) {
-        var ptag = document.createElement('span');
-        ptag.className = 'tag prev'; ptag.textContent = 'Previous';
-        tagCell.appendChild(ptag);
-      }
+      // Previous tag removed
 
       // Actions column: circular red trash button with confirmation popover.
       var acts = document.createElement('span');
@@ -680,6 +704,7 @@
   function renderStatus(s) {
     var running = !!s.running;
     sel.appVer.textContent = s.launcherVersion ? 'v' + s.launcherVersion : '';
+    sel.dshVer.textContent = s.activeVersion ? 'dsh v' + s.activeVersion : 'dsh v…';
     sel.ftHarness.textContent = s.activeVersion ? 'harness v' + s.activeVersion : 'harness —';
 
     var phase = s.enginePhase || (running ? 'running' : 'stopped');
