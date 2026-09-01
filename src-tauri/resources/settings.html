@@ -203,15 +203,22 @@
   .vc-tag { width: 92px; flex: none; }
   .vc-tag .tag { display: inline-block; }
   .vc-acts { width: 72px; flex: none; display: flex; align-items: center; justify-content: center; }
-  /* Delete action: circular button, no background, only backdrop on hover */
+  /* Delete action: circular borderless button with a white trash glyph;
+     hovering turns the disc red and keeps the glyph white. In light mode the
+     glyph gets a dim backing disc so white-on-white stays readable. */
   .btn.del { width: 30px; height: 30px; padding: 0; border-radius: 50%;
-    border: none; background: transparent; color: var(--err);
-    display: inline-flex; align-items: center; justify-content: center; }
+    border: none; background: transparent; color: #fff;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: background .15s; }
   .btn.del svg { width: 15px; height: 15px; }
-  .btn.del:hover { background: var(--cell-hover); }
+  .btn.del:hover { background: var(--err); }
   .btn.del:active { transform: translateY(1px); }
   .btn.del:disabled { opacity: 0.4; cursor: default; transform: none; }
   .btn.del:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
+  @media (prefers-color-scheme: light) {
+    .btn.del { background: rgba(29, 36, 48, 0.32); }
+    .btn.del:hover { background: var(--err); }
+  }
   .vc-def { width: 64px; flex: none; display: flex; align-items: center; justify-content: center; }
   /* custom radio for the "Default" (active) version selector */
   .vc-radio { appearance: none; -webkit-appearance: none; width: 16px; height: 16px;
