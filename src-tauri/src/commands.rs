@@ -172,15 +172,8 @@ fn switch_version_inner(app: &AppHandle, version: &str, op: &str) -> Result<Stri
     versions::install_version(app, &rd, version, op)?;
     invalidate_version_cache(app);
 
-    let settings = state::read_settings(app);
-    let previous = settings.current_version.clone();
-    state::update_settings(app, |s| {
-        s.previous_version = previous;
-        s.current_version = Some(version.to_string());
-    });
-
-    progress::emit(app, op, Some(version), "done", &format!("Installed {version} — start it from the Control Panel"), Some(100));
-    Ok(format!("installed {version} — start it from the Control Panel"))
+    progress::emit(app, op, Some(version), "done", &format!("Installed {version} — select it from the Control Panel"), Some(100));
+    Ok(format!("installed {version} — select it from the Control Panel"))
 }
 
 #[tauri::command]
@@ -595,33 +588,36 @@ pub fn cancel_operation(app: AppHandle) -> Result<String, String> {
 /// Delete an installed harness version directory. Refuses to remove the
 /// version that is currently active or running in the engine.
 #[tauri::command]
-pub fn delete_version(app: AppHandle, version: String) -> Result<String, String> {
-    let rd = state::runtime_dir(&app);
-    let dir = versions::version_dir(&rd, &version);
-    if !dir.exists() {
-        return Err(format!("version {version} is not installed"));
-    }
-    {
-        let st = app.state::<AppState>();
-        let proc = st.runtime.process.lock().unwrap();
-        if let Some(state) = proc.as_ref() {
-            if state.version == version {
-                return Err(format!("cannot delete {version}: the engine is currently running it"));
+pub async fn delete_version(app: AppHandle, version: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let rd = state::runtime_dir(&app);
+        let dir = versions::version_dir(&rd, &version);
+        if !dir.exists() {
+            return Err(format!("version {version} is not installed"));
+        }
+        {
+            let st = app.state::<AppState>();
+            let proc = st.runtime.process.lock().unwrap();
+            if let Some(state) = proc.as_ref() {
+                if state.version == version {
+                    return Err(format!("cannot delete {version}: the engine is currently running it"));
+                }
             }
         }
-    }
-    let settings = state::read_settings(&app);
-    if settings.current_version.as_deref() == Some(version.as_str()) {
-        return Err(format!("cannot delete {version}: it is the active version"));
-    }
-    std::fs::remove_dir_all(&dir).map_err(|e| format!("delete {version}: {e}"))?;
-    invalidate_version_cache(&app);
-    if settings.previous_version.as_deref() == Some(version.as_str()) {
-        state::update_settings(&app, |s| s.previous_version = None);
-    }
-    progress::push_console(&app, "info", &format!("Removed installed version {version}"));
-    Ok(format!("deleted version {version}"))
-}
+        let settings = state::read_settings(&app);
+        if settings.current_version.as_deref() == Some(version.as_str()) {
+            return Err(format!("cannot delete {version}: it is the active version"));
+        }
+        std::fs::remove_dir_all(&dir).map_err(|e| format!("delete {version}: {e}"))?;
+        invalidate_version_cache(&app);
+        if settings.previous_version.as_deref() == Some(version.as_str()) {
+            state::update_settings(&app, |s| s.previous_version = None);
+        }
+        progress::push_console(&app, "info", &format!("Removed installed version {version}"));
+        Ok(format!("deleted version {version}"))
+    })
+    .await
+    .map_err(|e| e.to_string())?}
 
 #[tauri::command]
 pub fn quit_app(app: AppHandle) -> Result<(), String> {

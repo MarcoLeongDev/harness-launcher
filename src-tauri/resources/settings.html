@@ -166,28 +166,7 @@
   .ecterm { border-top: 1px solid var(--hair); background: rgba(0,0,0,0.35); display: none; }
   .ecterm.open { display: block; }
   /* Logs tab now also surfaces the live engine run output (merged view) */
-  /* download terminal: the single feedback surface while a version installs */
-  .dl-head { display: flex; align-items: center; gap: 8px; padding: 10px 16px 6px; }
-  .dl-elapsed { font-family: var(--mono); font-size: 11px; color: var(--faint); min-width: 40px;
-    text-align: right; margin-left: auto; }
-  .dl-cmd { font-family: var(--mono); font-size: 10.5px; color: var(--faint); white-space: nowrap;
-    overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
-  .dl-term-wrap { position: relative; background: rgba(0,0,0,0.35); }
-  .term-out { margin: 0; padding: 10px 16px 46px; max-height: 220px; overflow: auto;
-    font: 10.5px/1.5 var(--mono); color: #9bd1c0; white-space: pre-wrap; word-break: break-all; }
-  .term-out .ln { display: block; }
-  .term-out .ln.out { color: #a9d5ff; }
-  .term-out .ln.info { color: #8ecdf7; font-weight: 600; }
-  .term-out .ln.err { color: #ff8a8a; }
-  .dl-cancel { position: absolute; right: 10px; bottom: 10px; width: 30px; height: 30px;
-    border-radius: 50%; border: none; background: var(--err); color: #fff; cursor: pointer;
-    display: inline-flex; align-items: center; justify-content: center; padding: 0; flex: none;
-    box-shadow: 0 3px 10px rgba(255,69,58,0.45); transition: background .15s, opacity .15s; }
-  .dl-cancel svg { width: 15px; height: 15px; }
-  .dl-cancel:hover { background: #ff6259; }
-  .dl-cancel:active { transform: translateY(1px); }
-  .dl-cancel:disabled { opacity: 0.55; cursor: default; transform: none; }
-  .dl-cancel:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
+
   /* version tiles */
   .ver-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
   .ver-tile { border: 1px solid var(--hair); border-radius: 10px; padding: 9px 11px;
@@ -381,29 +360,6 @@
         </label>
       </div>
       <div class="cell" id="op-result-cell" style="gap:8px;flex-wrap:wrap;display:none">
-        <div class="dl-head">
-          <i class="ico sm bi" style="color:var(--accent2)" data-ico="cloud-arrow-down-fill"></i>
-          <span class="dl-cmd" id="dl-cmd">npm install @deepseek-ai/dsh@…</span>
-          <span class="dl-elapsed" id="dl-elapsed">0:00</span>
-        </div>
-        <div class="dl-term-wrap">
-          <pre class="term-out" id="term-out" aria-live="polite"></pre>
-          <button class="dl-cancel" id="btn-stop-download" title="Cancel download" aria-label="Cancel download">
-            <i class="ico sm bi" data-ico="stop-circle"></i>
-          </button>
-        </div>
-      </div>
-    </div>
-      <div class="dl-head">
-        <i class="ico sm bi" style="color:var(--accent2)" data-ico="cloud-arrow-down-fill"></i>
-        <span class="dl-cmd" id="dl-cmd">npm install @deepseek-ai/dsh@…</span>
-        <span class="dl-elapsed" id="dl-elapsed">0:00</span>
-      </div>
-      <div class="dl-term-wrap">
-        <pre class="term-out" id="term-out" aria-live="polite"></pre>
-        <button class="dl-cancel" id="btn-stop-download" title="Cancel download" aria-label="Cancel download">
-          <i class="ico sm bi" data-ico="stop-circle"></i>
-        </button>
       </div>
     </div>
   </section>
@@ -483,9 +439,7 @@
     pre: $('chk-prerelease'),
     intervalSel: $('sel-interval'), installSel: $('sel-install-ver'), btnInstall: $('btn-install'),
     verTbody: $('ver-tbody'),
-    dlGroup: $('op-result-cell'), dlElapsed: $('dl-elapsed'), dlCmd: $('dl-cmd'),
-    termOut: $('term-out'),
-    stopDown: $('btn-stop-download'),
+    dlGroup: $('op-result-cell'),
     result: $('op-result'),
     auto: $('chk-autoupdate'), check: $('btn-check'), checkResult: $('check-result'),
     logRefresh: $('btn-log-refresh'), logFollow: $('btn-log-follow'), logTail: $('log-tail'),
@@ -494,13 +448,7 @@
     browser: $('btn-open'), quit: $('btn-quit')
   };
 
-  var downloadingOps = { install: 1, update: 1, rollback: 1 };
-  var downloadingPhases = { registry: 1, installing: 1, verifying: 1 };
-  var opStart = null;
-  var opKey = null;
-  var elapsedTimer = null;
   var followOn = true;
-  var stuckTimer = null;
   var lastPhase = 'stopped';
 
   // ---------- tabs ----------
@@ -535,70 +483,16 @@
     sel.checkResult.parentElement.hidden = !text;
   }
   function busy(on) {
-    [sel.toggle, sel.restart, sel.check, sel.btnInstall, sel.engineVer]
-      .forEach(function (b) { b.disabled = on; });
+    [sel.toggle, sel.restart, sel.check].forEach(function (b) { b.disabled = on; });
   }
 
-  function isDownloading(p) { return !!(p && downloadingOps[p.op] && downloadingPhases[p.phase]); }
-  function fmtTime(secs) {
-    secs = Math.max(0, Math.floor(secs));
-    var m = Math.floor(secs / 60), s = secs % 60;
-    return m + ':' + (s < 10 ? '0' : '') + s;
-  }
-  function clearElapsed() { if (elapsedTimer) { clearInterval(elapsedTimer); elapsedTimer = null; } sel.dlElapsed.textContent = '0:00'; }
-  function tickElapsed() {
-    clearElapsed();
-    elapsedTimer = setInterval(function () {
-      if (opStart) sel.dlElapsed.textContent = fmtTime((Date.now() - opStart) / 1000);
-    }, 1000);
-  }
 
-  function appendTermLine(stream, text) {
-    var ln = document.createElement('span');
-    ln.className = 'ln ' + (stream === 'err' ? 'err' : stream === 'info' ? 'info' : 'out');
-    ln.textContent = text;
-    sel.termOut.appendChild(ln);
-    while (sel.termOut.childElementCount > 400) sel.termOut.removeChild(sel.termOut.firstChild);
-    sel.termOut.scrollTop = sel.termOut.scrollHeight;
-  }
-
-  function setDownloadState(p) {
-    var downloading = isDownloading(p);
-    if (downloading) {
-      var key = p.op + ':' + (p.version || '');
-      if (opKey !== key) {
-        opKey = key; opStart = Date.now(); sel.termOut.innerHTML = ''; sel.dlElapsed.textContent = '0:00';
-        sel.dlCmd.textContent = 'npm install @deepseek-ai/dsh@' + (p.version || '…');
-        sel.stopDown.disabled = false;
-      }
-      sel.dlGroup.style.display = '';
-      // Progress messages double as liveness: every one defers the stuck hint.
-      if (p && p.message) armStuckTimer();
-      tickElapsed();
-    } else {
-      sel.dlGroup.style.display = 'none';
-      clearElapsed();
-      if (stuckTimer) { clearTimeout(stuckTimer); stuckTimer = null; }
-      opKey = null; opStart = null;
-    }
-  }
-
-  // After 60 s with no progress output, surface a hint inside the terminal.
-  function armStuckTimer() {
-    if (stuckTimer) clearTimeout(stuckTimer);
-    stuckTimer = setTimeout(function () {
-      if (sel.dlGroup && !sel.dlGroup.hidden) {
-        appendTermLine('info', 'no progress for 60s — still working? tap ✕ to cancel');
-      }
-    }, 60000);
-  }
 
   function applyProgress(p) {
-    if (!p) { busy(false); setDownloadState(null); return; }
-    setDownloadState(p);
+    if (!p) { busy(false); return; }
     busy(true);
     if (p.phase === 'done' || p.phase === 'failed' || p.phase === 'cancelled') {
-      setTimeout(function () { busy(false); setDownloadState(null); }, 2500);
+      setTimeout(function () { busy(false); }, 2500);
       setResult((p.message) || (p.phase === 'done' ? 'Completed' : p.phase), p.phase !== 'done');
     }
     if (p.phase === 'running' || p.phase === 'stopped') setTimeout(function () { busy(false); }, 1200);
@@ -801,15 +695,8 @@
 
     if (s.currentOp) {
       applyProgress(s.currentOp);
-      if (isDownloading(s.currentOp)) {
-        setDownloadState(s.currentOp);
-        if (!sel.termOut.childElementCount && s.console && s.console.length) {
-          s.console.forEach(function (line) { appendTermLine(line.stream || 'out', line.text); });
-        }
-      }
     } else {
       busy(false);
-      setDownloadState(null);
     }
   }
 
@@ -919,15 +806,10 @@
   // Cancel the in-flight download via the circular overlay button.
   sel.stopDown.addEventListener('click', function () {
     sel.stopDown.disabled = true;
-    appendTermLine('info', 'Stopping download…');
     invoke('cancel_operation').then(function (res) {
-      appendTermLine('info', (res && res.message) || 'stop requested');
-      // Immediately reflect the cancelled state in the UI, even if the
-      // backend's npm child takes a moment to actually exit.
-      setDownloadState(null);
-      appendTermLine('info', 'cancelled');
+      setResult((res && res.message) || 'stop requested', false);
     }).catch(function (e) {
-      appendTermLine('err', String(e && e.message || e));
+      setResult(String(e && e.message || e), true);
     }).finally(function () {
       setTimeout(function () { sel.stopDown.disabled = false; }, 2000);
     });
@@ -966,7 +848,7 @@
 
   // events
   listen('launcher://progress', function (p) { if (p) applyProgress(p); });
-  listen('launcher://console', function (line) { if (line && line.text) { armStuckTimer(); appendTermLine(line.stream || 'out', line.text); } });
+  listen('launcher://console', function (line) { if (line && line.text) { setResult(line.text, line.stream === 'err'); } });
   listen('launcher://status', function () { refresh(); });
 
   loadIconsIn(document);
