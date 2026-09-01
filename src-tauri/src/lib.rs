@@ -123,7 +123,11 @@ fn boot(app: AppHandle) {
     std::thread::spawn(move || match boot_inner(&app) {
         Ok(actual_port) => {
             app.state::<AppState>().booted.store(true, Ordering::Relaxed);
-            let url = commands::harness_url(actual_port);
+            // Token engines (0.1.2-alpha.2+) print their authenticated URL
+            // right after binding — wait briefly for it so the first window
+            // open already carries the launch token. Blocking here is safe:
+            // this is a background boot thread, not the main thread.
+            let url = commands::harness_web_url(&app, actual_port, Some(Duration::from_secs(10)));
             let settings = state::read_settings(&app);
             let open_on_launch = settings.open_on_launch;
             let engine_running = app.state::<AppState>().runtime.is_running();
