@@ -3,8 +3,13 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
 <title>DeepSeek Harness Launcher - Control Panel</title>
 <style>
+  :root { color-scheme: light dark; }
+  /* Dark palette (default). The native macOS titlebar follows the system
+     appearance, and the light overrides below keep the content in step so
+     the whole window follows the system theme. */
   :root {
     --bg: #0a0e17; --bg2: #0d1220;
     --cell: rgba(255,255,255,0.055); --cell-hover: rgba(255,255,255,0.08);
@@ -14,6 +19,24 @@
     --ok: #30d158; --warn: #ffd60a; --err: #ff453a;
     --radius: 13px;
     --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f5f6f8; --bg2: #eceef2;
+      --cell: rgba(0,0,0,0.045); --cell-hover: rgba(0,0,0,0.085);
+      --hair: rgba(0,0,0,0.10); --hair2: rgba(0,0,0,0.18);
+      --text: #1d2430; --dim: #5a6679; --faint: #98a1b0;
+      --accent: #0071e3; --accent2: #0077ed;
+      --ok: #1f9d4d; --warn: #b58a00; --err: #d70015;
+    }
+    body { -webkit-font-smoothing: auto; }
+    .logo { background: #fff; }
+    .switch .slider { background: rgba(0,0,0,0.12); }
+    .switch input:checked + .slider { background: var(--ok); }
+    input[type=number], select { background: rgba(255,255,255,0.85); }
+    .bar-track { background: rgba(0,0,0,0.08); }
+    .pop { background: #ffffff; box-shadow: 0 12px 32px rgba(0,0,0,0.18); }
+    .tab[aria-selected="true"] { box-shadow: inset 0 -1px 0 rgba(0,0,0,0.12); }
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; }
