@@ -375,8 +375,9 @@ pub async fn rollback(app: AppHandle) -> Result<String, String> {
             progress::emit(&app, "rollback", Some(&previous), "switching", "Switching active version…", Some(90));
             let actual = restart_engine(&app, "rollback", Some(&previous), false)?;
             let _ = window::navigate(&app, &harness_url(actual));
-            progress::finish(&app, "rollback", Some(&previous), &format!("Rolled back to {previous} on port {actual}"));
-            Ok(format!("rolled back to {previous} on port {actual}"))
+            let msg = format!("rolled back to {previous} on port {actual}");
+            progress::finish(&app, "rollback", Some(&previous), &msg);
+            Ok(msg)
         })
     })
     .await
@@ -403,22 +404,24 @@ pub async fn set_port(app: AppHandle, port: u16) -> Result<String, String> {
 
         // When the engine is stopped, only persist the port — do NOT auto-start.
         if !running {
-            progress::finish(&app, "port", None, &format!("Port set to {port} (applies on next start)"));
-            return Ok(format!(
+            let msg = format!(
                 "port set to {port}{} — applies when you start the engine",
                 if changed { format!(" (busy, will use {actual})") } else { String::new() }
-            ));
+            );
+            progress::finish(&app, "port", None, &msg);
+            return Ok(msg);
         }
 
         progress::emit(&app, "port", None, "restarting", &format!("Restarting engine on port {actual}…"), Some(40));
         match restart_engine(&app, "port", None, false) {
             Ok(actual2) => {
                 let _ = window::navigate(&app, &harness_web_url(&app, actual2, Some(Duration::from_secs(10))));
-                progress::finish(&app, "port", None, &format!("Port set to {port}, engine on {actual2}"));
-                Ok(format!(
+                let msg = format!(
                     "port set to {port}{} — harness on {actual2}",
                     if changed { format!(" (busy, using {actual2})") } else { String::new() }
-                ))
+                );
+                progress::finish(&app, "port", None, &msg);
+                Ok(msg)
             }
             Err(e) => {
                 // Revert the persisted selection and effective port, then try
@@ -579,7 +582,9 @@ pub fn engine_stop(app: AppHandle) -> Result<String, String> {
     progress::emit(&app, "engine", None, "stopping", "Stopping engine…", Some(10));
     runtime::stop(&st.runtime, &rd);
     state::update_settings(&app, |s| s.start_on_launch = false);
-    progress::finish(&app, "engine", None, "Engine stopped");
+    // Identical strings for the progress event and the command result so the
+    // panel's terminal feed does not render the same notification twice.
+    progress::finish(&app, "engine", None, "engine stopped");
     runtime::emit_status(&app, &st.runtime);
     crate::tray::refresh(&app);
     Ok("engine stopped".into())
