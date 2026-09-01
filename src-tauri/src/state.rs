@@ -26,6 +26,24 @@ pub struct AppState {
     pub cancel: AtomicBool,
     /// Tray menu items that reflect engine state (set by tray::setup_tray).
     pub tray_state: Mutex<Option<crate::tray::TrayState>>,
+    /// Cached remote version list to avoid spawning npm every 3 s.
+    pub version_cache: Mutex<VersionCache>,
+}
+
+pub struct VersionCache {
+    pub versions: Vec<String>,
+    pub include_prerelease: bool,
+    pub fetched_at: Option<std::time::Instant>,
+}
+
+impl Default for VersionCache {
+    fn default() -> Self {
+        Self {
+            versions: Vec::new(),
+            include_prerelease: false,
+            fetched_at: None,
+        }
+    }
 }
 
 impl Default for AppState {
@@ -41,6 +59,7 @@ impl Default for AppState {
             console: Mutex::new(VecDeque::new()),
             cancel: AtomicBool::new(false),
             tray_state: Mutex::new(None),
+            version_cache: Mutex::new(VersionCache::default()),
         }
     }
 }
