@@ -244,7 +244,9 @@
       $('lc-active').textContent = s.activeVersion ? 'v' + s.activeVersion : '(none)';
       $('lc-ver').textContent = s.launcherVersion ? 'app v' + s.launcherVersion : '';
       if (s.actualPort) {
-        const url = 'http://127.0.0.1:' + s.actualPort;
+        // Prefer the authenticated URL the engine printed (token engines
+        // 401 on the plain URL); fall back to constructing it.
+        const url = s.webUrl || ('http://127.0.0.1:' + s.actualPort);
         const a = $('lc-url'); a.textContent = url.replace('http://', ''); a.href = url;
         $('lc-actual').textContent = 'in use: ' + s.actualPort + (s.portChanged ? ' (fallback)' : '');
         if ($('lc-port').value === '') $('lc-port').value = String(s.port);
