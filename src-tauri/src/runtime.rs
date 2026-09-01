@@ -29,7 +29,55 @@ pub struct HarnessRuntime {
     pub process: Arc<Mutex<Option<ChildState>>>,
     /// Current engine phase: stopped|starting|running|stopping.
     pub phase: Arc<Mutex<String>>,
+    /// Authenticated WebUI URL the harness printed at boot
+    /// ("dsh web: http://127.0.0.1:<port>/?token=…"). Harness 0.1.2-alpha.2+
+    /// gates the WebUI behind a per-process launch token, so windows must open
+    /// this URL instead of the plain one. None for older engines.
+    pub web_url: Arc<Mutex<Option<String>>>,
     next_id: Arc<AtomicU64>,
+}
+
+/// Extract the WebUI URL the harness printed on one stdout/stderr line.
+/// Harness prints: `dsh web: http://127.0.0.1:<port>/?token=<token>`
+/// optionally followed by ` (LAN: http://…)`. Token engines (0.1.2-alpha.2+)
+/// print the authenticated URL; pre-token engines print a plain loopback URL,
+/// which is stored as-is (it equals the constructed fallback). Only loopback
+/// URLs are accepted — the LAN variant is never what our windows should open.
+pub fn parse_web_url_line(line: &str) -> Option<String> {
+    let rest = line.trim().strip_prefix("dsh web:")?.trim();
+    let candidate = rest.split_whitespace().next()?.trim().to_string();
+    if candidate.starts_with("http://127.0.0.1:") || candidate.starts_with("http://localhost:") {
+        Some(candidate)
+    } else {
+        None
+    }
+}
+
+impl HarnessRuntime {
+    /// The captured authenticated WebUI URL, if any.
+    pub fn captured_web_url(&self) -> Option<String> {
+        self.web_url.lock().unwrap().clone()
+    }
+
+    /// Wait up to `timeout` for the harness to print its authenticated URL
+    /// (it is emitted right after the web server binds). Returns the captured
+    /// URL or None on timeout.
+    pub fn wait_for_web_url(&self, timeout: Duration) -> Option<String> {
+        let deadline = std::time::Instant::now() + timeout;
+        loop {
+            if let Some(url) = self.captured_web_url() {
+                return Some(url);
+            }
+            if std::time::Instant::now() >= deadline {
+                return None;
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+    }
+
+    pub fn clear_web_url(&self) {
+        *self.web_url.lock().unwrap() = None;
+    }
 }
 
 pub struct ChildState {
@@ -59,6 +107,7 @@ impl HarnessRuntime {
             log_tail: Arc::new(Mutex::new(VecDeque::new())),
             process: Arc::new(Mutex::new(None)),
             phase: Arc::new(Mutex::new(PHASE_STOPPED.to_string())),
+            web_url: Arc::new(Mutex::new(None)),
             next_id: Arc::new(AtomicU64::new(0)),
         }
     }
@@ -133,6 +182,7 @@ pub fn stop(runtime: &HarnessRuntime, runtime_dir: &Path) -> bool {
         runtime.mark_phase(PHASE_STOPPING);
         let _ = state.child.kill();
         runtime.mark_phase(PHASE_STOPPED);
+        runtime.clear_web_url();
         append_log(runtime_dir, "[launcher] harness stopped");
         true
     } else {
@@ -155,6 +205,7 @@ pub fn force_stop(
         runtime.mark_phase(PHASE_STOPPING);
         state.child.kill().map_err(|e| format!("force-stop kill failed: {e}"))?;
         runtime.mark_phase(PHASE_STOPPED);
+        runtime.clear_web_url();
         append_log(runtime_dir, "[launcher] force-stopping harness");
         true
     } else {
@@ -232,6 +283,9 @@ pub fn start(
     });
     let id = runtime.next_id.fetch_add(1, Ordering::Relaxed) + 1;
     let (port_n, version_s) = (port, version.to_string());
+    // A new process mints a new launch token: drop any stale captured URL so
+    // callers can never navigate to the previous process's token.
+    runtime.clear_web_url();
     runtime.mark_phase(PHASE_STARTING);
     *runtime.process.lock().unwrap() = Some(ChildState {
         child,
@@ -245,6 +299,7 @@ pub fn start(
     let tail = Arc::clone(&runtime.log_tail);
     let proc = Arc::clone(&runtime.process);
     let phase = Arc::clone(&runtime.phase);
+    let web_url = Arc::clone(&runtime.web_url);
     let app_handle = app.clone();
     let version_display = version_s.clone();
     std::thread::spawn(move || {
@@ -255,6 +310,18 @@ pub fn start(
                     let trimmed = text.trim_end().to_string();
                     if trimmed.is_empty() {
                         continue;
+                    }
+                    // Capture the authenticated WebUI URL the harness prints
+                    // at boot (token engines) and surface it to open windows.
+                    if let Some(url) = parse_web_url_line(&trimmed) {
+                        *web_url.lock().unwrap() = Some(url.clone());
+                        let _ = app_handle.emit("launcher://status", HarnessStatus {
+                            running: true,
+                            phase: PHASE_RUNNING.to_string(),
+                            version: Some(version_display.clone()),
+                            port: Some(port_n),
+                            last_log: trimmed.clone(),
+                        });
                     }
                     append_log(&runtime_dir_buf, &trimmed);
                     let mut t = tail.lock().unwrap();
@@ -307,4 +374,56 @@ pub fn start(
         });
     });
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_web_url_line;
+
+    #[test]
+    fn parses_token_url_line() {
+        assert_eq!(
+            parse_web_url_line("dsh web: http://127.0.0.1:3081/?token=[REDACTED-ENGINE-TOKEN]"),
+            Some("http://127.0.0.1:3081/?token=[REDACTED-ENGINE-TOKEN]".to_string())
+        );
+    }
+
+    #[test]
+    fn parses_token_url_line_with_lan_suffix() {
+        assert_eq!(
+            parse_web_url_line("dsh web: http://127.0.0.1:3081/?token=abc_DEF-123 (LAN: http://192.168.1.5:3081/?token=abc_DEF-123)"),
+            Some("http://127.0.0.1:3081/?token=abc_DEF-123".to_string())
+        );
+    }
+
+    #[test]
+    fn plain_url_line_is_stored_verbatim() {
+        // Pre-token engines (≤ 0.1.1-rc.x) print the plain loopback URL; the
+        // printed value is authoritative, so it is captured as-is.
+        assert_eq!(
+            parse_web_url_line("dsh web: http://127.0.0.1:3081"),
+            Some("http://127.0.0.1:3081".to_string())
+        );
+    }
+
+    #[test]
+    fn lan_url_line_yields_none() {
+        // A LAN-prefixed line alone (never our bind shape) must not be used.
+        assert_eq!(parse_web_url_line("dsh web: http://192.168.1.5:3081/?token=abc"), None);
+    }
+
+    #[test]
+    fn ignores_unrelated_lines() {
+        assert_eq!(parse_web_url_line("[launcher] starting harness 0.1.2-alpha.3 on 127.0.0.1:3081"), None);
+        assert_eq!(parse_web_url_line(""), None);
+        assert_eq!(parse_web_url_line("listening on http://127.0.0.1:3081"), None);
+    }
+
+    #[test]
+    fn tolerates_leading_whitespace() {
+        assert_eq!(
+            parse_web_url_line("  dsh web: http://127.0.0.1:9/?token=x"),
+            Some("http://127.0.0.1:9/?token=x".to_string())
+        );
+    }
 }
