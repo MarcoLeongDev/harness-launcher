@@ -174,7 +174,8 @@ fn boot_inner(app: &AppHandle) -> Result<u16, String> {
         let data_dir = state::data_dir(app);
         settings::log(&data_dir, "installing default (latest) harness version…");
         let latest = versions::latest_dist_tag(app, &rd)?;
-        versions::install_version(app, &rd, &latest, "install")?;
+        let op = crate::progress::op_key("install", Some(&latest));
+        versions::install_version(app, &rd, &latest, &op)?;
         {
             let st = app.state::<AppState>();
             let mut vc = st.version_cache.lock().unwrap();
