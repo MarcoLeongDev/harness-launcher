@@ -28,9 +28,9 @@
 - [x] 6.1 Remove footer harness version + wiring; v0.1.39
 
 ## 7. Logs tab: overlay controls + shared terminal styling
-- [ ] 7.1 Go-to-last overlay bottom-right, refresh overlay top-right (circular, hover background)
-- [ ] 7.2 Log fills panel height, resizes with window
-- [ ] 7.3 Shared .terminal style for feeds + log; v0.1.40
+- [x] 7.1 Go-to-last overlay bottom-right, refresh overlay top-right (circular, hover background)
+- [x] 7.2 Log fills panel height, resizes with window
+- [x] 7.3 Shared .terminal style for feeds + log; v0.1.40
 
 ## 8. Build, deploy & verify
 - [ ] 8.1 cargo test green; lightspec validate pass
