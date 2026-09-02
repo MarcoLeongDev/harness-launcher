@@ -34,8 +34,12 @@ pub struct StatusPayload {
     pub auto_update_interval_hours: u64,
     pub start_on_launch: bool,
     pub boot_error: Option<String>,
-    /// In-flight long-running operation, if any.
+    /// In-flight long-running operation, if any (legacy single slot for the
+    /// overlay panel; the first by key when several run at once).
     pub current_op: Option<progress::ProgressPayload>,
+    /// Every in-flight long-running operation (parallel downloads each keep
+    /// their own progress).
+    pub current_ops: Vec<progress::ProgressPayload>,
     /// Terminal lines of the current download (only meaningful while a
     /// version download is in progress).
     pub console: Vec<progress::ConsoleLine>,
@@ -77,13 +81,14 @@ fn ensure_runtime_dirs(app: &AppHandle) -> std::io::Result<()> {
     Ok(())
 }
 
-/// Run a blocking operation, clearing the recorded in-flight op on error
-/// so UIs never stay stuck in a "busy" state after a failure.
-fn with_progress_cleanup<T>(app: &AppHandle, f: impl FnOnce() -> Result<T, String>) -> Result<T, String> {
+/// Run a blocking operation, clearing that operation's in-flight record on
+/// error so UIs never stay stuck in a "busy" state after a failure. Other
+/// concurrently running operations (parallel downloads) are untouched.
+fn with_progress_cleanup<T>(app: &AppHandle, op: &str, f: impl FnOnce() -> Result<T, String>) -> Result<T, String> {
     match f() {
         Ok(v) => Ok(v),
         Err(e) => {
-            progress::clear(app);
+            progress::clear_op(app, op);
             Err(e)
         }
     }
@@ -166,9 +171,10 @@ fn restart_engine(app: &AppHandle, op: &str, version: Option<&str>, force: bool)
     Ok(actual)
 }
 
-/// Human-readable feedback for a switch operation. The radio in the versions
-/// table IS the designed way to switch, so the message must describe what the
-/// switch did — never bounce the user back to the Control Panel.
+/// Human-readable feedback for a switch done while the engine was stopped.
+/// The radio in the versions table IS the designed way to switch, so the
+/// message must describe what the switch did — never bounce the user back to
+/// the Control Panel.
 fn switch_feedback(version: &str, was_installed: bool, already_active: bool) -> String {
     if already_active {
         format!("v{version} is already the default version")
@@ -179,18 +185,32 @@ fn switch_feedback(version: &str, was_installed: bool, already_active: bool) -> 
     }
 }
 
+/// Human-readable feedback for a switch done while the engine was running:
+/// the launcher stopped it, switched, and started the new version itself.
+fn switch_running_feedback(version: &str, port: u16) -> String {
+    format!("switched to v{version} — engine running on port {port}")
+}
+
 /// Install `version` when missing and make it the active (default) version.
-/// This is the switch path behind the versions-table radio and the install
-/// button: switching only records the default (it never starts the engine),
-/// and it is refused while the engine is running so the running binary and
-/// the recorded default stay consistent.
+/// This is the switch path behind the versions-table radio, the engine card
+/// version dropdown and the update banner. When the engine is running, the
+/// launcher stops it, switches, and starts the new version again — the user
+/// never has to stop the engine by hand. When stopped, switching only records
+/// the default (it never auto-starts).
 fn switch_version_inner(app: &AppHandle, version: &str, op: &str) -> Result<String, String> {
     ensure_runtime_dirs(app).map_err(|e| format!("runtime dirs: {e}"))?;
-    {
-        let st = app.state::<AppState>();
-        if st.runtime.is_running() {
-            return Err("stop the engine before switching versions".into());
-        }
+    let st = app.state::<AppState>();
+    let was_running = st.runtime.is_running();
+    if was_running {
+        progress::emit(
+            app,
+            op,
+            Some(version),
+            "stopping",
+            "Stopping the running engine to switch versions…",
+            Some(10),
+        );
+        runtime::stop(&st.runtime, &state::runtime_dir(app));
     }
     let rd = state::runtime_dir(app);
     let was_installed = versions::is_installed(&rd, version);
@@ -207,6 +227,15 @@ fn switch_version_inner(app: &AppHandle, version: &str, op: &str) -> Result<Stri
         });
         crate::tray::refresh(app);
     }
+
+    if was_running {
+        let actual = restart_engine(app, op, Some(version), false)?;
+        let _ = window::navigate(app, &harness_web_url(app, actual, Some(Duration::from_secs(10))));
+        let msg = switch_running_feedback(version, actual);
+        progress::finish(app, op, Some(version), &msg);
+        return Ok(msg);
+    }
+
     let msg = switch_feedback(version, was_installed, already_active);
     progress::finish(app, op, Some(version), &msg);
     Ok(msg)
@@ -238,6 +267,17 @@ mod switch_tests {
             let msg = switch_feedback("0.1.0-rc.7", was_installed, already_active);
             assert!(!msg.contains("select it from the Control Panel"), "{msg}");
         }
+    }
+
+    #[test]
+    fn running_switch_feedback_reports_the_live_engine() {
+        use super::switch_running_feedback;
+        let msg = switch_running_feedback("0.1.2-alpha.4", 3081);
+        assert!(msg.contains("switched to v0.1.2-alpha.4"), "{msg}");
+        assert!(msg.contains("running on port 3081"), "{msg}");
+        // A running switch never asks the user to do anything by hand.
+        assert!(!msg.contains("press Start"), "{msg}");
+        assert!(!msg.contains("stop the engine"), "{msg}");
     }
 }
 
@@ -297,6 +337,7 @@ pub async fn get_status(app: AppHandle) -> Result<StatusPayload, String> {
 
     let boot_error = st.boot_error.lock().unwrap().clone();
     let current_op = st.current_op.lock().unwrap().clone();
+    let current_ops = progress::current_ops(&app);
     let console = progress::console_snapshot(&app);
 
     Ok(StatusPayload {
@@ -318,6 +359,7 @@ pub async fn get_status(app: AppHandle) -> Result<StatusPayload, String> {
         start_on_launch: settings.start_on_launch,
         boot_error,
         current_op,
+        current_ops,
         console,
         web_url: st.runtime.captured_web_url(),
     })
@@ -328,8 +370,42 @@ pub async fn get_status(app: AppHandle) -> Result<StatusPayload, String> {
 
 #[tauri::command]
 pub async fn install_and_switch(app: AppHandle, version: String) -> Result<String, String> {
+    let op = progress::op_key("switch", Some(&version));
     tauri::async_runtime::spawn_blocking(move || {
-        with_progress_cleanup(&app, || switch_version_inner(&app, &version, "install"))
+        with_progress_cleanup(&app, &op, || switch_version_inner(&app, &version, &op))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Download (install) a harness version WITHOUT switching: the active version
+/// stays as it is and a running engine is never stopped, started or restarted.
+/// Downloading is just downloading — it works while the engine runs, because
+/// npm installs into this version's own directory and only the shared
+/// (concurrency-safe) npm cache is touched.
+#[tauri::command]
+pub async fn download_version(app: AppHandle, version: String) -> Result<String, String> {
+    let op = progress::op_key("download", Some(&version));
+    tauri::async_runtime::spawn_blocking(move || {
+        with_progress_cleanup(&app, &op, || {
+            if !versions::is_valid_version_name(&version) {
+                return Err(format!("invalid version name: {version}"));
+            }
+            ensure_runtime_dirs(&app).map_err(|e| format!("runtime dirs: {e}"))?;
+            let rd = state::runtime_dir(&app);
+            if versions::is_installed(&rd, &version) {
+                let msg = format!("v{version} is already installed");
+                progress::finish(&app, &op, Some(&version), &msg);
+                return Ok(msg);
+            }
+            versions::install_version(&app, &rd, &version, &op)?;
+            invalidate_version_cache(&app);
+            let msg = format!(
+                "installed v{version} — set it as the default to run it"
+            );
+            progress::finish(&app, &op, Some(&version), &msg);
+            Ok(msg)
+        })
     })
     .await
     .map_err(|e| e.to_string())?
@@ -338,16 +414,20 @@ pub async fn install_and_switch(app: AppHandle, version: String) -> Result<Strin
 #[tauri::command]
 pub async fn update_to_latest(app: AppHandle) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        with_progress_cleanup(&app, || {
+        with_progress_cleanup(&app, "update", || {
             let rd = state::runtime_dir(&app);
             progress::emit(&app, "update", None, "registry", "Checking npm registry for latest version…", Some(5));
             let latest = versions::latest_dist_tag(&app, &rd)?;
             *app.state::<AppState>().latest_remote.lock().unwrap() = Some(latest.clone());
             if state::active_version(&app).as_deref() == Some(latest.as_str()) {
-                progress::clear(&app);
+                progress::finish(&app, "update", None, &format!("already on latest ({latest})"));
                 return Ok(format!("already on latest ({latest})"));
             }
-            switch_version_inner(&app, &latest, "update")
+            // Continue under the resolved version's own key so the terminal
+            // feed and cancellation target this update precisely.
+            let op = progress::op_key("update", Some(&latest));
+            progress::clear_op(&app, "update");
+            switch_version_inner(&app, &latest, &op)
         })
     })
     .await
@@ -357,26 +437,25 @@ pub async fn update_to_latest(app: AppHandle) -> Result<String, String> {
 #[tauri::command]
 pub async fn rollback(app: AppHandle) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        with_progress_cleanup(&app, || {
-            let settings = state::read_settings(&app);
-            let previous = settings
-                .previous_version
-                .clone()
-                .ok_or_else(|| "no previous version to roll back to".to_string())?;
+        let previous = state::read_settings(&app)
+            .previous_version
+            .ok_or_else(|| "no previous version to roll back to".to_string())?;
+        let op = progress::op_key("rollback", Some(&previous));
+        with_progress_cleanup(&app, &op, || {
             let rd = state::runtime_dir(&app);
             if !versions::is_installed(&rd, &previous) {
-                versions::install_version(&app, &rd, &previous, "rollback")?;
+                versions::install_version(&app, &rd, &previous, &op)?;
             }
-            let current = settings.current_version.clone();
+            let current = state::read_settings(&app).current_version.clone();
             state::update_settings(&app, |s| {
                 s.current_version = Some(previous.clone());
                 s.previous_version = current;
             });
-            progress::emit(&app, "rollback", Some(&previous), "switching", "Switching active version…", Some(90));
-            let actual = restart_engine(&app, "rollback", Some(&previous), false)?;
+            progress::emit(&app, &op, Some(&previous), "switching", "Switching active version…", Some(90));
+            let actual = restart_engine(&app, &op, Some(&previous), false)?;
             let _ = window::navigate(&app, &harness_url(actual));
             let msg = format!("rolled back to {previous} on port {actual}");
-            progress::finish(&app, "rollback", Some(&previous), &msg);
+            progress::finish(&app, &op, Some(&previous), &msg);
             Ok(msg)
         })
     })
@@ -390,7 +469,7 @@ pub async fn set_port(app: AppHandle, port: u16) -> Result<String, String> {
         return Err("port must be between 1 and 65535".into());
     }
     tauri::async_runtime::spawn_blocking(move || {
-        with_progress_cleanup(&app, || {
+        with_progress_cleanup(&app, "port", || {
         let st = app.state::<AppState>();
         let running = st.runtime.is_running();
         let previous_effective = *st.effective_port.lock().unwrap();
@@ -541,10 +620,10 @@ pub fn open_in_browser(app: AppHandle) -> Result<String, String> {
 #[tauri::command]
 pub async fn restart_harness(app: AppHandle) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        with_progress_cleanup(&app, || {
+        with_progress_cleanup(&app, "engine", || {
             let actual = restart_engine(&app, "engine", None, false)?;
             let _ = window::navigate(&app, &harness_web_url(&app, actual, Some(Duration::from_secs(10))));
-            progress::clear(&app);
+            progress::clear_op(&app, "engine");
             Ok(format!("harness restarted on port {actual}"))
         })
     })
@@ -557,14 +636,14 @@ pub async fn restart_harness(app: AppHandle) -> Result<String, String> {
 #[tauri::command]
 pub async fn engine_start(app: AppHandle) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        with_progress_cleanup(&app, || {
+        with_progress_cleanup(&app, "engine", || {
             if app.state::<AppState>().runtime.is_running() {
                 return Ok("engine already running".into());
             }
             let actual = start_engine(&app, "engine")?;
             state::update_settings(&app, |s| s.start_on_launch = true);
             let _ = window::navigate(&app, &harness_web_url(&app, actual, Some(Duration::from_secs(10))));
-            progress::clear(&app);
+            progress::clear_op(&app, "engine");
             Ok(format!("engine started on port {actual}"))
         })
     })
@@ -593,10 +672,10 @@ pub fn engine_stop(app: AppHandle) -> Result<String, String> {
 #[tauri::command]
 pub async fn engine_restart(app: AppHandle) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        with_progress_cleanup(&app, || {
+        with_progress_cleanup(&app, "engine", || {
             let actual = restart_engine(&app, "engine", None, false)?;
             let _ = window::navigate(&app, &harness_web_url(&app, actual, Some(Duration::from_secs(10))));
-            progress::clear(&app);
+            progress::clear_op(&app, "engine");
             Ok(format!("engine restarted on port {actual}"))
         })
     })
@@ -607,15 +686,15 @@ pub async fn engine_restart(app: AppHandle) -> Result<String, String> {
 #[tauri::command]
 pub async fn engine_force_restart(app: AppHandle) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        with_progress_cleanup(&app, || {
+        with_progress_cleanup(&app, "engine", || {
             let st = app.state::<AppState>();
             if !st.runtime.is_running() && port::is_free(*st.effective_port.lock().unwrap()) {
-                progress::clear(&app);
+                progress::clear_op(&app, "engine");
                 return Ok("engine is stopped; use Start to launch it".into());
             }
             let actual = restart_engine(&app, "engine", None, true)?;
             let _ = window::navigate(&app, &harness_web_url(&app, actual, Some(Duration::from_secs(10))));
-            progress::clear(&app);
+            progress::clear_op(&app, "engine");
             Ok(format!("engine force-restarted on port {actual}"))
         })
     })
@@ -644,9 +723,11 @@ pub async fn set_version(app: AppHandle, version: String) -> Result<String, Stri
         if st.runtime.is_running() {
             return Err("stop the engine before switching versions".into());
         }
+        let op = progress::op_key("select", Some(&version));
         if !versions::is_installed(&rd, &version) {
-            versions::install_version(&app, &rd, &version, "select")?;
+            versions::install_version(&app, &rd, &version, &op)?;
         }
+        progress::finish(&app, &op, Some(&version), &format!("active version set to {version}"));
         let previous = state::read_settings(&app).current_version.clone();
         state::update_settings(&app, |s| {
             s.previous_version = previous;
@@ -665,16 +746,32 @@ pub fn open_harness_window(app: AppHandle) -> Result<String, String> {
     Ok("harness window opened".into())
 }
 
-/// Ask the backend to stop the in-flight download/operation. The running npm
-/// child is killed as soon as it observes the cancellation flag.
+/// Ask the backend to stop an in-flight download/operation. With `op` set
+/// only that operation is targeted (parallel downloads cancel independently);
+/// without it every in-flight operation is cancelled. The running npm child
+/// is killed as soon as it observes the cancellation flag.
 #[tauri::command]
-pub fn cancel_operation(app: AppHandle) -> Result<String, String> {
-    if app.state::<AppState>().current_op.lock().unwrap().is_none() {
-        return Ok("no operation in progress".into());
+pub fn cancel_operation(app: AppHandle, op: Option<String>) -> Result<String, String> {
+    let ops = progress::current_ops(&app);
+    match op {
+        Some(key) if !key.is_empty() => {
+            if !ops.iter().any(|p| p.op == key) {
+                return Ok("no operation in progress".into());
+            }
+            progress::request_cancel(&app, &key);
+            Ok("stop requested — the operation will abort shortly".into())
+        }
+        _ => {
+            if ops.is_empty() {
+                return Ok("no operation in progress".into());
+            }
+            progress::request_cancel(&app, "");
+            Ok(format!(
+                "stop requested for {} operation(s) — they will abort shortly",
+                ops.len()
+            ))
+        }
     }
-    progress::request_cancel(&app);
-    progress::clear(&app);
-    Ok("stop requested — download will abort shortly".into())
 }
 
 /// Delete an installed harness version directory. Refuses to remove the
@@ -705,7 +802,7 @@ pub async fn delete_version(app: AppHandle, version: String) -> Result<String, S
         if settings.previous_version.as_deref() == Some(version.as_str()) {
             state::update_settings(&app, |s| s.previous_version = None);
         }
-        progress::push_console(&app, "info", &format!("Removed installed version {version}"));
+        progress::push_console(&app, "", "info", &format!("Removed installed version {version}"));
         Ok(format!("deleted version {version}"))
     })
     .await
