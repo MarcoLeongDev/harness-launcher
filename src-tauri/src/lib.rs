@@ -74,6 +74,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::get_status,
             commands::install_and_switch,
+            commands::download_version,
             commands::update_to_latest,
             commands::rollback,
             commands::set_port,

@@ -370,6 +370,38 @@ pub async fn install_and_switch(app: AppHandle, version: String) -> Result<Strin
     .map_err(|e| e.to_string())?
 }
 
+/// Download (install) a harness version WITHOUT switching: the active version
+/// stays as it is and a running engine is never stopped, started or restarted.
+/// Downloading is just downloading — it works while the engine runs, because
+/// npm installs into this version's own directory and only the shared
+/// (concurrency-safe) npm cache is touched.
+#[tauri::command]
+pub async fn download_version(app: AppHandle, version: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        with_progress_cleanup(&app, || {
+            if !versions::is_valid_version_name(&version) {
+                return Err(format!("invalid version name: {version}"));
+            }
+            ensure_runtime_dirs(&app).map_err(|e| format!("runtime dirs: {e}"))?;
+            let rd = state::runtime_dir(&app);
+            if versions::is_installed(&rd, &version) {
+                let msg = format!("v{version} is already installed");
+                progress::finish(&app, "install", Some(&version), &msg);
+                return Ok(msg);
+            }
+            versions::install_version(&app, &rd, &version, "install")?;
+            invalidate_version_cache(&app);
+            let msg = format!(
+                "installed v{version} — set it as the default to run it"
+            );
+            progress::finish(&app, "install", Some(&version), &msg);
+            Ok(msg)
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[tauri::command]
 pub async fn update_to_latest(app: AppHandle) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
