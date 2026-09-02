@@ -18,5 +18,5 @@
 - [x] 4.2 "Check now" busy state + inline status text (no dead click); v0.1.44
 
 ## 5. Build, deploy & verify
-- [ ] 5.1 cargo test green; lightspec validate pass
-- [ ] 5.2 Release build + deploy + relaunch; version live; app left running
+- [x] 5.1 cargo test green; lightspec validate pass
+- [x] 5.2 Release build + deploy + relaunch; version live; app left running
