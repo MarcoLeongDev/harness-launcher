@@ -1,7 +1,7 @@
 //! Shared application state + path helpers.
-use std::collections::VecDeque;
+use std::collections::{BTreeMap, HashSet, VecDeque};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::AtomicBool;
 use std::sync::Mutex;
 
 use tauri::Manager;
@@ -18,12 +18,20 @@ pub struct AppState {
     pub boot_error: Mutex<Option<String>>,
     pub latest_remote: Mutex<Option<String>>,
     /// The in-flight long-running operation (install/update/rollback/engine/port).
+    /// Legacy single slot mirroring the first entry of `current_ops` for the
+    /// overlay panel; newer UIs read `current_ops` directly.
     pub current_op: Mutex<Option<ProgressPayload>>,
+    /// Every in-flight long-running operation, keyed by its unique operation
+    /// key ("install:<version>", "switch:<version>", …) so parallel version
+    /// downloads each keep their own progress.
+    pub current_ops: Mutex<BTreeMap<String, ProgressPayload>>,
     /// Ring buffer of the most recent npm/operation console lines, surfaced
     /// to the Control Panel and overlay as a "terminal" while downloading.
+    /// Lines are tagged with their operation key.
     pub console: Mutex<VecDeque<crate::progress::ConsoleLine>>,
-    /// User cancellation request for the in-flight long-running operation.
-    pub cancel: AtomicBool,
+    /// Per-operation user cancellation requests (the in-flight operation
+    /// aborts once it observes its key; "*" cancels everything).
+    pub cancel: Mutex<HashSet<String>>,
     /// Tray menu items that reflect engine state (set by tray::setup_tray).
     pub tray_state: Mutex<Option<crate::tray::TrayState>>,
     /// Cached remote version list to avoid spawning npm every 3 s.
@@ -56,20 +64,16 @@ impl Default for AppState {
             boot_error: Mutex::new(None),
             latest_remote: Mutex::new(None),
             current_op: Mutex::new(None),
+            current_ops: Mutex::new(BTreeMap::new()),
             console: Mutex::new(VecDeque::new()),
-            cancel: AtomicBool::new(false),
+            cancel: Mutex::new(HashSet::new()),
             tray_state: Mutex::new(None),
             version_cache: Mutex::new(VersionCache::default()),
         }
     }
 }
 
-impl AppState {
-    /// Whether the user has requested cancellation of the current operation.
-    pub fn cancel_requested(&self) -> bool {
-        self.cancel.load(Ordering::SeqCst)
-    }
-}
+
 
 pub fn data_dir(app: &tauri::AppHandle) -> PathBuf {
     app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."))

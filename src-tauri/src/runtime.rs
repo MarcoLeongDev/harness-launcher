@@ -13,6 +13,7 @@ use tauri::{AppHandle, Emitter};
 use tauri_plugin_shell::process::CommandEvent;
 use tauri_plugin_shell::ShellExt;
 
+use crate::presets;
 use crate::versions;
 
 pub const LOG_MAX_BYTES: u64 = 2 * 1024 * 1024;
@@ -250,6 +251,19 @@ pub fn start(
     let entry = versions::harness_entry(runtime_dir, version).ok_or_else(|| {
         format!("harness {version} is not installed (missing bin.js)")
     })?;
+
+    // Reconcile the shared harness home with the presets THIS engine ships
+    // before it spawns: a default recorded by another version (rc "code" vs
+    // alpha "standard"…) would make every new session fail to resolve, and
+    // sessions created under rc engines reference a preset alpha removed.
+    {
+        let log_dir = runtime_dir.to_path_buf();
+        let app_sink = app.clone();
+        presets::repair_preset_compatibility(&versions::version_dir(runtime_dir, version), move |line| {
+            append_log(&log_dir, &format!("[launcher] {line}"));
+            crate::progress::push_console(&app_sink, "", "info", &format!("[launcher] {line}"));
+        });
+    }
 
     let (mut rx_async, child) = app
         .shell()
