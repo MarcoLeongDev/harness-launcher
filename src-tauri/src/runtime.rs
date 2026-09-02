@@ -261,7 +261,7 @@ pub fn start(
         let app_sink = app.clone();
         presets::repair_preset_compatibility(&versions::version_dir(runtime_dir, version), move |line| {
             append_log(&log_dir, &format!("[launcher] {line}"));
-            crate::progress::push_console(&app_sink, "info", &format!("[launcher] {line}"));
+            crate::progress::push_console(&app_sink, "", "info", &format!("[launcher] {line}"));
         });
     }
 
