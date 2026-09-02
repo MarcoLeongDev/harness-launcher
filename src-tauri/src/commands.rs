@@ -552,9 +552,9 @@ pub async fn check_updates(app: AppHandle) -> Result<String, String> {
                 *app2.state::<AppState>().latest_remote.lock().unwrap() = Some(latest.clone());
                 let active = state::active_version(&app2).unwrap_or_default();
                 if update::is_newer(&active, &latest) {
-                    parts.push(format!("harness update available: {active} -> {latest}"));
+                    parts.push(format!("Harness update available: {active} → {latest}"));
                 } else {
-                    parts.push(format!("harness up to date ({latest})"));
+                    parts.push(format!("Harness is current at version {latest}"));
                 }
             }
             Err(e) => parts.push(format!("harness check failed: {e}")),
@@ -572,7 +572,7 @@ pub async fn check_updates(app: AppHandle) -> Result<String, String> {
             Err(e) => parts.push(format!("app check failed: {e}")),
         }
     } else {
-        parts.push("app self-update not configured (set updateEndpoint to enable)".into());
+        parts.push("App self-update not configured — set updateEndpoint to enable it".into());
     }
     Ok(parts.join(" "))
 }
