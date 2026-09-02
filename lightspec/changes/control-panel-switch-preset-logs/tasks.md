@@ -33,5 +33,5 @@
 - [x] 7.3 Shared .terminal style for feeds + log; v0.1.40
 
 ## 8. Build, deploy & verify
-- [ ] 8.1 cargo test green; lightspec validate pass
-- [ ] 8.2 Release build + deploy to /Applications + relaunch; confirm new version live; leave app running
+- [x] 8.1 cargo test green; lightspec validate pass
+- [x] 8.2 Release build + deploy to /Applications + relaunch; confirm new version live; leave app running
