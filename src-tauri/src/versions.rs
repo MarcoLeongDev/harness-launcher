@@ -29,6 +29,7 @@ pub fn npm_cli_path(app: &AppHandle) -> Result<PathBuf, String> {
 pub fn run_npm(
     app: &AppHandle,
     runtime_dir: &Path,
+    op: &str,
     npm_args: &[&str],
     timeout: Duration,
     mut sink: Option<&mut dyn FnMut(&str, &str)>,
@@ -71,9 +72,9 @@ pub fn run_npm(
     loop {
         // Honour an explicit user cancellation (Stop button) every 250ms so
         // the UI stays responsive and cancel feels instant.
-        if crate::progress::cancel_requested(app) {
+        if crate::progress::cancel_requested(app, op) {
             let _ = child.kill();
-            crate::progress::push_console(app, "err", "Download stopped by user");
+            crate::progress::push_console(app, op, "err", "Download stopped by user");
             return Err("operation cancelled by user".into());
         }
         match rx.recv_timeout(poll_interval) {
@@ -123,6 +124,7 @@ pub fn latest_dist_tag(app: &AppHandle, runtime_dir: &Path) -> Result<String, St
     let (out, err) = run_npm(
         app,
         runtime_dir,
+        "",
         &["view", PACKAGE, "dist-tags.latest", "--json"],
         Duration::from_secs(30),
         None,
@@ -156,6 +158,7 @@ pub fn list_versions(
     let (out, err) = run_npm(
         app,
         runtime_dir,
+        "",
         &["view", PACKAGE, "versions", "--json"],
         Duration::from_secs(30),
         None,
@@ -269,9 +272,9 @@ pub fn install_version(
     let dir = version_dir(runtime_dir, version);
     std::fs::create_dir_all(&dir).map_err(|e| format!("mkdir {dir:?}: {e}"))?;
     let spec = format!("{PACKAGE}@{version}");
-    crate::progress::reset_console(app);
-    crate::progress::reset_cancel(app);
-    crate::progress::push_console(app, "info", &format!("$ npm install {spec}"));
+    crate::progress::reset_console(app, op);
+    crate::progress::reset_cancel(app, op);
+    crate::progress::push_console(app, op, "info", &format!("$ npm install {spec}"));
     crate::progress::emit(app, op, Some(version), "installing", &format!("Installing {spec}…"), None);
     let app_sink = app.clone();
     let op_sink = op.to_string();
@@ -295,7 +298,7 @@ pub fn install_version(
         if now.duration_since(last_console).as_millis() >= 60 {
             last_console = now;
             let text: String = line.chars().take(600).collect();
-            crate::progress::push_console(&app_sink, stream, &text);
+            crate::progress::push_console(&app_sink, &op_sink, stream, &text);
         }
         // Progress bar: throttled harder, truncated preview.
         if now.duration_since(last_progress).as_millis() >= 200 {
@@ -315,6 +318,7 @@ pub fn install_version(
     let (out, err) = run_npm(
         app,
         runtime_dir,
+        op,
         &[
             "install",
             "--prefix",
@@ -333,8 +337,8 @@ pub fn install_version(
         Duration::from_secs(120),
         Some(&mut throttled_sink),
     )?;
-    if crate::progress::cancel_requested(app) {
-        crate::progress::push_console(app, "err", "Download stopped by user");
+    if crate::progress::cancel_requested(app, op) {
+        crate::progress::push_console(app, op, "err", "Download stopped by user");
         return Err("operation cancelled by user".into());
     }
     if !is_installed(runtime_dir, version) {
@@ -346,7 +350,7 @@ pub fn install_version(
     if is_installed(runtime_dir, version) {
         ensure_peer_completion(app, runtime_dir, version, op)?;
     }
-    crate::progress::push_console(app, "info", "Install finished — verifying…");
+    crate::progress::push_console(app, op, "info", "Install finished — verifying…");
     crate::progress::emit(app, op, Some(version), "verifying", "Verifying installation…", Some(85));
     if !is_installed(runtime_dir, version) {
         std::thread::sleep(Duration::from_millis(800));
@@ -439,6 +443,7 @@ pub fn ensure_peer_completion(
     let spec = format!("{}@{}", PACKAGE, version);
     crate::progress::push_console(
         app,
+        op,
         "info",
         &format!("Installing {} missing peer packages...", extra.len()),
     );
@@ -470,11 +475,11 @@ pub fn ensure_peer_completion(
     let mut sink = |stream: &str, line: &str| {
         let line = line.trim();
         if !line.is_empty() {
-            crate::progress::push_console(app, stream, &line.chars().take(600).collect::<String>());
+            crate::progress::push_console(app, op, stream, &line.chars().take(600).collect::<String>());
         }
     };
-    run_npm(app, runtime_dir, &npm_args, Duration::from_secs(120), Some(&mut sink))?;
-    crate::progress::push_console(app, "info", "Peer packages complete - verifying...");
+    run_npm(app, runtime_dir, op, &npm_args, Duration::from_secs(120), Some(&mut sink))?;
+    crate::progress::push_console(app, op, "info", "Peer packages complete - verifying...");
     crate::progress::emit(app, op, Some(version), "verifying", "Verifying installation...", Some(95));
     if !is_installed(runtime_dir, version) {
         std::thread::sleep(Duration::from_millis(800));
