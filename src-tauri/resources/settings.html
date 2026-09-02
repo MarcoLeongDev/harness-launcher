@@ -58,8 +58,14 @@
   .logo img { width: 100%; height: 100%; display: block; object-fit: cover; }
   .header-title { font-size: 15px; font-weight: 650; letter-spacing: -0.2px; }
   header .spacer { flex: 1; }
-  .hdr-ver { font-size: 11.5px; color: var(--dim); background: var(--cell);
-    border: 1px solid var(--hair); padding: 3px 10px; border-radius: 999px; }
+  /* Launcher version: bare, subtle text — no tag styling. */
+  .hdr-ver-subtle { font-family: var(--mono); font-size: 10.5px; color: var(--faint);
+    letter-spacing: 0.2px; user-select: text; }
+  /* Engine version keeps the tag style, pushed to the right end of the header
+     (beside the power button) via the header spacer. */
+  .hdr-tag { font-family: var(--mono); font-size: 11.5px; color: var(--dim);
+    background: var(--cell); border: 1px solid var(--hair); padding: 3px 10px;
+    border-radius: 999px; white-space: nowrap; }
   .hdr-quit { width: 28px; height: 28px; border-radius: 50%; border: none;
     background: transparent; color: var(--dim); cursor: pointer; display: inline-flex;
     align-items: center; justify-content: center; padding: 0; flex: none; }
@@ -301,8 +307,9 @@
 <header>
   <div class="logo"><img id="brand-logo" src="dsh-ui://localhost/brand/logo.png" alt="DeepSeek Harness Launcher" /></div>
   <span class="header-title">Harness Launcher</span>
-  <span class="hdr-ver" id="app-ver">v0.1.7</span>
-  <span class="hdr-ver" id="dsh-ver"></span>
+  <span class="hdr-ver-subtle" id="app-ver"></span>
+  <span class="spacer"></span>
+  <span class="hdr-tag" id="dsh-ver"></span>
   <button class="hdr-quit" id="btn-quit" title="Quit"><i class="ico sm bi" data-ico="power"></i></button>
 </header>
 
@@ -798,7 +805,7 @@
 
   function renderStatus(s) {
     var running = !!s.running;
-    sel.appVer.textContent = s.launcherVersion ? 'v' + s.launcherVersion : '';
+    sel.appVer.textContent = s.launcherVersion || '';
     sel.dshVer.textContent = s.activeVersion ? 'dsh v' + s.activeVersion : 'dsh v…';
     sel.ftHarness.textContent = s.activeVersion ? 'harness v' + s.activeVersion : 'harness —';
 
