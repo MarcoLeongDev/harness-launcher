@@ -12,8 +12,8 @@
 - [x] 2.3 Feedback messages + tests; v0.1.35
 
 ## 3. Download without stopping the engine
-- [ ] 3.1 New install_version IPC command: download only, never switches or restarts
-- [ ] 3.2 Install button uses download-only path; v0.1.36
+- [x] 3.1 New install_version IPC command: download only, never switches or restarts
+- [x] 3.2 Install button uses download-only path; v0.1.36
 
 ## 4. Parallel downloads with reusable terminal component
 - [ ] 4.1 progress.rs: per-op current_ops map, per-op console tags, per-op cancel
