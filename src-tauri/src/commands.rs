@@ -166,9 +166,10 @@ fn restart_engine(app: &AppHandle, op: &str, version: Option<&str>, force: bool)
     Ok(actual)
 }
 
-/// Human-readable feedback for a switch operation. The radio in the versions
-/// table IS the designed way to switch, so the message must describe what the
-/// switch did — never bounce the user back to the Control Panel.
+/// Human-readable feedback for a switch done while the engine was stopped.
+/// The radio in the versions table IS the designed way to switch, so the
+/// message must describe what the switch did — never bounce the user back to
+/// the Control Panel.
 fn switch_feedback(version: &str, was_installed: bool, already_active: bool) -> String {
     if already_active {
         format!("v{version} is already the default version")
@@ -179,18 +180,32 @@ fn switch_feedback(version: &str, was_installed: bool, already_active: bool) -> 
     }
 }
 
+/// Human-readable feedback for a switch done while the engine was running:
+/// the launcher stopped it, switched, and started the new version itself.
+fn switch_running_feedback(version: &str, port: u16) -> String {
+    format!("switched to v{version} — engine running on port {port}")
+}
+
 /// Install `version` when missing and make it the active (default) version.
-/// This is the switch path behind the versions-table radio and the install
-/// button: switching only records the default (it never starts the engine),
-/// and it is refused while the engine is running so the running binary and
-/// the recorded default stay consistent.
+/// This is the switch path behind the versions-table radio, the engine card
+/// version dropdown and the update banner. When the engine is running, the
+/// launcher stops it, switches, and starts the new version again — the user
+/// never has to stop the engine by hand. When stopped, switching only records
+/// the default (it never auto-starts).
 fn switch_version_inner(app: &AppHandle, version: &str, op: &str) -> Result<String, String> {
     ensure_runtime_dirs(app).map_err(|e| format!("runtime dirs: {e}"))?;
-    {
-        let st = app.state::<AppState>();
-        if st.runtime.is_running() {
-            return Err("stop the engine before switching versions".into());
-        }
+    let st = app.state::<AppState>();
+    let was_running = st.runtime.is_running();
+    if was_running {
+        progress::emit(
+            app,
+            op,
+            Some(version),
+            "stopping",
+            "Stopping the running engine to switch versions…",
+            Some(10),
+        );
+        runtime::stop(&st.runtime, &state::runtime_dir(app));
     }
     let rd = state::runtime_dir(app);
     let was_installed = versions::is_installed(&rd, version);
@@ -207,6 +222,15 @@ fn switch_version_inner(app: &AppHandle, version: &str, op: &str) -> Result<Stri
         });
         crate::tray::refresh(app);
     }
+
+    if was_running {
+        let actual = restart_engine(app, op, Some(version), false)?;
+        let _ = window::navigate(app, &harness_web_url(app, actual, Some(Duration::from_secs(10))));
+        let msg = switch_running_feedback(version, actual);
+        progress::finish(app, op, Some(version), &msg);
+        return Ok(msg);
+    }
+
     let msg = switch_feedback(version, was_installed, already_active);
     progress::finish(app, op, Some(version), &msg);
     Ok(msg)
@@ -238,6 +262,17 @@ mod switch_tests {
             let msg = switch_feedback("0.1.0-rc.7", was_installed, already_active);
             assert!(!msg.contains("select it from the Control Panel"), "{msg}");
         }
+    }
+
+    #[test]
+    fn running_switch_feedback_reports_the_live_engine() {
+        use super::switch_running_feedback;
+        let msg = switch_running_feedback("0.1.2-alpha.4", 3081);
+        assert!(msg.contains("switched to v0.1.2-alpha.4"), "{msg}");
+        assert!(msg.contains("running on port 3081"), "{msg}");
+        // A running switch never asks the user to do anything by hand.
+        assert!(!msg.contains("press Start"), "{msg}");
+        assert!(!msg.contains("stop the engine"), "{msg}");
     }
 }
 

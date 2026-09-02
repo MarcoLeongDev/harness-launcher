@@ -7,9 +7,9 @@
 - [x] 1.4 Wire into runtime::start; unit tests; v0.1.34
 
 ## 2. Live version switching (auto stop → switch → start)
-- [ ] 2.1 switch_version_inner: stop running engine, install, set default, start new version
-- [ ] 2.2 Engine card version dropdown selectable while running (switch = install_and_switch)
-- [ ] 2.3 Feedback messages + tests; v0.1.35
+- [x] 2.1 switch_version_inner: stop running engine, install, set default, start new version
+- [x] 2.2 Engine card version dropdown selectable while running (switch = install_and_switch)
+- [x] 2.3 Feedback messages + tests; v0.1.35
 
 ## 3. Download without stopping the engine
 - [ ] 3.1 New install_version IPC command: download only, never switches or restarts
