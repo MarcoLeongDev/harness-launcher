@@ -16,10 +16,10 @@
 - [x] 3.2 Install button uses download-only path; v0.1.36
 
 ## 4. Parallel downloads with reusable terminal component
-- [ ] 4.1 progress.rs: per-op current_ops map, per-op console tags, per-op cancel
-- [ ] 4.2 cancel_operation targets one op; run_npm honours per-op cancel
-- [ ] 4.3 settings.html: TerminalFeed component, one feed per active download
-- [ ] 4.4 Overlay compatibility (current_op preserved); v0.1.37
+- [x] 4.1 progress.rs: per-op current_ops map, per-op console tags, per-op cancel
+- [x] 4.2 cancel_operation targets one op; run_npm honours per-op cancel
+- [x] 4.3 settings.html: TerminalFeed component, one feed per active download
+- [x] 4.4 Overlay compatibility (current_op preserved); v0.1.37
 
 ## 5. Header restyle
 - [ ] 5.1 Subtle launcher version (no tag), engine version tag + power button right-aligned; v0.1.38
