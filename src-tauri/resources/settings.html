@@ -176,7 +176,7 @@
      operation owns one feed — header with npm command + elapsed time, mono
      output lines, and the circular stop button overlaid on the output while
      that version downloads. Feeds stack; parallel downloads never share one. */
-  .op-feed { border-top: 1px solid var(--hair); background: rgba(0,0,0,0.35); }
+  .op-feed { border-top: 1px solid var(--hair); }
   .op-feed + .op-feed { border-top: 1px solid var(--hair); }
   #op-feeds:empty { display: none; }
   .op-feed-head { display: flex; align-items: center; gap: 8px; padding: 10px 16px 6px; }
@@ -185,8 +185,12 @@
   .op-feed-elapsed { font-family: var(--mono); font-size: 11px; color: var(--faint);
     min-width: 40px; text-align: right; }
   .op-feed-body { position: relative; }
+  /* Shared terminal styling: one look for every terminal surface in the app
+     (operation feeds, harness log) — dark backing, mono, muted green text. */
+  .terminal { background: rgba(0,0,0,0.35); color: #9bd1c0;
+    font: 11px/1.5 var(--mono); white-space: pre-wrap; word-break: break-all; }
   .term-out { margin: 0; padding: 8px 16px 46px; max-height: 220px; overflow: auto;
-    font: 10.5px/1.5 var(--mono); color: #9bd1c0; white-space: pre-wrap; word-break: break-all; }
+    font-size: 10.5px; }
   .op-feed.idle .term-out { padding-bottom: 14px; }
   .term-out .ln { display: block; }
   .term-out .ln.out { color: #a9d5ff; }
@@ -289,10 +293,23 @@
   .pop-txt { font-size: 12px; margin-bottom: 10px; color: var(--text); }
   .pop-txt b { font-family: var(--mono); }
   .pop-acts { display: flex; gap: 8px; justify-content: flex-end; }
-  /* logs */
-  .log-toolbar { display: flex; align-items: center; gap: 6px; }
-  .log-view { margin: 0; padding: 12px 16px; max-height: 60vh; overflow: auto;
-    font: 11px/1.5 var(--mono); color: #9bd1c0; white-space: pre-wrap; word-break: break-all; }
+  /* logs — the log fills the control panel and resizes with the window;
+     refresh (top-right) and go-to-last (bottom-right) overlay the log itself
+     as circular buttons with a background only while hovered. */
+  .log-group { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+  .log-wrap { position: relative; flex: 1; min-height: 0; display: flex; }
+  .log-view { margin: 0; flex: 1; min-height: 0; overflow: auto; padding: 12px 52px 12px 16px; }
+  .log-overlay { position: absolute; right: 10px; width: 30px; height: 30px;
+    border-radius: 50%; border: none; background: transparent; color: var(--dim);
+    cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+    padding: 0; z-index: 2; transition: background .15s, color .15s; }
+  .log-overlay:hover { background: var(--cell-hover); color: var(--accent2); }
+  .log-overlay:active { transform: translateY(1px); }
+  .log-overlay:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
+  .log-overlay svg { width: 15px; height: 15px; }
+  .log-overlay.top { top: 10px; }
+  .log-overlay.bottom { bottom: 10px; }
+  .log-overlay.pressed { color: var(--accent2); }
   @media (max-width: 560px) { .actions { grid-template-columns: 1fr 1fr; } }
 </style>
 </head>
@@ -416,13 +433,12 @@
 
   <!-- ============ LOGS ============ -->
   <section class="tabpanel" id="tab-logs" role="tabpanel" aria-labelledby="tab-btn-logs" hidden>
-    <div class="group">
-      <div class="cell log-toolbar" style="padding:8px 10px">
-        <button class="btn icon" id="btn-log-refresh" title="Refresh"><i class="ico sm bi" data-ico="arrow-clockwise"></i></button>
-        <button class="btn icon" id="btn-log-follow" title="Follow output" aria-pressed="true"><i class="ico sm bi" data-ico="arrow-down-circle-fill"></i></button>
-        <span style="flex:1"></span>
+    <div class="group log-group">
+      <div class="log-wrap">
+        <pre class="log-view terminal" id="log-tail">No output yet</pre>
+        <button class="log-overlay top" id="btn-log-refresh" title="Refresh"><i class="ico sm bi" data-ico="arrow-clockwise"></i></button>
+        <button class="log-overlay bottom pressed" id="btn-log-follow" title="Go to last line" aria-pressed="true"><i class="ico sm bi" data-ico="arrow-down-circle-fill"></i></button>
       </div>
-      <pre class="log-view" id="log-tail">No output yet</pre>
     </div>
   </section>
 </main>
@@ -549,7 +565,7 @@
         '<span class="op-feed-elapsed">0:00</span>' +
       '</div>' +
       '<div class="op-feed-body">' +
-        '<pre class="term-out" aria-live="polite"></pre>' +
+        '<pre class="term-out terminal" aria-live="polite"></pre>' +
         '<button class="dl-cancel" title="Stop download" aria-label="Stop download" hidden>' +
           '<i class="ico sm bi" data-ico="stop-circle"></i>' +
         '</button>' +
@@ -1031,10 +1047,11 @@
 
   // logs
   sel.logRefresh.addEventListener('click', refreshLog);
+  // Go to last line: jump to the end of the log and keep following it.
   sel.logFollow.addEventListener('click', function () {
-    followOn = !followOn;
-    sel.logFollow.setAttribute('aria-pressed', followOn ? 'true' : 'false');
-    sel.logFollow.style.color = followOn ? 'var(--accent2)' : '';
+    followOn = true;
+    sel.logFollow.setAttribute('aria-pressed', 'true');
+    sel.logFollow.classList.add('pressed');
     refreshLog();
   });
 
