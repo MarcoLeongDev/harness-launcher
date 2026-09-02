@@ -22,7 +22,7 @@
 - [x] 4.4 Overlay compatibility (current_op preserved); v0.1.37
 
 ## 5. Header restyle
-- [ ] 5.1 Subtle launcher version (no tag), engine version tag + power button right-aligned; v0.1.38
+- [x] 5.1 Subtle launcher version (no tag), engine version tag + power button right-aligned; v0.1.38
 
 ## 6. Remove footer version label
 - [ ] 6.1 Remove footer harness version + wiring; v0.1.39
