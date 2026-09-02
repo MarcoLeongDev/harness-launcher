@@ -165,12 +165,14 @@
   .ecterm-toggle.open svg { transform: rotate(180deg); }
   .ecterm { border-top: 1px solid var(--hair); background: rgba(0,0,0,0.35); display: none; }
   .ecterm.open { display: block; }
-  /* Operation feed: the single notification surface of the Versions tab,
-     appended as the LAST CELL of the installed-versions table group. Terminal
-     styling restored from v0.1.23: header with npm command + elapsed time,
-     mono output lines, and the circular stop button overlaid on the output
-     while a version downloads. Hidden whenever there is nothing to show. */
+  /* Operation feeds: the notification surface of the Versions tab, appended
+     as the LAST CELL of the installed-versions table group. Each in-flight
+     operation owns one feed — header with npm command + elapsed time, mono
+     output lines, and the circular stop button overlaid on the output while
+     that version downloads. Feeds stack; parallel downloads never share one. */
   .op-feed { border-top: 1px solid var(--hair); background: rgba(0,0,0,0.35); }
+  .op-feed + .op-feed { border-top: 1px solid var(--hair); }
+  #op-feeds:empty { display: none; }
   .op-feed-head { display: flex; align-items: center; gap: 8px; padding: 10px 16px 6px; }
   .op-feed-cmd { font-family: var(--mono); font-size: 10.5px; color: var(--faint);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
@@ -383,23 +385,12 @@
           <span class="vc-acts">Actions</span>
         </div>
         <div id="ver-tbody"></div>
-        <!-- Operation feed: notifications for this tab (progress messages,
+        <!-- Operation feeds: notifications for this tab (progress messages,
              npm output, result/error lines) render here as the last cell of
-             the table section. The circular stop button overlays the output
-             only while a version download is in flight. -->
-        <div class="op-feed idle" id="op-feed" hidden>
-          <div class="op-feed-head" id="op-feed-head" hidden>
-            <i class="ico sm bi" style="color:var(--accent2)" data-ico="cloud-arrow-down-fill"></i>
-            <span class="op-feed-cmd" id="op-feed-cmd">npm install @deepseek-ai/dsh@…</span>
-            <span class="op-feed-elapsed" id="op-feed-elapsed">0:00</span>
-          </div>
-          <div class="op-feed-body">
-            <pre class="term-out" id="term-out" aria-live="polite"></pre>
-            <button class="dl-cancel" id="btn-stop-download" title="Stop download" aria-label="Stop download" hidden>
-              <i class="ico sm bi" data-ico="stop-circle"></i>
-            </button>
-          </div>
-        </div>
+             the table section. One REUSABLE feed component per operation —
+             parallel downloads each get their own terminal (head + output +
+             circular stop button overlay) instead of fighting over one div. -->
+        <div id="op-feeds"></div>
       </div>
     </div>
 
@@ -497,8 +488,7 @@
     pre: $('chk-prerelease'),
     intervalSel: $('sel-interval'), installSel: $('sel-install-ver'), btnInstall: $('btn-install'),
     verTbody: $('ver-tbody'),
-    feed: $('op-feed'), feedHead: $('op-feed-head'), feedCmd: $('op-feed-cmd'),
-    feedElapsed: $('op-feed-elapsed'), termOut: $('term-out'), stopDown: $('btn-stop-download'),
+    feedsBox: $('op-feeds'),
     auto: $('chk-autoupdate'), check: $('btn-check'), checkResult: $('check-result'),
     logRefresh: $('btn-log-refresh'), logFollow: $('btn-log-follow'), logTail: $('log-tail'),
     banner: $('update-banner'), bannerText: $('update-banner-text'), bannerBtn: $('btn-banner-update'),
@@ -508,12 +498,7 @@
 
   var followOn = true;
   var lastPhase = 'stopped';
-  // Operation feed state (the terminal cell of the versions table).
-  var opKey = null, opStart = null, lastFeedPhase = null, feedDownloading = false;
-  var elapsedTimer = null, stuckTimer = null, feedHideTimer = null;
-  var lastResultText = '', lastResultAt = 0;
-  var downloadingOps = { install: 1, update: 1, rollback: 1, select: 1 };
-  var downloadingPhases = { registry: 1, installing: 1, verifying: 1 };
+
 
   // ---------- tabs ----------
   var tabs = ['engine', 'versions', 'logs'];
@@ -541,43 +526,119 @@
     var m = Math.floor(secs / 60), s = secs % 60;
     return m + ':' + (s < 10 ? '0' : '') + s;
   }
-  function clearElapsed() {
-    if (elapsedTimer) { clearInterval(elapsedTimer); elapsedTimer = null; }
-    sel.feedElapsed.textContent = '0:00';
-  }
-  function tickElapsed() {
-    if (elapsedTimer) return;
-    elapsedTimer = setInterval(function () {
-      if (opStart) sel.feedElapsed.textContent = fmtTime((Date.now() - opStart) / 1000);
-    }, 1000);
-  }
-  function appendTermLine(stream, text) {
-    var ln = document.createElement('span');
-    ln.className = 'ln ' + (stream === 'err' ? 'err' : stream === 'info' ? 'info' : 'out');
-    ln.textContent = text;
-    sel.termOut.appendChild(ln);
-    while (sel.termOut.childElementCount > 400) sel.termOut.removeChild(sel.termOut.firstChild);
-    sel.termOut.scrollTop = sel.termOut.scrollHeight;
-  }
-  function isDownloading(p) { return !!(p && downloadingOps[p.op] && downloadingPhases[p.phase]); }
-  // After 60 s with no progress output, surface a hint inside the terminal.
-  function armStuckTimer() {
-    if (stuckTimer) clearTimeout(stuckTimer);
-    stuckTimer = setTimeout(function () {
-      if (!sel.feed.hidden && feedDownloading) {
-        appendTermLine('info', 'no progress for 60s — still working? tap the stop button to cancel');
+  // ---------- operation feeds: one reusable terminal per operation ----------
+  // Every in-flight operation (parallel version downloads included) owns one
+  // feed — head (npm command + elapsed), terminal output and stop button —
+  // so concurrent downloads never fight over a single output div.
+  var downloadingOps = { download: 1, switch: 1, update: 1, rollback: 1, install: 1, select: 1 };
+  var downloadingPhases = { registry: 1, installing: 1, verifying: 1 };
+  // Ops that stop/start/restart the engine: while any runs, engine controls
+  // are disabled. Plain downloads (kind "download") never touch the engine.
+  var engineBusyOps = { switch: 1, update: 1, rollback: 1, engine: 1, port: 1 };
+  var feeds = {};        // op key -> feed object
+  var noticeFeed = null; // terminal surface for launcher-level notices
+  var lastResultText = '', lastResultAt = 0;
+
+  function opKind(op) { return String(op || '').split(':')[0]; }
+
+  function makeFeed(opKey) {
+    var el = document.createElement('div');
+    el.className = 'op-feed idle';
+    el.hidden = true;
+    el.innerHTML =
+      '<div class="op-feed-head" hidden>' +
+        '<i class="ico sm bi" style="color:var(--accent2)" data-ico="cloud-arrow-down-fill"></i>' +
+        '<span class="op-feed-cmd">npm install @deepseek-ai/dsh@…</span>' +
+        '<span class="op-feed-elapsed">0:00</span>' +
+      '</div>' +
+      '<div class="op-feed-body">' +
+        '<pre class="term-out" aria-live="polite"></pre>' +
+        '<button class="dl-cancel" title="Stop download" aria-label="Stop download" hidden>' +
+          '<i class="ico sm bi" data-ico="stop-circle"></i>' +
+        '</button>' +
+      '</div>';
+    sel.feedsBox.appendChild(el);
+    loadIconsIn(el);
+    var head = el.querySelector('.op-feed-head');
+    var cmd = el.querySelector('.op-feed-cmd');
+    var elapsedEl = el.querySelector('.op-feed-elapsed');
+    var out = el.querySelector('.term-out');
+    var stop = el.querySelector('.dl-cancel');
+    var feed = {
+      opKey: opKey, el: el, downloading: false, done: false,
+      start: null, lastPhase: null,
+      elapsedTimer: null, stuckTimer: null, hideTimer: null,
+      append: function (stream, text) {
+        var ln = document.createElement('span');
+        ln.className = 'ln ' + (stream === 'err' ? 'err' : stream === 'info' ? 'info' : 'out');
+        ln.textContent = text;
+        out.appendChild(ln);
+        while (out.childElementCount > 400) out.removeChild(out.firstChild);
+        out.scrollTop = out.scrollHeight;
+        el.hidden = false;
+      },
+      setHeader: function (text) {
+        cmd.textContent = text;
+        head.hidden = false;
+        el.hidden = false;
+      },
+      setDownloading: function (on) {
+        feed.downloading = on;
+        el.classList.toggle('idle', !on);
+        el.hidden = false;
+        stop.hidden = !on;
+        head.hidden = !on;
+        if (!on) {
+          if (feed.elapsedTimer) { clearInterval(feed.elapsedTimer); feed.elapsedTimer = null; }
+          if (feed.stuckTimer) { clearTimeout(feed.stuckTimer); feed.stuckTimer = null; }
+        } else {
+          if (feed.hideTimer) { clearTimeout(feed.hideTimer); feed.hideTimer = null; }
+          if (!feed.start) feed.start = Date.now();
+          if (!feed.elapsedTimer) {
+            feed.elapsedTimer = setInterval(function () {
+              elapsedEl.textContent = fmtTime((Date.now() - feed.start) / 1000);
+            }, 1000);
+          }
+        }
+      },
+      // After 60 s with no progress output, surface a hint in the terminal.
+      armStuck: function () {
+        if (feed.stuckTimer) clearTimeout(feed.stuckTimer);
+        feed.stuckTimer = setTimeout(function () {
+          if (feed.downloading) feed.append('info', 'no progress for 60s — still working? tap the stop button to cancel');
+        }, 60000);
+      },
+      // Keep the terminal visible briefly after the operation settles, then
+      // remove the feed entirely — the container collapses when empty.
+      finishSoon: function (ms) {
+        feed.done = true;
+        feed.setDownloading(false);
+        if (feed.hideTimer) clearTimeout(feed.hideTimer);
+        feed.hideTimer = setTimeout(function () {
+          if (feed.downloading) return;
+          if (el.parentNode) el.parentNode.removeChild(el);
+          delete feeds[opKey];
+        }, ms);
       }
-    }, 60000);
-  }
-  function hideFeedSoon(ms) {
-    if (feedHideTimer) clearTimeout(feedHideTimer);
-    feedHideTimer = setTimeout(function () {
-      if (!feedDownloading) sel.feed.hidden = true;
-    }, ms);
+    };
+    stop.addEventListener('click', function () {
+      stop.disabled = true;
+      feed.append('info', 'Stopping download…');
+      invoke('cancel_operation', { op: feed.opKey })
+        .catch(function (e) { feed.append('err', String(e && e.message || e)); })
+        .finally(function () { setTimeout(function () { stop.disabled = false; }, 2000); });
+    });
+    feeds[opKey] = feed;
+    return feed;
   }
 
-  // Notifications surface in the terminal cell — the last cell of the
-  // installed-versions table — instead of a stray line under the install row.
+  function feedFor(op) {
+    return feeds[op] || makeFeed(op);
+  }
+
+  // Launcher-level notices (delete confirmations, engine results) surface in
+  // a dedicated notice feed inside the same terminal area, instead of a
+  // stray line under the install row.
   function setResult(text, isErr) {
     if (!text) return;
     var now = Date.now();
@@ -585,43 +646,10 @@
     // result); appending both would duplicate the line.
     if (text === lastResultText && now - lastResultAt < 2500) { lastResultAt = now; return; }
     lastResultText = text; lastResultAt = now;
-    if (feedHideTimer) { clearTimeout(feedHideTimer); feedHideTimer = null; }
-    sel.feed.classList.toggle('idle', !feedDownloading);
-    sel.feed.hidden = false;
-    appendTermLine(isErr ? 'err' : 'info', text);
-    if (!feedDownloading) hideFeedSoon(8000);
-  }
-
-  function setDownloadState(p) {
-    var downloading = isDownloading(p);
-    feedDownloading = downloading;
-    sel.feed.classList.toggle('idle', !downloading);
-    if (downloading) {
-      if (feedHideTimer) { clearTimeout(feedHideTimer); feedHideTimer = null; }
-      var key = p.op + ':' + (p.version || '');
-      if (opKey !== key) {
-        opKey = key; opStart = Date.now(); lastFeedPhase = null;
-        sel.termOut.innerHTML = '';
-        sel.feedCmd.textContent = 'npm install @deepseek-ai/dsh@' + (p.version || '…');
-      }
-      sel.feed.hidden = false;
-      sel.feedHead.hidden = false;
-      sel.stopDown.hidden = false;
-      // Milestone messages (registry → installing → verifying) stream in as
-      // info lines so the terminal tells the whole story.
-      if (p.message && p.phase !== lastFeedPhase) {
-        lastFeedPhase = p.phase;
-        appendTermLine('info', p.message);
-      }
-      if (p.message) armStuckTimer();
-      tickElapsed();
-    } else {
-      sel.stopDown.hidden = true;
-      sel.feedHead.hidden = true;
-      clearElapsed();
-      if (stuckTimer) { clearTimeout(stuckTimer); stuckTimer = null; }
-      opKey = null; opStart = null; lastFeedPhase = null;
-    }
+    var f = noticeFeed;
+    if (!f || f.done) f = noticeFeed = makeFeed('__notice__');
+    f.append(isErr ? 'err' : 'info', text);
+    f.finishSoon(8000);
   }
 
   function setCheckResult(text, isErr) {
@@ -634,19 +662,38 @@
     [sel.toggle, sel.restart, sel.check].forEach(function (b) { b.disabled = on; });
   }
 
-
-
   function applyProgress(p) {
-    if (!p) { busy(false); setDownloadState(null); return; }
-    setDownloadState(p);
-    busy(true);
-    if (p.phase === 'done' || p.phase === 'failed' || p.phase === 'cancelled') {
-      setTimeout(function () { busy(false); }, 2500);
-      setResult((p.message) || (p.phase === 'done' ? 'Completed' : p.phase), p.phase !== 'done');
+    if (!p) return;
+    var kind = opKind(p.op);
+    var f = feedFor(p.op || '');
+    var downloading = !!downloadingOps[kind] && !!downloadingPhases[p.phase];
+    if (downloading) {
+      f.done = false;
+      f.setDownloading(true);
+      if (p.phase === 'registry') f.setHeader('npm view @deepseek-ai/dsh dist-tags…');
+      else f.setHeader('npm install @deepseek-ai/dsh@' + (p.version || '…'));
     }
-    if (p.phase === 'running' || p.phase === 'stopped') setTimeout(function () { busy(false); }, 1200);
-    if (p.phase === 'done' || p.phase === 'failed' || p.phase === 'cancelled' || p.phase === 'stopped') {
+    // Milestone messages (registry → installing → verifying, stopping →
+    // starting → running) stream in as info lines so the terminal tells the
+    // whole story for engine-affecting operations too.
+    if (p.message && p.phase !== f.lastPhase) {
+      f.lastPhase = p.phase;
+      if (downloading || engineBusyOps[kind]) f.append('info', p.message);
+    }
+    if (downloading && p.message) f.armStuck();
+    if (engineBusyOps[kind]) busy(true);
+    if (p.phase === 'done' || p.phase === 'failed' || p.phase === 'cancelled') {
+      if (f.lastPhase !== p.phase) {
+        f.lastPhase = p.phase;
+        f.append(p.phase === 'done' ? 'info' : 'err', p.message || (p.phase === 'done' ? 'Completed' : p.phase));
+      }
+      f.finishSoon(p.phase === 'done' ? 8000 : 10000);
+      if (engineBusyOps[kind]) setTimeout(function () { busy(false); }, 2500);
       setTimeout(refresh, 700);
+    }
+    if (p.phase === 'running' || p.phase === 'stopped') {
+      setTimeout(function () { busy(false); }, 1200);
+      if (p.phase === 'stopped') setTimeout(refresh, 700);
     }
   }
 
@@ -840,16 +887,18 @@
     fillVersionSelects(s);
     renderVersions(s);
 
-    if (s.currentOp) {
-      applyProgress(s.currentOp);
-      // Window (re)opened mid-download: seed the terminal with the snapshot
-      // so the feed tells the whole story from the start.
-      if (isDownloading(s.currentOp) && !sel.termOut.childElementCount && s.console && s.console.length) {
-        sel.feed.hidden = false;
-        s.console.forEach(function (line) { appendTermLine(line.stream || 'out', line.text); });
-      }
-    } else {
-      busy(false);
+    // Rebuild feed state: every in-flight operation (parallel downloads
+    // included) gets its own feed, then each feed's terminal is seeded from
+    // the console snapshot so it tells the whole story from the start.
+    var activeOps = s.currentOps || (s.currentOp ? [s.currentOp] : []);
+    activeOps.forEach(function (p) { if (p) applyProgress(p); });
+    if (!activeOps.length) busy(false);
+    if (s.console && s.console.length) {
+      s.console.forEach(function (line) {
+        if (!line || !line.text || !line.op) return;
+        var f = feeds[line.op];
+        if (f) f.append(line.stream || 'out', line.text);
+      });
     }
   }
 
@@ -964,23 +1013,7 @@
   });
   sel.bannerBtn.addEventListener('click', function () { withCmd(function () { return invoke('update_to_latest', {}); }, 'Updated'); });
 
-  // Cancel the in-flight download via the circular stop overlay.
-  sel.stopDown.addEventListener('click', function () {
-    sel.stopDown.disabled = true;
-    appendTermLine('info', 'Stopping download…');
-    invoke('cancel_operation').then(function (res) {
-      appendTermLine('info', (res && res.message) || 'stop requested');
-      // Reflect the cancelled state immediately even if the backend's npm
-      // child takes a moment to actually exit.
-      setDownloadState(null);
-      appendTermLine('info', 'cancelled');
-      hideFeedSoon(4000);
-    }).catch(function (e) {
-      appendTermLine('err', String(e && e.message || e));
-    }).finally(function () {
-      setTimeout(function () { sel.stopDown.disabled = false; }, 2000);
-    });
-  });
+
 
   // auto-update
   sel.auto.addEventListener('change', function () {
@@ -1017,11 +1050,16 @@
   listen('launcher://progress', function (p) { if (p) applyProgress(p); });
   listen('launcher://console', function (line) {
     if (!line || !line.text) return;
-    // While the feed is open (e.g. a download running) npm output streams
-    // into the terminal; stray lines (like delete confirmations) surface as
+    // Lines tagged with an operation stream into THAT operation's feed;
+    // stray launcher-level lines (like delete confirmations) surface as
     // notifications instead of piling up invisibly.
-    if (sel.feed.hidden) { setResult(line.text, line.stream === 'err'); }
-    else { armStuckTimer(); appendTermLine(line.stream || 'out', line.text); }
+    if (line.op) {
+      var f = feedFor(line.op);
+      f.append(line.stream || 'out', line.text);
+      if (f.downloading) f.armStuck();
+    } else {
+      setResult(line.text, line.stream === 'err');
+    }
   });
   listen('launcher://status', function () { refresh(); });
 
