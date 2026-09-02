@@ -900,8 +900,9 @@
     renderVersions(s);
 
     // Rebuild feed state: every in-flight operation (parallel downloads
-    // included) gets its own feed, then each feed's terminal is seeded from
-    // the console snapshot so it tells the whole story from the start.
+    // included) gets its own feed, then each feed's terminal is seeded ONCE
+    // from the console snapshot so it tells the whole story from the start
+    // (refresh polls every few seconds and must not duplicate lines).
     var activeOps = s.currentOps || (s.currentOp ? [s.currentOp] : []);
     activeOps.forEach(function (p) { if (p) applyProgress(p); });
     if (!activeOps.length) busy(false);
@@ -909,7 +910,7 @@
       s.console.forEach(function (line) {
         if (!line || !line.text || !line.op) return;
         var f = feeds[line.op];
-        if (f) f.append(line.stream || 'out', line.text);
+        if (f && !f.seeded) { f.seeded = true; f.append(line.stream || 'out', line.text); }
       });
     }
   }
@@ -1067,6 +1068,7 @@
     // notifications instead of piling up invisibly.
     if (line.op) {
       var f = feedFor(line.op);
+      f.seeded = true; // live lines supersede the snapshot seed
       f.append(line.stream || 'out', line.text);
       if (f.downloading) f.armStuck();
     } else {
