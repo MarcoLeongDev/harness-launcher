@@ -10,8 +10,8 @@
 - [x] 2.3 Verify no window-level scrollbar on the Logs tab; v0.1.42
 
 ## 3. Feed title + terminal icon
-- [ ] 3.1 No ellipsis truncation; full "npm install @deepseek-ai/dsh@<version>" title
-- [ ] 3.2 terminal-fill icon in the feed header; v0.1.43
+- [x] 3.1 No ellipsis truncation; full "npm install @deepseek-ai/dsh@<version>" title
+- [x] 3.2 terminal-fill icon in the feed header; v0.1.43
 
 ## 4. Auto-update section redesign
 - [ ] 4.1 Remove empty cell; layout rethink (toggle + interval + check row)
