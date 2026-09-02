@@ -39,10 +39,11 @@
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; }
-  body { margin: 0; color: var(--text);
+  body { margin: 0; color: var(--text); overflow: hidden;
     font: 13px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
     background: linear-gradient(180deg, var(--bg2), var(--bg)); min-height: 100vh;
-    display: flex; flex-direction: column; -webkit-font-smoothing: antialiased; }
+    display: flex; flex-direction: column; -webkit-font-smoothing: antialiased;
+    overflow: hidden; }
   /* Minimal iOS-style scroll bars */
   *::-webkit-scrollbar { width: 3px; height: 3px; }
   *::-webkit-scrollbar-track { background: transparent; }
@@ -87,9 +88,14 @@
   .tab[aria-selected="true"] { color: var(--text); background: var(--cell);
     border-color: var(--hair); box-shadow: inset 0 -1px 0 rgba(255,255,255,0.12); }
   .tab svg { width: 15px; height: 15px; }
-  main { flex: 1; padding: 12px 22px 24px; margin: 0 auto; width: 100%; max-width: 640px; }
-  .tabpanel { display: none; flex-direction: column; gap: 14px; }
+  main { flex: 1; min-height: 0; padding: 12px 22px 24px; margin: 0 auto; width: 100%;
+    max-width: 640px; display: flex; flex-direction: column; overflow: hidden; }
+  .tabpanel { display: none; flex-direction: column; gap: 14px;
+    flex: 1; min-height: 0; overflow: auto; }
   .tabpanel.active { display: flex; }
+  /* The Logs tab manages its own height: the log fills the panel and scrolls
+     internally — the window itself never scrolls for this tab. */
+  #tab-logs.active { overflow: hidden; }
   /* grouped macOS-style rows */
   .group { background: var(--cell); border: 1px solid var(--hair); border-radius: var(--radius);
     overflow: hidden; backdrop-filter: blur(8px); }
@@ -121,6 +127,9 @@
   select { font-family: inherit; }
   .err { color: var(--err); }
   .ok2 { color: var(--ok); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .ico.spin { animation: spin .9s linear infinite; display: inline-block; }
+  @media (prefers-reduced-motion: reduce) { .ico.spin { animation: none; } }
   /* Hide empty result cells */
   #check-result:empty { display: none; }
   /* engine card */
@@ -176,12 +185,19 @@
      operation owns one feed — header with npm command + elapsed time, mono
      output lines, and the circular stop button overlaid on the output while
      that version downloads. Feeds stack; parallel downloads never share one. */
-  .op-feed { border-top: 1px solid var(--hair); }
+  .op-feed { border-top: 1px solid var(--hair); overflow: hidden;
+    animation: feed-in .18s ease-out both; }
   .op-feed + .op-feed { border-top: 1px solid var(--hair); }
+  .op-feed.leaving { animation: feed-out .16s ease-in both; }
   #op-feeds:empty { display: none; }
+  @keyframes feed-in { from { opacity: 0; transform: translateY(-6px); } }
+  @keyframes feed-out { to { opacity: 0; transform: translateY(-6px); } }
+  @media (prefers-reduced-motion: reduce) {
+    .op-feed, .op-feed.leaving { animation: none; }
+  }
   .op-feed-head { display: flex; align-items: center; gap: 8px; padding: 10px 16px 6px; }
   .op-feed-cmd { font-family: var(--mono); font-size: 10.5px; color: var(--faint);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+    white-space: normal; word-break: break-all; flex: 1; min-width: 0; }
   .op-feed-elapsed { font-family: var(--mono); font-size: 11px; color: var(--faint);
     min-width: 40px; text-align: right; }
   .op-feed-body { position: relative; }
@@ -372,24 +388,21 @@
       </div>
     </div>
 
-    <!-- Section 1: auto-update — interval dropdown + toggle share one cell,
-         "Check now" is its own cell, the result line closes the section. -->
+    <!-- Section 1: auto-update — toggle+interval row and a Check row whose
+         status text sits inline beside the button. No empty cells. -->
     <div class="group">
       <div class="cell">
         <span class="lbl">Auto update</span>
-        <span style="flex:1"></span>
+        <span class="hint" style="flex:1"></span>
         <select id="sel-interval" aria-label="Check every"></select>
         <span class="switch"><input type="checkbox" id="chk-autoupdate" aria-label="Enable auto update" /><span class="slider"></span></span>
       </div>
-      <div class="cell">
-        <span class="lbl">Check for updates</span>
-        <span style="flex:1"></span>
+      <div class="cell" style="padding-top:9px;padding-bottom:11px">
         <button class="btn" id="btn-check" title="Check for updates now">
           <i class="ico sm bi" data-ico="arrow-clockwise"></i> Check now
         </button>
-      </div>
-      <div class="cell" style="padding-top:9px;padding-bottom:11px">
-        <span class="hint" id="check-result" hidden></span>
+        <span style="flex:1"></span>
+        <span class="hint" id="check-result" aria-live="polite"></span>
       </div>
     </div>
 
@@ -560,8 +573,8 @@
     el.hidden = true;
     el.innerHTML =
       '<div class="op-feed-head" hidden>' +
-        '<i class="ico sm bi" style="color:var(--accent2)" data-ico="cloud-arrow-down-fill"></i>' +
-        '<span class="op-feed-cmd">npm install @deepseek-ai/dsh@…</span>' +
+        '<i class="ico sm bi" style="color:var(--accent2)" data-ico="terminal-fill"></i>' +
+        '<span class="op-feed-cmd">npm install @deepseek-ai/dsh</span>' +
         '<span class="op-feed-elapsed">0:00</span>' +
       '</div>' +
       '<div class="op-feed-body">' +
@@ -622,15 +635,18 @@
         }, 60000);
       },
       // Keep the terminal visible briefly after the operation settles, then
-      // remove the feed entirely — the container collapses when empty.
+      // animate the feed out and remove it — the container collapses.
       finishSoon: function (ms) {
         feed.done = true;
         feed.setDownloading(false);
         if (feed.hideTimer) clearTimeout(feed.hideTimer);
         feed.hideTimer = setTimeout(function () {
           if (feed.downloading) return;
-          if (el.parentNode) el.parentNode.removeChild(el);
-          delete feeds[opKey];
+          el.classList.add('leaving');
+          setTimeout(function () {
+            if (el.parentNode) el.parentNode.removeChild(el);
+            delete feeds[opKey];
+          }, 180);
         }, ms);
       }
     };
@@ -667,9 +683,9 @@
 
   function setCheckResult(text, isErr) {
     sel.checkResult.textContent = text || '';
-    sel.checkResult.className = isErr ? 'err' : '';
-    // Show/hide the cell based on content (auto-update section)
-    sel.checkResult.parentElement.hidden = !text;
+    // Result state lives in the row beside the Check button; the span is
+    // hidden when empty (:empty rule) so no empty cell ever shows.
+    sel.checkResult.className = isErr ? 'err' : (text ? 'ok2' : '');
   }
   function busy(on) {
     [sel.toggle, sel.restart, sel.check].forEach(function (b) { b.disabled = on; });
@@ -683,8 +699,8 @@
     if (downloading) {
       f.done = false;
       f.setDownloading(true);
-      if (p.phase === 'registry') f.setHeader('npm view @deepseek-ai/dsh dist-tags…');
-      else f.setHeader('npm install @deepseek-ai/dsh@' + (p.version || '…'));
+      if (p.phase === 'registry') f.setHeader('npm view @deepseek-ai/dsh dist-tags');
+      else f.setHeader('npm install @deepseek-ai/dsh@' + (p.version || ''));
     }
     // Milestone messages (registry → installing → verifying, stopping →
     // starting → running) stream in as info lines so the terminal tells the
@@ -968,11 +984,33 @@
     });
   }
 
+  // Log lines render as coloured .ln spans — the same palette the operation
+  // feeds use — and ANSI escapes from the harness are stripped.
+  function logLineClass(line) {
+    if (/error|fail(?:ed|ure)?|panic|exception|ENOENT|EADDR|exited with code/i.test(line)) return 'err';
+    if (/^\[launcher\]|dsh web:|engine (running|stopped|starting)|installed|updated|update available|checking/i.test(line)) return 'info';
+    return 'out';
+  }
   function refreshLog() {
     invoke('tail_logs', { lines: 300 }).then(function (text) {
       var pre = sel.logTail;
       var atBottom = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 40;
-      pre.textContent = text || '(no logs yet)';
+      var raw = String(text || '').replace(/\u001b\[[0-9;]*m/g, '');
+      var lines = raw.split('\n');
+      pre.textContent = '';
+      for (var i = 0; i < lines.length; i++) {
+        if (!lines[i] && i === lines.length - 1) continue;
+        var ln = document.createElement('span');
+        ln.className = 'ln ' + logLineClass(lines[i]);
+        ln.textContent = lines[i] || ' ';
+        pre.appendChild(ln);
+      }
+      if (!pre.childElementCount) {
+        var empty = document.createElement('span');
+        empty.className = 'ln info';
+        empty.textContent = '(no logs yet)';
+        pre.appendChild(empty);
+      }
       if (followOn || atBottom) pre.scrollTop = pre.scrollHeight;
     }).catch(function () {});
   }
@@ -1038,12 +1076,18 @@
       .catch(function (e) { setResult(String(e.message || e), true); });
   });
   sel.check.addEventListener('click', function () {
+    if (sel.check.disabled) return;
     sel.check.disabled = true;
-    setCheckResult('Checking…');
+    var ico = sel.check.querySelector('.ico');
+    if (ico) ico.classList.add('spin');
+    setCheckResult('Checking for updates…');
     invoke('check_updates', {}).then(function (r) {
       setCheckResult(r || 'Up to date');
     }).catch(function (e) { setCheckResult(String(e && e.message || e), true); })
-      .finally(function () { sel.check.disabled = false; });
+      .finally(function () {
+        sel.check.disabled = false;
+        if (ico) ico.classList.remove('spin');
+      });
   });
 
   // logs
