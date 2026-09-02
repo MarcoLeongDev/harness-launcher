@@ -315,11 +315,12 @@
   .log-group { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
   .log-wrap { position: relative; flex: 1; min-height: 0; display: flex; }
   .log-view { margin: 0; flex: 1; min-height: 0; overflow: auto; padding: 12px 52px 12px 16px; }
-  .log-overlay { position: absolute; right: 10px; width: 30px; height: 30px;
-    border-radius: 50%; border: none; background: transparent; color: var(--dim);
+  .log-view .ln { display: block; }
+  .log-overlay { position: absolute; right: 6px; width: 32px; height: 32px;
+    border-radius: 50%; border: none; background: rgba(255,255,255,0.08); color: var(--dim);
     cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
-    padding: 0; z-index: 2; transition: background .15s, color .15s; }
-  .log-overlay:hover { background: var(--cell-hover); color: var(--accent2); }
+    padding: 0; z-index: 3; transition: background .15s, color .15s, opacity .15s; opacity: 0.55; }
+  .log-overlay:hover { background: rgba(255,255,255,0.25); color: var(--accent2); opacity: 1; }
   .log-overlay:active { transform: translateY(1px); }
   .log-overlay:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
   .log-overlay svg { width: 15px; height: 15px; }
@@ -370,6 +371,7 @@
         </div>
         <span class="ec-sep">:</span>
         <input id="inp-port" class="ec-port" type="number" min="1" max="65535" aria-label="Port" disabled />
+        <a id="engine-url-link" href="#" target="_blank" rel="noreferrer" style="font-size:10.5px;font-family:var(--mono);color:var(--accent2);text-decoration:none;margin-right:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;display:inline-block;vertical-align:middle;opacity:0.8;" title="Open harness WebUI"></a>
         <button class="ec-open-btn" id="btn-open" title="Open in browser" aria-label="Open in browser"><i class="ico sm bi" data-ico="globe2"></i></button>
         <div class="ec-actions">
           <button class="ec-btn icon-start" id="btn-toggle" title="Start"><i class="ico bi" data-ico="play-fill"></i></button>
@@ -574,7 +576,7 @@
     el.innerHTML =
       '<div class="op-feed-head" hidden>' +
         '<i class="ico sm bi" style="color:var(--accent2)" data-ico="terminal-fill"></i>' +
-        '<span class="op-feed-cmd">npm install @deepseek-ai/dsh</span>' +
+        '<span class="op-feed-cmd">Installing DeepSeek Harness version</span>' +
         '<span class="op-feed-elapsed">0:00</span>' +
       '</div>' +
       '<div class="op-feed-body">' +
@@ -699,8 +701,8 @@
     if (downloading) {
       f.done = false;
       f.setDownloading(true);
-      if (p.phase === 'registry') f.setHeader('npm view @deepseek-ai/dsh dist-tags');
-      else f.setHeader('npm install @deepseek-ai/dsh@' + (p.version || ''));
+      if (p.phase === 'registry') f.setHeader('Checking DeepSeek Harness versions');
+      else f.setHeader('Installing DeepSeek Harness version@' + (p.version || ''));
     }
     // Milestone messages (registry → installing → verifying, stopping →
     // starting → running) stream in as info lines so the terminal tells the
@@ -861,6 +863,19 @@
     sel.engineVer.disabled = false;
     sel.verWrap.style.cursor = 'pointer';
 
+    // Engine URL link: include token dynamically when engine prints it
+    var urlLink = $('engine-url-link');
+    if (s.webUrl) {
+      urlLink.href = s.webUrl;
+      urlLink.textContent = s.webUrl.replace('http://', '').replace(/\?.*$/, '').substring(0, 40);
+      urlLink.style.display = 'inline-block';
+    } else if (s.actualPort) {
+      urlLink.href = 'http://127.0.0.1:' + s.actualPort;
+      urlLink.textContent = '127.0.0.1:' + s.actualPort;
+      urlLink.style.display = 'inline-block';
+    } else {
+      urlLink.style.display = 'none';
+    }
     if (runningLike) {
       // Port as text
       sel.port.type = 'text';
@@ -996,6 +1011,8 @@
       var pre = sel.logTail;
       var atBottom = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 40;
       var raw = String(text || '').replace(/\u001b\[[0-9;]*m/g, '');
+      // Censor auth tokens in log output (token=... query params and bearer tokens)
+      raw = raw.replace(/token=[^\s&"'\)\]]+/gi, 'token=[CENSORED]').replace(/bearer\s+[a-zA-Z0-9_\-\.]+/gi, 'bearer [CENSORED]');
       var lines = raw.split('\n');
       pre.textContent = '';
       for (var i = 0; i < lines.length; i++) {
