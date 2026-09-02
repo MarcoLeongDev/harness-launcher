@@ -1,7 +1,7 @@
 {
   "name": "dsh-launcher",
   "private": true,
-  "version": "0.1.38",
+  "version": "0.1.39",
   "description": "DeepSeek Harness Launcher - Tauri macOS menubar app to manage the DeepSeek Harness engine",
   "type": "module",
   "scripts": {

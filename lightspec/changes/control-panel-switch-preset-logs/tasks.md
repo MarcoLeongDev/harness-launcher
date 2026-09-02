@@ -25,7 +25,7 @@
 - [x] 5.1 Subtle launcher version (no tag), engine version tag + power button right-aligned; v0.1.38
 
 ## 6. Remove footer version label
-- [ ] 6.1 Remove footer harness version + wiring; v0.1.39
+- [x] 6.1 Remove footer harness version + wiring; v0.1.39
 
 ## 7. Logs tab: overlay controls + shared terminal styling
 - [ ] 7.1 Go-to-last overlay bottom-right, refresh overlay top-right (circular, hover background)
