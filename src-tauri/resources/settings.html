@@ -194,7 +194,7 @@
   }
   .op-feed-head { display: flex; align-items: center; gap: 8px; padding: 10px 16px 6px; }
   .op-feed-cmd { font-family: var(--mono); font-size: 10.5px; color: var(--faint);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+    white-space: normal; word-break: break-all; flex: 1; min-width: 0; }
   .op-feed-elapsed { font-family: var(--mono); font-size: 11px; color: var(--faint);
     min-width: 40px; text-align: right; }
   .op-feed-body { position: relative; }
@@ -573,8 +573,8 @@
     el.hidden = true;
     el.innerHTML =
       '<div class="op-feed-head" hidden>' +
-        '<i class="ico sm bi" style="color:var(--accent2)" data-ico="cloud-arrow-down-fill"></i>' +
-        '<span class="op-feed-cmd">npm install @deepseek-ai/dsh@…</span>' +
+        '<i class="ico sm bi" style="color:var(--accent2)" data-ico="terminal-fill"></i>' +
+        '<span class="op-feed-cmd">npm install @deepseek-ai/dsh</span>' +
         '<span class="op-feed-elapsed">0:00</span>' +
       '</div>' +
       '<div class="op-feed-body">' +
@@ -699,8 +699,8 @@
     if (downloading) {
       f.done = false;
       f.setDownloading(true);
-      if (p.phase === 'registry') f.setHeader('npm view @deepseek-ai/dsh dist-tags…');
-      else f.setHeader('npm install @deepseek-ai/dsh@' + (p.version || '…'));
+      if (p.phase === 'registry') f.setHeader('npm view @deepseek-ai/dsh dist-tags');
+      else f.setHeader('npm install @deepseek-ai/dsh@' + (p.version || ''));
     }
     // Milestone messages (registry → installing → verifying, stopping →
     // starting → running) stream in as info lines so the terminal tells the
