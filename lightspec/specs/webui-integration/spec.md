@@ -33,55 +33,16 @@ The launcher SHALL expose Rust commands to the panel through the Tauri IPC layer
 - **THEN** the command result is returned to the overlay and unauthorized commands are rejected
 
 ### Requirement: Settings Window
-The launcher SHALL provide a dedicated native Settings window (opened from the tray or the overlay) that aggregates harness status, engine control, version & update management with live progress, port configuration, auto-update settings, and recent logs, served from a launcher-owned custom protocol origin (`dsh-ui://`) so it works in development and production without the harness server. The window SHALL organize its content into tabs — Engine (engine status, controls and port), Versions (version & update management, auto-update and progress) and Logs (harness log tail) — using a visual, minimal, icon-driven design (macOS-style grouped rows) and SHALL display the provided brand logo in its header. The Engine tab SHALL surface the effective port exactly once ("Runs at http://127.0.0.1:<port>"), provide a single port field, and use icon-first engine controls (Start/Stop primary, Restart secondary, Force subdued). The Logs tab SHALL NOT repeat a "Logs" label and SHALL present the log output with a minimal icon toolbar.
+The Control Panel settings window SHALL present the launcher's configuration
+through tabbed sections (Engine, Versions, Logs) using the ARIA tab pattern
+with keyboard arrow navigation, and SHALL expose version-management controls
+(install/switch/delete), an engine status card with start/stop/restart and
+port controls, and an update section. All state and actions MUST survive
+launcher relaunches; user data is never deleted by redeployment.
 
-On the Versions tab the installed-version table SHALL present a Default radio
-column (selecting a row's radio switches the default engine version when the
-engine is stopped and is refused with a clear message while it runs), a Version
-column, a Folder column whose link opens that version's installation directory,
-and an Actions column with a delete button whose trash glyph is white and gains
-a red background with white glyph on hover; the table SHALL NOT render a Status
-column. All Versions-tab operation notifications (progress messages, live npm
-console output and result/error lines) SHALL be shown in a terminal-style cell
-appended as the last cell of the installed-versions table group, visible only
-while there is something to display, with a circular stop-button overlay while
-a version download is in flight.
-
-#### Scenario: Open settings window
-- **WHEN** the user selects Settings from the tray menu or the overlay panel
-- **THEN** a settings window opens (or focuses if already open) showing the tabbed control panel
-
-#### Scenario: Engine tab port authority
-- **WHEN** the engine is running
-- **THEN** the Engine tab shows exactly one running address ("Runs at http://127.0.0.1:3080") and one port field, with no duplicated port text elsewhere
-
-#### Scenario: Logs tab
-- **WHEN** the user opens the Logs tab
-- **THEN** the tab shows the recent harness output with icon-only toolbar actions (refresh, follow), without a redundant title
-
-#### Scenario: Radio switches the default version
-- **WHEN** the engine is stopped and the user selects the radio of another installed version
-- **THEN** that version becomes the default (active) version and the feedback reads that it is now the default version, not "select it from the Control Panel"
-
-#### Scenario: Radio while running
-- **WHEN** the engine is running and the user selects the radio of another installed version
-- **THEN** the switch is refused with a clear "stop the engine before switching versions" message and the active version is unchanged
-
-#### Scenario: Folder link opens the install directory
-- **WHEN** the user clicks a row's folder link
-- **THEN** the file manager reveals that version's installation directory; invalid or traversal version names are rejected
-
-#### Scenario: Delete button hover state
-- **WHEN** the user hovers a row's delete button
-- **THEN** the button shows a red circular background with a white trash glyph; unhovered it shows the white glyph
-
-#### Scenario: Download terminal feedback
-- **WHEN** a version download/install is in flight
-- **THEN** the versions-table group shows a terminal-style cell with the npm command, elapsed time, live output lines and a stop-button overlay that cancels the operation
-
-#### Scenario: Idle feed hidden
-- **WHEN** no operation is in flight and no recent result message is pending
-- **THEN** the terminal cell is hidden so the table ends cleanly
+#### Scenario: Open the settings window
+- **WHEN** the user opens the settings window
+- **THEN** the Engine tab is shown with the live engine status
 
 ### Requirement: One Reusable Terminal Feed Per Operation
 The Versions tab SHALL render operation output through a reusable feed
@@ -107,4 +68,43 @@ and the area collapses when no operation is active.
 - **WHEN** the Control Panel is opened while a download is in flight
 - **THEN** the feed for that download is rebuilt from status and console
   snapshots with its existing output
+
+### Requirement: Animated Operation Feed
+The operation feed terminal in the Versions tab SHALL animate its showing and
+hiding (fade and slide) rather than appearing abruptly, and MUST respect the
+user's reduced-motion preference by skipping the animation.
+
+#### Scenario: A download starts and finishes
+- **WHEN** a version download begins
+- **THEN** its feed animates in; when the operation settles the feed animates
+  out and the area collapses
+
+### Requirement: Logs Tab Fills the Panel
+The Logs tab SHALL occupy the full remaining height of the Control Panel and
+scroll its log content internally; opening the Logs tab MUST NOT make the
+window itself scroll. The log lines SHALL be rendered with the same colour
+palette as the operation feed terminals.
+
+#### Scenario: Logs tab with many lines
+- **WHEN** the harness log contains more lines than fit on screen
+- **THEN** the log scrolls inside the panel while the window stays fixed
+
+### Requirement: Terminal Feed Title and Icon
+The operation feed header SHALL show the full install command
+("npm install @deepseek-ai/dsh@<version>") without ellipsis truncation when
+space allows, and SHALL use a terminal icon (_) rather than a download icon.
+
+#### Scenario: Feed header during install
+- **WHEN** a download is in flight
+- **THEN** the header shows the full command with the terminal icon
+
+### Requirement: Auto-Update Section Usability
+The auto-update section SHALL have no empty cells, and the "Check now" action
+MUST give visible in-place feedback (disabled button with progress indicator
+and an inline status message) from the moment it is clicked until it resolves.
+
+#### Scenario: User clicks Check now
+- **WHEN** the user clicks "Check now"
+- **THEN** the button becomes busy with a spinner and an inline status message
+  appears, then updates with the result or error
 
