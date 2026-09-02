@@ -104,7 +104,7 @@
         </div>
       </div>
       <div class="term" id="lc-term">
-        <div class="term-head"><span class="term-title" id="lc-termtitle">npm install @deepseek-ai/dsh@…</span></div>
+        <div class="term-head"><span class="term-title" id="lc-termtitle">Installing DeepSeek Harness version@…</span></div>
         <div class="term-body">
           <pre class="term-out" id="lc-termout"></pre>
           <button class="stop-btn" id="lc-stopdown"><span class="sq"></span> Stop</button>
@@ -187,7 +187,7 @@
   function showTerminal(show, op) {
     $('lc-term').classList.toggle('on', !!show);
     if (show && op) {
-      $('lc-termtitle').textContent = 'npm install @deepseek-ai/dsh@' + (op.version || '…');
+      $('lc-termtitle').textContent = 'Installing DeepSeek Harness version@' + (op.version || '…');
       $('lc-termout').innerHTML = '';
     }
   }
