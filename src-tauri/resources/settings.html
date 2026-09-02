@@ -127,6 +127,9 @@
   select { font-family: inherit; }
   .err { color: var(--err); }
   .ok2 { color: var(--ok); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .ico.spin { animation: spin .9s linear infinite; display: inline-block; }
+  @media (prefers-reduced-motion: reduce) { .ico.spin { animation: none; } }
   /* Hide empty result cells */
   #check-result:empty { display: none; }
   /* engine card */
@@ -385,24 +388,21 @@
       </div>
     </div>
 
-    <!-- Section 1: auto-update — interval dropdown + toggle share one cell,
-         "Check now" is its own cell, the result line closes the section. -->
+    <!-- Section 1: auto-update — toggle+interval row and a Check row whose
+         status text sits inline beside the button. No empty cells. -->
     <div class="group">
       <div class="cell">
         <span class="lbl">Auto update</span>
-        <span style="flex:1"></span>
+        <span class="hint" style="flex:1"></span>
         <select id="sel-interval" aria-label="Check every"></select>
         <span class="switch"><input type="checkbox" id="chk-autoupdate" aria-label="Enable auto update" /><span class="slider"></span></span>
       </div>
-      <div class="cell">
-        <span class="lbl">Check for updates</span>
-        <span style="flex:1"></span>
+      <div class="cell" style="padding-top:9px;padding-bottom:11px">
         <button class="btn" id="btn-check" title="Check for updates now">
           <i class="ico sm bi" data-ico="arrow-clockwise"></i> Check now
         </button>
-      </div>
-      <div class="cell" style="padding-top:9px;padding-bottom:11px">
-        <span class="hint" id="check-result" hidden></span>
+        <span style="flex:1"></span>
+        <span class="hint" id="check-result" aria-live="polite"></span>
       </div>
     </div>
 
@@ -683,9 +683,9 @@
 
   function setCheckResult(text, isErr) {
     sel.checkResult.textContent = text || '';
-    sel.checkResult.className = isErr ? 'err' : '';
-    // Show/hide the cell based on content (auto-update section)
-    sel.checkResult.parentElement.hidden = !text;
+    // Result state lives in the row beside the Check button; the span is
+    // hidden when empty (:empty rule) so no empty cell ever shows.
+    sel.checkResult.className = isErr ? 'err' : (text ? 'ok2' : '');
   }
   function busy(on) {
     [sel.toggle, sel.restart, sel.check].forEach(function (b) { b.disabled = on; });
@@ -1076,12 +1076,18 @@
       .catch(function (e) { setResult(String(e.message || e), true); });
   });
   sel.check.addEventListener('click', function () {
+    if (sel.check.disabled) return;
     sel.check.disabled = true;
-    setCheckResult('Checking…');
+    var ico = sel.check.querySelector('.ico');
+    if (ico) ico.classList.add('spin');
+    setCheckResult('Checking for updates…');
     invoke('check_updates', {}).then(function (r) {
       setCheckResult(r || 'Up to date');
     }).catch(function (e) { setCheckResult(String(e && e.message || e), true); })
-      .finally(function () { sel.check.disabled = false; });
+      .finally(function () {
+        sel.check.disabled = false;
+        if (ico) ico.classList.remove('spin');
+      });
   });
 
   // logs
