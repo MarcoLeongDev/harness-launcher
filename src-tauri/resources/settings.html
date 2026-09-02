@@ -952,7 +952,10 @@
   sel.btnInstall.addEventListener('click', function () {
     var v = sel.installSel.value;
     if (!v) return;
-    withCmd(function () { return invoke('install_and_switch', { version: v }); }, 'Installed');
+    // Download only: never switches the default version and never touches a
+    // running engine — downloading works while the engine runs. Switching is
+    // the versions-table radio / engine-card dropdown.
+    withCmd(function () { return invoke('download_version', { version: v }); }, 'Downloaded');
   });
   sel.installSel.addEventListener('change', function () { closePopovers(); });
   sel.pre.addEventListener('change', function () {
