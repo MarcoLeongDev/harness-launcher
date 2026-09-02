@@ -397,8 +397,8 @@ mod tests {
     #[test]
     fn parses_token_url_line() {
         assert_eq!(
-            parse_web_url_line("dsh web: http://127.0.0.1:3081/?token=[REDACTED-ENGINE-TOKEN]"),
-            Some("http://127.0.0.1:3081/?token=[REDACTED-ENGINE-TOKEN]".to_string())
+            parse_web_url_line("dsh web: http://127.0.0.1:3081/?token=test-token-0123456789abcdefghijklmnopqrstuvwxyz"),
+            Some("http://127.0.0.1:3081/?token=test-token-0123456789abcdefghijklmnopqrstuvwxyz".to_string())
         );
     }
 

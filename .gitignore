@@ -1,3 +1,4 @@
+# build artifacts & vendored runtime
 node_modules/
 target/
 src-tauri/binaries/
@@ -5,6 +6,27 @@ src-tauri/resources/npm/
 src-tauri/icons/icon.icns
 web-dist/
 src-tauri/gen/
+
+# macOS
 .DS_Store
+
 # unrelated tooling that may be dropped into the tree; never commit
 nous-tags-proxy.mjs
+
+# secrets & local configuration — never commit
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+*.p12
+*.crt
+credentials*.json
+credentials*.yaml
+secrets*.yaml
+secrets*
+.netrc
+.npmrc
+id_rsa*
+*.pwd
