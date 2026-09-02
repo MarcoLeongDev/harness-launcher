@@ -5,9 +5,9 @@
 - [x] 1.2 JS: trigger animations on append/show and on finishSoon; v0.1.41
 
 ## 2. Logs tab: panel-filling log + terminal colour parity
-- [ ] 2.1 Log fills panel height, scrolls internally; window never scrolls
-- [ ] 2.2 Log lines coloured with the same palette as terminal feeds
-- [ ] 2.3 Verify no window-level scrollbar on the Logs tab; v0.1.42
+- [x] 2.1 Log fills panel height, scrolls internally; window never scrolls
+- [x] 2.2 Log lines coloured with the same palette as terminal feeds
+- [x] 2.3 Verify no window-level scrollbar on the Logs tab; v0.1.42
 
 ## 3. Feed title + terminal icon
 - [ ] 3.1 No ellipsis truncation; full "npm install @deepseek-ai/dsh@<version>" title
