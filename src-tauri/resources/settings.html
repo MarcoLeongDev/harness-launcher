@@ -39,10 +39,11 @@
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; }
-  body { margin: 0; color: var(--text);
+  body { margin: 0; color: var(--text); overflow: hidden;
     font: 13px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
     background: linear-gradient(180deg, var(--bg2), var(--bg)); min-height: 100vh;
-    display: flex; flex-direction: column; -webkit-font-smoothing: antialiased; }
+    display: flex; flex-direction: column; -webkit-font-smoothing: antialiased;
+    overflow: hidden; }
   /* Minimal iOS-style scroll bars */
   *::-webkit-scrollbar { width: 3px; height: 3px; }
   *::-webkit-scrollbar-track { background: transparent; }
@@ -87,9 +88,14 @@
   .tab[aria-selected="true"] { color: var(--text); background: var(--cell);
     border-color: var(--hair); box-shadow: inset 0 -1px 0 rgba(255,255,255,0.12); }
   .tab svg { width: 15px; height: 15px; }
-  main { flex: 1; padding: 12px 22px 24px; margin: 0 auto; width: 100%; max-width: 640px; }
-  .tabpanel { display: none; flex-direction: column; gap: 14px; }
+  main { flex: 1; min-height: 0; padding: 12px 22px 24px; margin: 0 auto; width: 100%;
+    max-width: 640px; display: flex; flex-direction: column; overflow: hidden; }
+  .tabpanel { display: none; flex-direction: column; gap: 14px;
+    flex: 1; min-height: 0; overflow: auto; }
   .tabpanel.active { display: flex; }
+  /* The Logs tab manages its own height: the log fills the panel and scrolls
+     internally — the window itself never scrolls for this tab. */
+  #tab-logs.active { overflow: hidden; }
   /* grouped macOS-style rows */
   .group { background: var(--cell); border: 1px solid var(--hair); border-radius: var(--radius);
     overflow: hidden; backdrop-filter: blur(8px); }
@@ -978,11 +984,33 @@
     });
   }
 
+  // Log lines render as coloured .ln spans — the same palette the operation
+  // feeds use — and ANSI escapes from the harness are stripped.
+  function logLineClass(line) {
+    if (/error|fail(?:ed|ure)?|panic|exception|ENOENT|EADDR|exited with code/i.test(line)) return 'err';
+    if (/^\[launcher\]|dsh web:|engine (running|stopped|starting)|installed|updated|update available|checking/i.test(line)) return 'info';
+    return 'out';
+  }
   function refreshLog() {
     invoke('tail_logs', { lines: 300 }).then(function (text) {
       var pre = sel.logTail;
       var atBottom = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 40;
-      pre.textContent = text || '(no logs yet)';
+      var raw = String(text || '').replace(/\u001b\[[0-9;]*m/g, '');
+      var lines = raw.split('\n');
+      pre.textContent = '';
+      for (var i = 0; i < lines.length; i++) {
+        if (!lines[i] && i === lines.length - 1) continue;
+        var ln = document.createElement('span');
+        ln.className = 'ln ' + logLineClass(lines[i]);
+        ln.textContent = lines[i] || ' ';
+        pre.appendChild(ln);
+      }
+      if (!pre.childElementCount) {
+        var empty = document.createElement('span');
+        empty.className = 'ln info';
+        empty.textContent = '(no logs yet)';
+        pre.appendChild(empty);
+      }
       if (followOn || atBottom) pre.scrollTop = pre.scrollHeight;
     }).catch(function () {});
   }
