@@ -2,6 +2,7 @@
 //! updates, versions and manages the DeepSeek Harness background engine.
 mod commands;
 mod port;
+mod presets;
 mod progress;
 mod runtime;
 mod settings;
