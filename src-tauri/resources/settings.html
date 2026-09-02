@@ -774,31 +774,24 @@
     // Stopped state: show version as dropdown, port as input
     var runningLike = phase !== 'stopped';
 
-    if (runningLike) {
-      // Version as text
-      sel.engineVer.style.display = 'none';
-      sel.verChevron.style.display = 'none';
-      var verText = document.createElement('span');
-      verText.className = 'ec-ver';
-      verText.textContent = s.activeVersion ? 'v' + s.activeVersion : 'v0.0.0';
-      sel.verWrap.innerHTML = '';
-      sel.verWrap.appendChild(verText);
-      sel.verWrap.style.cursor = 'default';
+    // The version dropdown is offered in BOTH states: while stopped it picks
+    // the version to run next (set_version); while running it performs a live
+    // switch — the backend stops the engine, installs/sets the version and
+    // starts the new one again.
+    sel.verWrap.innerHTML = '';
+    sel.verWrap.appendChild(sel.engineVer);
+    sel.verWrap.appendChild(sel.verChevron);
+    sel.engineVer.style.display = '';
+    sel.verChevron.style.display = '';
+    sel.engineVer.disabled = false;
+    sel.verWrap.style.cursor = 'pointer';
 
+    if (runningLike) {
       // Port as text
       sel.port.type = 'text';
       sel.port.readOnly = true;
       sel.port.value = s.actualPort || 0;
     } else {
-      // Version as dropdown
-      sel.verWrap.innerHTML = '';
-      sel.verWrap.appendChild(sel.engineVer);
-      sel.verWrap.appendChild(sel.verChevron);
-      sel.engineVer.style.display = '';
-      sel.verChevron.style.display = '';
-      sel.engineVer.disabled = false;
-      sel.verWrap.style.cursor = 'pointer';
-
       // Port as input
       sel.port.type = 'number';
       sel.port.readOnly = false;
@@ -927,9 +920,14 @@
     var v = sel.engineVer.value;
     if (!v) return;
     // When stopped, selecting a version just records the choice (does not
-    // auto-launch); press Start to run it. When running we never show the
-    // dropdown, so this only fires in the stopped state.
-    withCmd(function () { return invoke('set_version', { version: v }); }, 'Version set');
+    // auto-launch); press Start to run it. When running, switching hands over
+    // live: the backend stops the engine, installs/sets the version and
+    // starts the new one — no manual stop required.
+    if (lastPhase !== 'stopped') {
+      withCmd(function () { return invoke('install_and_switch', { version: v }); }, 'Switched');
+    } else {
+      withCmd(function () { return invoke('set_version', { version: v }); }, 'Version set');
+    }
   });
   sel.toggle.addEventListener('click', function () {
     if (lastPhase === 'running') {
