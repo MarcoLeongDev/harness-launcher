@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="color-scheme" content="light dark" />
-<title>DeepSeek Harness Launcher - Control Panel</title>
+<title>Harness Launcher - Control Panel</title>
 <style>
   :root { color-scheme: light dark; }
   /* Dark palette (default). The native macOS titlebar follows the system
@@ -332,7 +332,7 @@
 <body>
 
 <header>
-  <div class="logo"><img id="brand-logo" src="dsh-ui://localhost/brand/logo.png" alt="DeepSeek Harness Launcher" /></div>
+  <div class="logo"><img id="brand-logo" src="dsh-ui://localhost/brand/logo.png" alt="Harness Launcher" /></div>
   <span class="header-title">Harness Launcher</span>
   <span class="hdr-ver-subtle" id="app-ver"></span>
   <span class="spacer"></span>
@@ -388,25 +388,7 @@
       </div>
     </div>
 
-    <!-- Section 1: auto-update — toggle+interval row and a Check row whose
-         status text sits inline beside the button. No empty cells. -->
-    <div class="group">
-      <div class="cell">
-        <span class="lbl">Auto update</span>
-        <span class="hint" style="flex:1"></span>
-        <select id="sel-interval" aria-label="Check every"></select>
-        <span class="switch"><input type="checkbox" id="chk-autoupdate" aria-label="Enable auto update" /><span class="slider"></span></span>
-      </div>
-      <div class="cell" style="padding-top:9px;padding-bottom:11px">
-        <button class="btn" id="btn-check" title="Check for updates now">
-          <i class="ico sm bi" data-ico="arrow-clockwise"></i> Check now
-        </button>
-        <span style="flex:1"></span>
-        <span class="hint" id="check-result" aria-live="polite"></span>
-      </div>
-    </div>
-
-    <!-- Section 2: the installed-version table -->
+    <!-- Section 1: the installed-version table -->
     <div class="group">
       <div class="vtable">
         <div class="vrow vhead-row">
@@ -425,7 +407,7 @@
       </div>
     </div>
 
-    <!-- Section 3: install a published version -->
+    <!-- Section 2: install a published version -->
     <div class="group">
       <div class="cell" style="gap:10px">
         <span class="lbl">Install version</span>
@@ -434,10 +416,14 @@
         <button class="btn icon primary" id="btn-install" title="Install selected version" aria-label="Install selected version">
           <i class="ico sm bi" data-ico="cloud-arrow-down-fill"></i>
         </button>
-        <label class="hint" style="display:flex;align-items:center;gap:6px">
-          Pre-release
-          <span class="switch"><input type="checkbox" id="chk-prerelease" /><span class="slider"></span></span>
-        </label>
+      </div>
+      <!-- Section 3: Get Latest button as a cell -->
+      <div class="cell" style="padding-top:9px;padding-bottom:11px">
+        <button class="btn" id="btn-get-latest" title="Check for latest version and show update status">
+          <i class="ico sm bi" data-ico="arrow-clockwise"></i> Get Latest
+        </button>
+        <span style="flex:1"></span>
+        <span class="hint" id="get-latest-result" aria-live="polite"></span>
       </div>
       <!-- Result / progress notifications for this tab live in the terminal
            cell at the end of the installed-versions table above. -->
@@ -511,11 +497,10 @@
     engineVer: $('sel-version'), verWrap: $('ver-wrap'), verChevron: $('ver-chevron'),
     host: $('host-text'), hostWrap: $('host-wrap'),
     port: $('inp-port'),
-    pre: $('chk-prerelease'),
     intervalSel: $('sel-interval'), installSel: $('sel-install-ver'), btnInstall: $('btn-install'),
     verTbody: $('ver-tbody'),
     feedsBox: $('op-feeds'),
-    auto: $('chk-autoupdate'), check: $('btn-check'), checkResult: $('check-result'),
+    getLatest: $('btn-get-latest'), getLatestResult: $('get-latest-result'),
     logRefresh: $('btn-log-refresh'), logFollow: $('btn-log-follow'), logTail: $('log-tail'),
     banner: $('update-banner'), bannerText: $('update-banner-text'), bannerBtn: $('btn-banner-update'),
     appVer: $('app-ver'), dshVer: $('dsh-ver'),
@@ -681,14 +666,12 @@
     f.finishSoon(8000);
   }
 
-  function setCheckResult(text, isErr) {
-    sel.checkResult.textContent = text || '';
-    // Result state lives in the row beside the Check button; the span is
-    // hidden when empty (:empty rule) so no empty cell ever shows.
-    sel.checkResult.className = isErr ? 'err' : (text ? 'ok2' : '');
+  function setGetLatestResult(text, isErr) {
+    sel.getLatestResult.textContent = text || '';
+    sel.getLatestResult.className = isErr ? 'err' : (text ? 'ok2' : '');
   }
   function busy(on) {
-    [sel.toggle, sel.restart, sel.check].forEach(function (b) { b.disabled = on; });
+    [sel.toggle, sel.restart].forEach(function (b) { b.disabled = on; });
   }
 
   function applyProgress(p) {
@@ -901,10 +884,6 @@
 
     if (!runningLike && sel.port.value === '') sel.port.value = String(s.port);
 
-    sel.auto.checked = !!s.autoUpdateHarness;
-    sel.intervalSel.value = String(s.autoUpdateIntervalHours || 6);
-    sel.pre.checked = !!s.includePrerelease;
-
     if (s.updateAvailable && s.latestRemote) {
       sel.banner.style.display = '';
       sel.bannerText.textContent = 'Update available: v' + (s.activeVersion || '?') + ' → v' + s.latestRemote;
@@ -931,27 +910,7 @@
     }
   }
 
-  var INTERVAL_OPTS = [
-    [1,'1 hour'],[2,'2 hours'],[3,'3 hours'],[4,'4 hours'],[5,'5 hours'],[6,'6 hours'],
-    [7,'7 hours'],[8,'8 hours'],[9,'9 hours'],[10,'10 hours'],[11,'11 hours'],[12,'12 hours'],
-    [18,'18 hours'],[24,'1 day'],[48,'2 days'],[72,'3 days'],[168,'1 week']
-  ];
-  function buildIntervalSelect() {
-    if (sel.intervalSel.options.length) return;
-    INTERVAL_OPTS.forEach(function (p) {
-      var o = document.createElement('option');
-      o.value = String(p[0]); o.textContent = p[1];
-      sel.intervalSel.appendChild(o);
-    });
-  }
   function fillVersionSelects(s) {
-    buildIntervalSelect();
-    var iv = Number(s.autoUpdateIntervalHours);
-    if (iv > 0) {
-      var hit = INTERVAL_OPTS.filter(function (p) { return p[0] === iv; })[0];
-      if (hit) sel.intervalSel.value = String(iv);
-      else sel.intervalSel.value = '12';
-    } else sel.intervalSel.value = '12';
     var all = s.versions || [];
     var cur = sel.installSel.value;
     sel.installSel.innerHTML = '';
@@ -1058,34 +1017,22 @@
     withCmd(function () { return invoke('download_version', { version: v }); }, 'Downloaded');
   });
   sel.installSel.addEventListener('change', function () { closePopovers(); });
-  sel.pre.addEventListener('change', function () {
-    invoke('set_prerelease', { include: sel.pre.checked }).then(refresh)
-      .catch(function (e) { setResult(String(e.message || e), true); });
-  });
   sel.bannerBtn.addEventListener('click', function () { withCmd(function () { return invoke('update_to_latest', {}); }, 'Updated'); });
 
 
 
   // auto-update
-  sel.auto.addEventListener('change', function () {
-    invoke('set_auto_update', { enabled: sel.auto.checked }).catch(function (e) { setResult(String(e.message || e), true); });
-  });
-  sel.intervalSel.addEventListener('change', function () {
-    var h = parseInt(sel.intervalSel.value, 10);
-    if (h >= 1) invoke('set_auto_update', { intervalHours: h }).then(refresh)
-      .catch(function (e) { setResult(String(e.message || e), true); });
-  });
-  sel.check.addEventListener('click', function () {
-    if (sel.check.disabled) return;
-    sel.check.disabled = true;
-    var ico = sel.check.querySelector('.ico');
+  sel.getLatest.addEventListener('click', function () {
+    if (sel.getLatest.disabled) return;
+    sel.getLatest.disabled = true;
+    var ico = sel.getLatest.querySelector('.ico');
     if (ico) ico.classList.add('spin');
-    setCheckResult('Checking for updates…');
+    setGetLatestResult('Checking for updates…');
     invoke('check_updates', {}).then(function (r) {
-      setCheckResult(r || 'Up to date');
-    }).catch(function (e) { setCheckResult(String(e && e.message || e), true); })
+      setGetLatestResult(r || 'Up to date');
+    }).catch(function (e) { setGetLatestResult(String(e && e.message || e), true); })
       .finally(function () {
-        sel.check.disabled = false;
+        sel.getLatest.disabled = false;
         if (ico) ico.classList.remove('spin');
       });
   });

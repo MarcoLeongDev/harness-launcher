@@ -27,6 +27,6 @@ if (iconRes.status !== 0) {
 run("fetch-node.mjs");
 run("bundle-npm.mjs");
 await mkdir(path.join(root, "web-dist"), { recursive: true });
-const html = '<!doctype html><html><head><meta charset="utf-8"/><title>DeepSeek Harness Launcher</title></head><body><p>DeepSeek Harness Launcher shell - the harness window is created at runtime.</p></body></html>';
+const html = '<!doctype html><html><head><meta charset="utf-8"/><title>Harness Launcher</title></head><body><p>Harness Launcher shell - the harness window is created at runtime.</p></body></html>';
 await writeFile(path.join(root, "web-dist", "index.html"), html);
 console.log("[prepare] all assets ready");

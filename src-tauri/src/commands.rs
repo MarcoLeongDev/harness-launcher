@@ -29,7 +29,6 @@ pub struct StatusPayload {
     pub installed_versions: Vec<String>,
     pub latest_remote: Option<String>,
     pub update_available: bool,
-    pub include_prerelease: bool,
     pub auto_update_harness: bool,
     pub auto_update_interval_hours: u64,
     pub start_on_launch: bool,
@@ -314,17 +313,18 @@ pub async fn get_status(app: AppHandle) -> Result<StatusPayload, String> {
 
     // Use cached version list to avoid spawning an npm process every 3 s.
     // Refresh is triggered explicitly after installs/updates or on a 60 s TTL.
+    // Always include prerelease versions now.
     let version_list = {
         let mut vc = st.version_cache.lock().unwrap();
         let stale = vc
             .fetched_at
             .map(|t| t.elapsed().as_secs() >= 60)
             .unwrap_or(true);
-        if stale || vc.include_prerelease != settings.include_prerelease {
-            match versions::list_versions(&app, &rd, settings.include_prerelease) {
+        if stale || !vc.include_prerelease {
+            match versions::list_versions(&app, &rd, true) {
                 Ok(v) => {
                     vc.versions = v.clone();
-                    vc.include_prerelease = settings.include_prerelease;
+                    vc.include_prerelease = true;
                     vc.fetched_at = Some(std::time::Instant::now());
                     v
                 }
@@ -353,7 +353,6 @@ pub async fn get_status(app: AppHandle) -> Result<StatusPayload, String> {
         installed_versions: installed,
         latest_remote: remote,
         update_available,
-        include_prerelease: settings.include_prerelease,
         auto_update_harness: settings.auto_update_harness,
         auto_update_interval_hours: settings.auto_update_interval_hours,
         start_on_launch: settings.start_on_launch,
@@ -522,12 +521,6 @@ pub async fn set_port(app: AppHandle, port: u16) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub async fn set_prerelease(app: AppHandle, include: bool) -> Result<String, String> {
-    state::update_settings(&app, |s| s.include_prerelease = include);
-    Ok(format!("pre-release versions {}", if include { "shown" } else { "hidden" }))
-}
-
-#[tauri::command]
 pub async fn set_auto_update(app: AppHandle, enabled: Option<bool>, interval_hours: Option<u64>) -> Result<String, String> {
     state::update_settings(&app, |s| {
         if let Some(e) = enabled {
@@ -551,10 +544,50 @@ pub async fn check_updates(app: AppHandle) -> Result<String, String> {
             Ok(latest) => {
                 *app2.state::<AppState>().latest_remote.lock().unwrap() = Some(latest.clone());
                 let active = state::active_version(&app2).unwrap_or_default();
+
+                // Also check locally installed versions for a newer one
+                let installed: Vec<String> = std::fs::read_dir(rd.join("versions"))
+                    .map(|entries| {
+                        entries
+                            .filter_map(|e| e.ok())
+                            .filter(|e| e.path().is_dir())
+                            .filter_map(|e| e.file_name().to_str().map(|s| s.to_string()))
+                            .filter(|v| versions::is_installed(&rd, v))
+                            .collect::<Vec<_>>()
+                    })
+                    .unwrap_or_default();
+
+                // Find the latest installed version (by semver)
+                let latest_installed = installed.iter().max_by(|a, b| {
+                    let pa = semver::Version::parse(a.trim_start_matches('v')).ok();
+                    let pb = semver::Version::parse(b.trim_start_matches('v')).ok();
+                    match (pa, pb) {
+                        (Some(a), Some(b)) => a.cmp(&b),
+                        _ => a.cmp(b),
+                    }
+                }).cloned();
+
+                let mut has_update = false;
+                let mut messages = Vec::new();
+
+                // Check npm latest
                 if update::is_newer(&active, &latest) {
-                    parts.push(format!("harness update available: {active} -> {latest}"));
-                } else {
+                    has_update = true;
+                    messages.push(format!("harness update available: {active} -> {latest} (remote)"));
+                }
+
+                // Check locally installed versions
+                if let Some(local_latest) = latest_installed {
+                    if update::is_newer(&active, &local_latest) {
+                        has_update = true;
+                        messages.push(format!("harness v{local_latest} is installed but not active — switch to it?"));
+                    }
+                }
+
+                if !has_update {
                     parts.push(format!("harness up to date ({latest})"));
+                } else {
+                    parts.extend(messages);
                 }
             }
             Err(e) => parts.push(format!("harness check failed: {e}")),
@@ -574,7 +607,7 @@ pub async fn check_updates(app: AppHandle) -> Result<String, String> {
     } else {
         parts.push("app self-update not configured (set updateEndpoint to enable)".into());
     }
-    Ok(parts.join(" "))
+    Ok(parts.join(" | "))
 }
 
 async fn app_updater_check(app: &AppHandle, endpoint: &str) -> Result<Option<String>, String> {
