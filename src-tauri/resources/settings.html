@@ -118,10 +118,12 @@
   .btn.ok:hover { background: #4cd870; }
   .btn.warn { background: transparent; border-color: rgba(255,69,58,0.5); color: var(--err); }
   .btn.warn:hover { background: rgba(255,69,58,0.12); }
-  .btn.icon { padding: 8px; border-radius: 9px; }
+  .btn.icon { padding: 0; border-radius: 50%; width: 36px; height: 36px; border: none; background: transparent; color: var(--text); transition: background .15s, color .15s; }
+  .btn.icon:hover { background: var(--cell-hover); color: var(--accent2); }
   input[type=number], select {
-    background: rgba(0,0,0,0.25); color: var(--text); border: 1px solid var(--hair2);
-    border-radius: 8px; padding: 6px 10px; font-size: 13px; font-family: var(--mono); }
+    background: rgba(0,0,0,0.3); color: var(--text); border: 1px solid var(--hair2);
+    border-radius: 8px; padding: 6px 10px; font-size: 13px; font-family: var(--mono);
+    appearance: none; -webkit-appearance: none; cursor: pointer; }
   input:focus, select:focus { outline: none; border-color: var(--accent);
     box-shadow: 0 0 0 3px rgba(10,132,255,0.25); }
   select { font-family: inherit; }
@@ -149,7 +151,8 @@
     -webkit-appearance: none; }
   .ec-select:focus { outline: none; }
   .ec-select-wrap { display: inline-flex; align-items: center; gap: 2px; cursor: pointer; }
-  .ec-select-wrap svg { width: 10px; height: 10px; color: var(--faint); transition: transform .15s; flex: none; }
+  .ec-select-wrap svg { width: 10px; height: 10px; color: var(--faint); transition: transform .15s; flex: none; pointer-events: none; }
+  select { background-image: none !important; }
   .ec-sep { color: var(--faint); font-size: 13px; }
   .ec-port { font-family: var(--mono); font-size: 13px; background: transparent; border: none;
     color: var(--text); width: 64px; padding: 2px 0; text-align: left; }
@@ -435,10 +438,6 @@
         <button class="btn icon primary" id="btn-install" title="Install selected version" aria-label="Install selected version">
           <i class="ico sm bi" data-ico="cloud-arrow-down-fill"></i>
         </button>
-        <label class="hint" style="display:flex;align-items:center;gap:6px">
-          Pre-release
-          <span class="switch"><input type="checkbox" id="chk-prerelease" /><span class="slider"></span></span>
-        </label>
       </div>
       <!-- Result / progress notifications for this tab live in the terminal
            cell at the end of the installed-versions table above. -->
@@ -511,7 +510,7 @@
     engineVer: $('sel-version'), verWrap: $('ver-wrap'), verChevron: $('ver-chevron'),
     host: $('host-text'), hostWrap: $('host-wrap'),
     port: $('inp-port'),
-    pre: $('chk-prerelease'),
+    
     intervalSel: $('sel-interval'), installSel: $('sel-install-ver'), btnInstall: $('btn-install'),
     verTbody: $('ver-tbody'),
     feedsBox: $('op-feeds'),
@@ -903,8 +902,7 @@
 
     sel.auto.checked = !!s.autoUpdateHarness;
     sel.intervalSel.value = String(s.autoUpdateIntervalHours || 6);
-    sel.pre.checked = !!s.includePrerelease;
-
+    
     if (s.updateAvailable && s.latestRemote) {
       sel.banner.style.display = '';
       sel.bannerText.textContent = 'Update available: v' + (s.activeVersion || '?') + ' → v' + s.latestRemote;
@@ -994,14 +992,14 @@
   function refreshLog() {
     invoke('tail_logs', { lines: 300 }).then(function (text) {
       var pre = sel.logTail;
-      var atBottom = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 40;
+      var atBottom = (pre.scrollHeight - (pre.scrollTop + pre.clientHeight)) / pre.scrollHeight <= 0.01;
       var raw = String(text || '').replace(/\u001b\[[0-9;]*m/g, '');
       // Censor auth tokens in log output (token=... query params and bearer tokens)
       raw = raw.replace(/token=[^\s&"'\)\]]+/gi, 'token=[CENSORED]').replace(/bearer\s+[a-zA-Z0-9_\-\.]+/gi, 'bearer [CENSORED]');
       var lines = raw.split('\n');
       pre.textContent = '';
       for (var i = 0; i < lines.length; i++) {
-        if (!lines[i] && i === lines.length - 1) continue;
+        if (!lines[i].trim()) continue;
         var ln = document.createElement('span');
         ln.className = 'ln ' + logLineClass(lines[i]);
         ln.textContent = lines[i] || ' ';
@@ -1060,10 +1058,6 @@
     withCmd(function () { return invoke('download_version', { version: v }); }, 'Downloaded');
   });
   sel.installSel.addEventListener('change', function () { closePopovers(); });
-  sel.pre.addEventListener('change', function () {
-    invoke('set_prerelease', { include: sel.pre.checked }).then(refresh)
-      .catch(function (e) { setResult(String(e.message || e), true); });
-  });
   sel.bannerBtn.addEventListener('click', function () { withCmd(function () { return invoke('update_to_latest', {}); }, 'Updated'); });
 
 
