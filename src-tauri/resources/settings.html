@@ -98,7 +98,7 @@
   #tab-logs.active { overflow: hidden; }
   /* grouped macOS-style rows */
   .group { background: var(--cell); border: 1px solid var(--hair); border-radius: var(--radius);
-    overflow: hidden; backdrop-filter: blur(8px); }
+    overflow: visible; backdrop-filter: blur(8px); }
   .cell { display: flex; align-items: center; gap: 13px; padding: 13px 16px; min-height: 52px; }
   .cell + .cell { border-top: 1px solid var(--hair); }
   .cell.col { flex-direction: column; align-items: stretch; }
@@ -133,7 +133,7 @@
   /* Hide empty result cells */
   #check-result:empty { display: none; }
   /* engine card */
-  .ec-row { display: flex; align-items: center; gap: 12px; padding: 14px 16px; flex-wrap: wrap; }
+  .ec-row { display: flex; align-items: center; gap: 12px; padding: 14px 16px; flex-wrap: nowrap; }
   .ec-status-icon { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center;
     justify-content: center; flex: none; background: rgba(93,108,140,0.15);
     border: 1px solid rgba(93,108,140,0.4); color: var(--dim); }
@@ -314,7 +314,7 @@
      as circular buttons with a background only while hovered. */
   .log-group { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
   .log-wrap { position: relative; flex: 1; min-height: 0; display: flex; }
-  .log-view { margin: 0; flex: 1; min-height: 0; overflow: auto; padding: 12px 52px 12px 16px; }
+  .log-view { margin: 0; flex: 1; min-height: 0; overflow: auto; padding: 12px 16px 12px 16px; }
   .log-view .ln { display: block; }
   .log-overlay { position: absolute; right: 6px; width: 32px; height: 32px;
     border-radius: 50%; border: none; background: rgba(255,255,255,0.08); color: var(--dim);
@@ -371,7 +371,6 @@
         </div>
         <span class="ec-sep">:</span>
         <input id="inp-port" class="ec-port" type="number" min="1" max="65535" aria-label="Port" disabled />
-        <a id="engine-url-link" href="#" target="_blank" rel="noreferrer" style="font-size:10.5px;font-family:var(--mono);color:var(--accent2);text-decoration:none;margin-right:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;display:inline-block;vertical-align:middle;opacity:0.8;" title="Open harness WebUI"></a>
         <button class="ec-open-btn" id="btn-open" title="Open in browser" aria-label="Open in browser"><i class="ico sm bi" data-ico="globe2"></i></button>
         <div class="ec-actions">
           <button class="ec-btn icon-start" id="btn-toggle" title="Start"><i class="ico bi" data-ico="play-fill"></i></button>
@@ -451,7 +450,6 @@
     <div class="group log-group">
       <div class="log-wrap">
         <pre class="log-view terminal" id="log-tail">No output yet</pre>
-        <button class="log-overlay top" id="btn-log-refresh" title="Refresh"><i class="ico sm bi" data-ico="arrow-clockwise"></i></button>
         <button class="log-overlay bottom pressed" id="btn-log-follow" title="Go to last line" aria-pressed="true"><i class="ico sm bi" data-ico="arrow-down-circle-fill"></i></button>
       </div>
     </div>
@@ -518,7 +516,7 @@
     verTbody: $('ver-tbody'),
     feedsBox: $('op-feeds'),
     auto: $('chk-autoupdate'), check: $('btn-check'), checkResult: $('check-result'),
-    logRefresh: $('btn-log-refresh'), logFollow: $('btn-log-follow'), logTail: $('log-tail'),
+    logFollow: $('btn-log-follow'), logTail: $('log-tail'),
     banner: $('update-banner'), bannerText: $('update-banner-text'), bannerBtn: $('btn-banner-update'),
     appVer: $('app-ver'), dshVer: $('dsh-ver'),
     browser: $('btn-open'), quit: $('btn-quit')
@@ -863,19 +861,6 @@
     sel.engineVer.disabled = false;
     sel.verWrap.style.cursor = 'pointer';
 
-    // Engine URL link: include token dynamically when engine prints it
-    var urlLink = $('engine-url-link');
-    if (s.webUrl) {
-      urlLink.href = s.webUrl;
-      urlLink.textContent = s.webUrl.replace('http://', '').replace(/\?.*$/, '').substring(0, 40);
-      urlLink.style.display = 'inline-block';
-    } else if (s.actualPort) {
-      urlLink.href = 'http://127.0.0.1:' + s.actualPort;
-      urlLink.textContent = '127.0.0.1:' + s.actualPort;
-      urlLink.style.display = 'inline-block';
-    } else {
-      urlLink.style.display = 'none';
-    }
     if (runningLike) {
       // Port as text
       sel.port.type = 'text';
@@ -1108,7 +1093,6 @@
   });
 
   // logs
-  sel.logRefresh.addEventListener('click', refreshLog);
   // Go to last line: jump to the end of the log and keep following it.
   sel.logFollow.addEventListener('click', function () {
     followOn = true;
