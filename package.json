@@ -7,7 +7,7 @@
   "scripts": {
     "assets": "node scripts/prepare.mjs",
     "dev": "tauri dev",
-    "build": "npm run assets && tauri build -- --target universal-apple-darwin",
+    "build": "npm run assets && tauri build --target universal-apple-darwin",
     "icons": "node scripts/gen-icons.mjs && tauri icon src-tauri/icons/icon.png",
     "deploy": "npm run build && node scripts/deploy.mjs",
     "deploy:install": "node scripts/deploy.mjs",
