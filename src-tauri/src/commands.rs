@@ -554,7 +554,7 @@ pub async fn check_updates(app: AppHandle) -> Result<String, String> {
                 if update::is_newer(&active, &latest) {
                     parts.push(format!("Harness update available: {active} → {latest}"));
                 } else {
-                    parts.push(format!("Harness is current at version {active}"));
+                    parts.push(format!("Harness is current at version {active} — press Get latest to check for a newer version"));
                 }
             }
             Err(e) => parts.push(format!("harness check failed: {e}")),
@@ -572,7 +572,7 @@ pub async fn check_updates(app: AppHandle) -> Result<String, String> {
             Err(e) => parts.push(format!("app check failed: {e}")),
         }
     } else {
-        parts.push("App self-update not configured — set updateEndpoint to enable it".into());
+        parts.push(format!("App self-update not configured — enable in settings to auto-check for updates"));
     }
     Ok(parts.join(" "))
 }
