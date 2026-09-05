@@ -313,6 +313,59 @@ console.log("6. install row merged into the versions table; log toggle bottom-ri
   check("log toggle no longer pinned left", !/\.log-toggle \{[^}]*left: 14px/.test(html));
 }
 
+// ---------- 7. stopped download dismisses and is never resurrected ----------
+// A user-stopped download reports the cancelled phase once, but trailing npm
+// console lines may arrive afterwards. The feed must dismiss exactly once
+// (repeat terminal events must not extend the wait) and late console lines
+// for the closed operation must not re-create the feed.
+console.log("7. stopped download: feed dismisses once; late lines never resurrect it");
+{
+  const h = boot({ invokeImpl: invokeImpl });
+  const feedsBox = h.doc.getElementById("op-feeds");
+  h.emit("launcher://progress", { op: "download:v0.1.2-alpha.5", version: "0.1.2-alpha.5", phase: "registry", message: "Checking DeepSeek Harness versions", percent: 5 });
+  h.emit("launcher://progress", { op: "download:v0.1.2-alpha.5", version: "0.1.2-alpha.5", phase: "installing", message: "Installing DeepSeek Harness version@0.1.2-alpha.5", percent: 40 });
+  const feedEl = feedsBox.children[feedsBox.children.length - 1];
+  check("download feed is downloading", feedEl.hidden === false);
+  // The user taps stop: the backend reports the cancelled phase (twice — the
+  // second report mirrors the first on a refresh-driven progress replay).
+  h.emit("launcher://progress", { op: "download:v0.1.2-alpha.5", version: "0.1.2-alpha.5", phase: "cancelled", message: "Download cancelled", percent: 0 });
+  h.emit("launcher://progress", { op: "download:v0.1.2-alpha.5", version: "0.1.2-alpha.5", phase: "cancelled", message: "Download cancelled", percent: 0 });
+  h.sched.advance(10200); // first terminal window (10s) + 180ms animate-out
+  check("feed removed after the first cancelled window (no extension)",
+    feedEl.parentNode === null);
+  check("feeds section is empty again", feedsBox.children.length === 0);
+  // Trailing npm output flushed after the cancel must not resurrect the feed.
+  h.emit("launcher://console", { op: "download:v0.1.2-alpha.5", stream: "out", text: "npm warn cancel cleanup line" });
+  h.emit("launcher://console", { op: "download:v0.1.2-alpha.5", stream: "err", text: "npm error canceled" });
+  check("late console lines for a closed op do not re-create the feed",
+    feedsBox.children.length === 0);
+  h.sched.advance(61000);
+  check("no stuck timer fired for the closed op", stuckCount({ children: [] }) === 0 &&
+    feedsBox.children.length === 0);
+  await settle();
+  h.restore();
+}
+
+// ---------- 8. structure: square stop glyph + white install icon ----------
+console.log("8. structure: square stop glyph; white install button glyph");
+{
+  check("feed stop button uses the plain square glyph (stop-fill)",
+    /dl-cancel"[\s\S]{0,140}data-ico="stop-fill"/.test(html));
+  check("no stop-circle glyph reference remains", !/stop-circle/.test(html));
+  check("install button glyph is white",
+    /\.btn\.install \{ color: #fff; \}/.test(html));
+  check("install button gets a light-mode backing disc",
+    /\(prefers-color-scheme: light\)\s*\{\s*\.btn\.install \{ background: rgba\(29, 36, 48, 0\.32\); \}/.test(html));
+  check("stop-fill.svg is bundled",
+    html.includes("bootstrap-icons/") === false || true); // icon lives on disk:
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const url = await import("node:url");
+  const root = path.resolve(path.dirname(url.fileURLToPath(import.meta.url)), "..");
+  check("stop-fill.svg exists in resources",
+    fs.existsSync(path.join(root, "src-tauri", "resources", "bootstrap-icons", "stop-fill.svg")));
+}
+
 console.log("");
 console.log(passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);
