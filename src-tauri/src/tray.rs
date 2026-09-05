@@ -36,7 +36,9 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
         app, "open", "Open Harness", true, Some(NativeIcon::Home), None::<&str>,
     )?;
     let settings = IconMenuItem::with_id_and_native_icon(
-        app, "settings", "Control Panel…", true, Some(NativeIcon::PreferencesGeneral), None::<&str>,
+        // Plain gear template glyph (NSAdvanced) — the gear-in-rounded-box
+        // (PreferencesGeneral) reads as a filled switch plate at menu size.
+        app, "settings", "Control Panel…", true, Some(NativeIcon::Advanced), None::<&str>,
     )?;
     let start = IconMenuItem::with_id_and_native_icon(
         app, "start", "Start Harness", false, Some(NativeIcon::RightFacingTriangle), None::<&str>,
