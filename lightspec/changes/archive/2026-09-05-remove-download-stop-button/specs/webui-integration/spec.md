@@ -1,11 +1,5 @@
 ## REMOVED Requirements
 
-### Requirement: Square Stop Glyph on the Feed Stop Button
-**Reason**: The download stop button is removed entirely for a minimal
-terminal design; a glyph spec for a non-existent button is obsolete.
-**Migration**: Terminals render header (command + elapsed) and output only;
-stuck npm operations remain bounded by the run timeout.
-
 ### Requirement: Stop Button Only While Npm Runs
 **Reason**: The stop button no longer exists on any terminal, so the
 `stoppable` payload flag and its UI contract are removed.

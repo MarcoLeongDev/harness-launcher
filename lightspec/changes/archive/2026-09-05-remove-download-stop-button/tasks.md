@@ -9,6 +9,6 @@
       cargo check green; bump to 0.1.60; commit
 
 ## 2. Build, deploy & verify
-- [ ] 2.1 Release build + deploy:relaunch to /Applications
-- [ ] 2.2 Verify live: no Stop download control on any feed; terminal
+- [x] 2.1 Release build + deploy:relaunch to /Applications
+- [x] 2.2 Verify live: no Stop download control on any feed; terminal
       behaviour (header, elapsed, output, auto-dismiss) intact
