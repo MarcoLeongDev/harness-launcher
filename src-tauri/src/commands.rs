@@ -397,6 +397,11 @@ pub async fn install_and_switch(app: AppHandle, window: tauri::Window, version: 
     }
     let op = progress::op_key("switch", Some(&version));
     tauri::async_runtime::spawn_blocking(move || {
+        // SN12: serialize with concurrent version mutations (two lines: the
+        // State guard must be bound before locking through it). Inner helpers
+        // MUST NOT take this lock again.
+        let _state = app.state::<AppState>();
+        let _mutation = _state.version_mutation.lock().unwrap();
         with_progress_cleanup(&app, &op, || switch_version_inner(&app, &version, &op))
     })
     .await
@@ -413,6 +418,8 @@ pub async fn download_version(app: AppHandle, window: tauri::Window, version: St
     require_panel(&window)?;
     let op = progress::op_key("download", Some(&version));
     tauri::async_runtime::spawn_blocking(move || {
+        let _state = app.state::<AppState>();
+        let _mutation = _state.version_mutation.lock().unwrap();
         with_progress_cleanup(&app, &op, || {
             if !versions::is_valid_version_name(&version) {
                 return Err(format!("invalid version name: {version}"));
@@ -441,6 +448,8 @@ pub async fn download_version(app: AppHandle, window: tauri::Window, version: St
 pub async fn update_to_latest(app: AppHandle, window: tauri::Window) -> Result<String, String> {
     require_panel(&window)?;
     tauri::async_runtime::spawn_blocking(move || {
+        let _state = app.state::<AppState>();
+        let _mutation = _state.version_mutation.lock().unwrap();
         with_progress_cleanup(&app, "update", || {
             let rd = state::runtime_dir(&app);
             progress::emit(&app, "update", None, "registry", "Checking npm registry for latest version…", Some(5));
@@ -466,6 +475,8 @@ pub async fn update_to_latest(app: AppHandle, window: tauri::Window) -> Result<S
 pub async fn rollback(app: AppHandle, window: tauri::Window) -> Result<String, String> {
     require_panel(&window)?;
     tauri::async_runtime::spawn_blocking(move || {
+        let _state = app.state::<AppState>();
+        let _mutation = _state.version_mutation.lock().unwrap();
         let previous = state::read_settings(&app)
             .previous_version
             .ok_or_else(|| "no previous version to roll back to".to_string())?;
@@ -747,6 +758,8 @@ pub async fn set_version(app: AppHandle, window: tauri::Window, version: String)
         return Err(format!("invalid version name: {version}"));
     }
     tauri::async_runtime::spawn_blocking(move || {
+        let _state = app.state::<AppState>();
+        let _mutation = _state.version_mutation.lock().unwrap();
         let rd = state::runtime_dir(&app);
         ensure_runtime_dirs(&app).map_err(|e| format!("runtime dirs: {e}"))?;
         let st = app.state::<AppState>();
@@ -787,6 +800,8 @@ pub async fn delete_version(app: AppHandle, window: tauri::Window, version: Stri
         return Err(format!("invalid version name: {version}"));
     }
     tauri::async_runtime::spawn_blocking(move || {
+        let _state = app.state::<AppState>();
+        let _mutation = _state.version_mutation.lock().unwrap();
         let rd = state::runtime_dir(&app);
         let dir = versions::version_dir(&rd, &version);
         if !dir.exists() {
