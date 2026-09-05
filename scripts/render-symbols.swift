@@ -1,10 +1,12 @@
 // Render SF Symbols to black+alpha PNGs for the tray menu items.
 // Usage: swift render-symbols.swift <manifest.json>
 //   manifest: [{"symbol": "<SF Symbol name>", "out": "<abs .png path>"}, ...]
-// Rendered at 36x36 (18pt @2x, the size muda sets on menu item icons).
-// The glyph is forced to pure black + original alpha so it tints cleanly
-// as a template image. Fails loudly (non-zero exit) if a symbol name is
-// unknown or renders empty — never ship a blank icon.
+// Canvas: 36x36 (18pt @2x, the height muda sets on menu item icons).
+// The glyph is drawn ASPECT-FIT (natural SF Symbol ratio preserved) and
+// centered, scaled so its larger dimension spans 32px of the 36px canvas,
+// then forced to pure black + original alpha so it tints cleanly as a
+// template image. Fails loudly (non-zero exit) if a symbol name is unknown
+// or renders empty — never ship a blank or distorted icon.
 import AppKit
 import Foundation
 
@@ -27,6 +29,7 @@ catch {
 }
 
 let px = 36
+let contentMax: CGFloat = 32  // glyph max dimension inside the canvas (2px margin per side)
 var failed = false
 for entry in entries {
     guard let img = NSImage(systemSymbolName: entry.symbol, accessibilityDescription: entry.symbol) else {
@@ -34,12 +37,19 @@ for entry in entries {
         failed = true
         continue
     }
+    let natural = img.size
+    let scale = min(contentMax / max(natural.width, 0.5), contentMax / max(natural.height, 0.5))
+    let drawW = natural.width * scale
+    let drawH = natural.height * scale
+    let ox = (CGFloat(px) - drawW) / 2
+    let oy = (CGFloat(px) - drawH) / 2
+
     let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: px, pixelsHigh: px,
         bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
         colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
     NSGraphicsContext.saveGraphicsState()
     NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
-    img.draw(in: NSRect(x: 0, y: 0, width: px, height: px), from: .zero,
+    img.draw(in: NSRect(x: ox, y: oy, width: drawW, height: drawH), from: .zero,
              operation: .sourceOver, fraction: 1.0)
     NSGraphicsContext.restoreGraphicsState()
 
@@ -60,7 +70,8 @@ for entry in entries {
     }
     let png = rep.representation(using: .png, properties: [:])!
     try png.write(to: URL(fileURLWithPath: entry.out))
-    print("[gen-symbols] \(entry.symbol) -> \(entry.out) (ink \(String(format: "%.1f", pct))%)")
+    let ratio = String(format: "%.2f", natural.width / natural.height)
+    print("[gen-symbols] \(entry.symbol) (natural \(String(format: "%.1f", natural.width))x\(String(format: "%.1f", natural.height)), ratio \(ratio)) -> \(entry.out) (ink \(String(format: "%.1f", pct))%)")
 }
 
 exit(failed ? 3 : 0)
