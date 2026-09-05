@@ -39,6 +39,12 @@ pub struct ProgressPayload {
     pub message: String,
     /// 0-100 when known; `None` means indeterminate.
     pub percent: Option<u8>,
+    /// True only while npm is actually running for this operation (its
+    /// cancellation flag is polled by `run_npm`). UIs show the terminal stop
+    /// button only for stoppable payloads — pure message phases (registry
+    /// checks, engine/port ops, verification, notices) have nothing to stop.
+    #[serde(default)]
+    pub stoppable: bool,
 }
 
 /// A single line of an operation console (npm output while downloading).
@@ -128,13 +134,22 @@ pub fn cancel_requested(app: &AppHandle, op: &str) -> bool {
 /// Emit a progress update and record it as the current state of that
 /// operation. The legacy single-slot `current_op` keeps mirroring the
 /// first (deterministic) in-flight operation for older UIs (overlay).
+/// Progress emitted here is never stoppable — use [`emit_stoppable`] for
+/// phases where npm is actually running.
 pub fn emit(app: &AppHandle, op: &str, version: Option<&str>, phase: &str, message: &str, percent: Option<u8>) {
+    emit_stoppable(app, op, version, phase, message, percent, false)
+}
+
+/// Like [`emit`], with an explicit `stoppable` flag: true only for phases
+/// where npm is running and the user could cancel the download.
+pub fn emit_stoppable(app: &AppHandle, op: &str, version: Option<&str>, phase: &str, message: &str, percent: Option<u8>, stoppable: bool) {
     let payload = ProgressPayload {
         op: op.to_string(),
         version: version.map(|s| s.to_string()),
         phase: phase.to_string(),
         message: message.to_string(),
         percent,
+        stoppable,
     };
     {
         let st = app.state::<AppState>();

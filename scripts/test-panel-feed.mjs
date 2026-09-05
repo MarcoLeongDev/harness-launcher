@@ -203,9 +203,10 @@ console.log("2. single-key update lifecycle: feed closes, no stuck line after do
   const feedEl = feedsBox.children[feedsBox.children.length - 1];
   const out = feedEl._qs.get(".term-out");
   check("registry phase opens one feed", feedsBox.children.length === 1 && feedEl.hidden === false);
-  check("stop button visible while downloading", feedEl._qs.get(".dl-cancel").hidden === false);
+  check("registry check has no stop button (pure message)", feedEl._qs.get(".dl-cancel").hidden === true);
   h.emit("launcher://progress", { op: "update", version: "0.1.2-rc.1", phase: "stopping", message: "Stopping the running engine to switch versions…", percent: 10 });
-  h.emit("launcher://progress", { op: "update", version: "0.1.2-rc.1", phase: "installing", message: "Installing DeepSeek Harness version@0.1.2-rc.1", percent: 40 });
+  h.emit("launcher://progress", { op: "update", version: "0.1.2-rc.1", phase: "installing", message: "Installing DeepSeek Harness version@0.1.2-rc.1", percent: 40, stoppable: true });
+  check("stop button visible while npm installs", feedEl._qs.get(".dl-cancel").hidden === false);
   h.emit("launcher://progress", { op: "update", version: "0.1.2-rc.1", phase: "verifying", message: "Verifying v0.1.2-rc.1…", percent: 80 });
   check("still a single feed (no orphaned key switch)", feedsBox.children.length === 1);
   h.emit("launcher://progress", { op: "update", version: "0.1.2-rc.1", phase: "done", message: "switched to v0.1.2-rc.1 — engine running on port 3081", percent: 100 });
@@ -223,7 +224,7 @@ console.log("3. done phase clears a pending stuck timer (reported bug)");
 {
   const h = boot({ invokeImpl: invokeImpl });
   const feedsBox = h.doc.getElementById("op-feeds");
-  h.emit("launcher://progress", { op: "update", version: null, phase: "registry", message: "Checking npm registry for latest version…", percent: 5 });
+  h.emit("launcher://progress", { op: "update", version: "0.1.2-rc.1", phase: "installing", message: "Installing DeepSeek Harness version@0.1.2-rc.1", percent: 40, stoppable: true });
   const feedEl = feedsBox.children[0];
   h.sched.advance(30000);
   h.emit("launcher://progress", { op: "update", version: "0.1.2-rc.1", phase: "done", message: "switched to v0.1.2-rc.1", percent: 100 });
@@ -238,7 +239,7 @@ console.log("4. stuck hint appears while genuinely stalled; console output re-ar
 {
   const h = boot({ invokeImpl: invokeImpl });
   const feedsBox = h.doc.getElementById("op-feeds");
-  h.emit("launcher://progress", { op: "update", version: null, phase: "registry", message: "Checking npm registry for latest version…", percent: 5 });
+  h.emit("launcher://progress", { op: "update", version: "0.1.2-rc.1", phase: "installing", message: "Installing DeepSeek Harness version@0.1.2-rc.1", percent: 40, stoppable: true });
   const feedEl = feedsBox.children[0];
   const out = feedEl._qs.get(".term-out");
   h.sched.advance(61000);
@@ -323,7 +324,7 @@ console.log("7. stopped download: feed dismisses once; late lines never resurrec
   const h = boot({ invokeImpl: invokeImpl });
   const feedsBox = h.doc.getElementById("op-feeds");
   h.emit("launcher://progress", { op: "download:v0.1.2-alpha.5", version: "0.1.2-alpha.5", phase: "registry", message: "Checking DeepSeek Harness versions", percent: 5 });
-  h.emit("launcher://progress", { op: "download:v0.1.2-alpha.5", version: "0.1.2-alpha.5", phase: "installing", message: "Installing DeepSeek Harness version@0.1.2-alpha.5", percent: 40 });
+  h.emit("launcher://progress", { op: "download:v0.1.2-alpha.5", version: "0.1.2-alpha.5", phase: "installing", message: "Installing DeepSeek Harness version@0.1.2-alpha.5", percent: 40, stoppable: true });
   const feedEl = feedsBox.children[feedsBox.children.length - 1];
   check("download feed is downloading", feedEl.hidden === false);
   // The user taps stop: the backend reports the cancelled phase (twice — the
@@ -342,6 +343,36 @@ console.log("7. stopped download: feed dismisses once; late lines never resurrec
   h.sched.advance(61000);
   check("no stuck timer fired for the closed op", stuckCount({ children: [] }) === 0 &&
     feedsBox.children.length === 0);
+  await settle();
+  h.restore();
+}
+
+// ---------- 9. stop button only while npm runs ----------
+// Pure message feeds (registry checks, verification after npm, launcher
+// notices) must never offer the stop button; a real npm install shows it,
+// and the button hides again once npm is done while the output stays.
+console.log("9. stop button appears only for stoppable (npm-running) payloads");
+{
+  const h = boot({ invokeImpl: invokeImpl });
+  const feedsBox = h.doc.getElementById("op-feeds");
+  // Registry check: pure message, nothing to stop.
+  h.emit("launcher://progress", { op: "update", version: null, phase: "registry", message: "Checking npm registry for latest version…", percent: 5 });
+  let feedEl = feedsBox.children[0];
+  check("registry feed visible but not stoppable",
+    feedEl.hidden === false && feedEl._qs.get(".dl-cancel").hidden === true);
+  // Real npm install: stoppable.
+  h.emit("launcher://progress", { op: "update", version: "0.1.2-rc.1", phase: "installing", message: "Installing DeepSeek Harness version@0.1.2-rc.1", percent: 40, stoppable: true });
+  check("npm install shows the stop button", feedEl._qs.get(".dl-cancel").hidden === false);
+  // npm done — verification has nothing to stop; output stays visible.
+  h.emit("launcher://progress", { op: "update", version: "0.1.2-rc.1", phase: "verifying", message: "Verifying v0.1.2-rc.1…", percent: 85 });
+  check("verification hides the stop button", feedEl._qs.get(".dl-cancel").hidden === true);
+  check("terminal output still visible during verification", feedEl.hidden === false);
+  // Launcher-level notice (no op key): pure message, no stop.
+  h.emit("launcher://console", { stream: "info", text: "Removed installed version 0.1.1-rc.1" });
+  const noticeEl = feedsBox.children[feedsBox.children.length - 1];
+  check("notice feed has no stop button",
+    noticeEl._qs.get(".dl-cancel").hidden === true);
+  h.sched.advance(10000);
   await settle();
   h.restore();
 }
