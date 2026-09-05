@@ -54,6 +54,53 @@ pub fn parse_web_url_line(line: &str) -> Option<String> {
     }
 }
 
+/// Redact launch-token credentials from an engine output line BEFORE it is
+/// stored (log file, in-memory tail, status payload). The raw URL is captured
+/// separately for navigation via `parse_web_url_line`; nothing persisted or
+/// broadcast may carry the token. Mirrors the frontend display filter so both
+/// layers agree.
+pub fn redact_token(line: &str) -> String {
+    let mut out = String::with_capacity(line.len());
+    let bytes = line.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        let rest = &line[i..];
+        if let Some(token_start) = rest.find("token=") {
+            // Only redact when `token=` looks like a query credential (not a
+            // prose word): the value must be non-empty up to a delimiter.
+            let val_start = i + token_start + "token=".len();
+            let val_end = line[val_start..]
+                .find(|c: char| c.is_whitespace() || matches!(c, '&' | '"' | '\'' | ')' | ']' | '<' | '>'))
+                .map(|e| val_start + e)
+                .unwrap_or(line.len());
+            if val_end > val_start {
+                out.push_str(&line[i..val_start]);
+                out.push_str("[CENSORED]");
+                i = val_end;
+                continue;
+            }
+        }
+        // Case-insensitive `bearer <value>` redaction.
+        let lower = rest.to_lowercase();
+        if let Some(bearer_start) = lower.find("bearer ") {
+            let val_start = i + bearer_start + "bearer ".len();
+            let val_end = line[val_start..]
+                .find(|c: char| c.is_whitespace() || matches!(c, '"' | '\'' | ')' | ']' | '<' | '>'))
+                .map(|e| val_start + e)
+                .unwrap_or(line.len());
+            if val_end > val_start {
+                out.push_str(&line[i..val_start]);
+                out.push_str("[CENSORED]");
+                i = val_end;
+                continue;
+            }
+        }
+        out.push_str(&line[i..]);
+        break;
+    }
+    out
+}
+
 impl HarnessRuntime {
     /// The captured authenticated WebUI URL, if any.
     pub fn captured_web_url(&self) -> Option<String> {
@@ -177,6 +224,10 @@ pub fn emit_status(app: &AppHandle, runtime: &HarnessRuntime) {
 
 /// Stop the engine: kill the tracked child (SIGKILL via the shell plugin) and
 /// clear the process slot immediately. Returns true if a child was running.
+///
+/// NOTE: this deliberately signals ONLY the launcher-tracked child. A port
+/// held by any other process is never killed — use `port::holder_hint` to
+/// report the holder so the user can free the port or pick another one.
 pub fn stop(runtime: &HarnessRuntime, runtime_dir: &Path) -> bool {
     let mut proc = runtime.process.lock().unwrap();
     if let Some(state) = proc.take() {
@@ -190,55 +241,6 @@ pub fn stop(runtime: &HarnessRuntime, runtime_dir: &Path) -> bool {
         runtime.mark_phase(PHASE_STOPPED);
         false
     }
-}
-
-/// Force-stop the engine: kill the child, then verify the port is released and
-/// escalate to killing any process still bound to it (macOS `lsof` + SIGKILL).
-/// Returns Ok(true) if a child was running, Ok(false) if the engine was already
-/// stopped but the port was reclaimed.
-pub fn force_stop(
-    runtime: &HarnessRuntime,
-    runtime_dir: &Path,
-    port: u16,
-) -> Result<bool, String> {
-    let mut proc = runtime.process.lock().unwrap();
-    let had_child = if let Some(state) = proc.take() {
-        runtime.mark_phase(PHASE_STOPPING);
-        state.child.kill().map_err(|e| format!("force-stop kill failed: {e}"))?;
-        runtime.mark_phase(PHASE_STOPPED);
-        runtime.clear_web_url();
-        append_log(runtime_dir, "[launcher] force-stopping harness");
-        true
-    } else {
-        runtime.mark_phase(PHASE_STOPPED);
-        false
-    };
-    drop(proc);
-
-    // Give the child a moment to release the port, then escalate.
-    let deadline = std::time::Instant::now() + Duration::from_secs(2);
-    while std::time::Instant::now() < deadline {
-        if crate::port::is_free(port) {
-            return Ok(had_child);
-        }
-        std::thread::sleep(Duration::from_millis(150));
-    }
-
-    if !crate::port::is_free(port) {
-        // Escalate: kill anything still listening on the port.
-        if let Ok(out) = std::process::Command::new("lsof")
-            .args(["-ti", &format!("tcp:{port}")])
-            .output()
-        {
-            let pids = String::from_utf8_lossy(&out.stdout);
-            for pid in pids.split_whitespace() {
-                let _ = std::process::Command::new("kill").args(["-9", pid]).status();
-                append_log(runtime_dir, &format!("[launcher] killed lingering pid {pid} on port {port}"));
-            }
-            std::thread::sleep(Duration::from_millis(300));
-        }
-    }
-    Ok(had_child)
 }
 
 pub fn start(
@@ -327,6 +329,8 @@ pub fn start(
                     }
                     // Capture the authenticated WebUI URL the harness prints
                     // at boot (token engines) and surface it to open windows.
+                    // The raw URL is captured for navigation; everything
+                    // stored or broadcast uses the redacted form (SN9).
                     if let Some(url) = parse_web_url_line(&trimmed) {
                         *web_url.lock().unwrap() = Some(url.clone());
                         let _ = app_handle.emit("launcher://status", HarnessStatus {
@@ -334,12 +338,13 @@ pub fn start(
                             phase: PHASE_RUNNING.to_string(),
                             version: Some(version_display.clone()),
                             port: Some(port_n),
-                            last_log: trimmed.clone(),
+                            last_log: redact_token(&trimmed),
                         });
                     }
-                    append_log(&runtime_dir_buf, &trimmed);
+                    let stored = redact_token(&trimmed);
+                    append_log(&runtime_dir_buf, &stored);
                     let mut t = tail.lock().unwrap();
-                    t.push_back(trimmed);
+                    t.push_back(stored);
                     while t.len() > TAIL_BUFFER_LINES {
                         t.pop_front();
                     }
@@ -393,6 +398,7 @@ pub fn start(
 #[cfg(test)]
 mod tests {
     use super::parse_web_url_line;
+    use super::redact_token;
 
     #[test]
     fn parses_token_url_line() {
@@ -439,5 +445,32 @@ mod tests {
             parse_web_url_line("  dsh web: http://127.0.0.1:9/?token=x"),
             Some("http://127.0.0.1:9/?token=x".to_string())
         );
+    }
+
+    #[test]
+    fn redacts_token_query_values() {
+        assert_eq!(
+            redact_token("dsh web: http://127.0.0.1:3081/?token=abc123"),
+            "dsh web: http://127.0.0.1:3081/?token=[CENSORED]"
+        );
+        assert_eq!(
+            redact_token("dsh web: http://127.0.0.1:3081/?token=abc (LAN: http://1.2.3.4:3081/?token=abc)"),
+            "dsh web: http://127.0.0.1:3081/?token=[CENSORED] (LAN: http://1.2.3.4:3081/?token=[CENSORED])"
+        );
+    }
+
+    #[test]
+    fn redacts_bearer_values() {
+        assert_eq!(
+            redact_token("auth failed: Bearer secret-value-9"),
+            "auth failed: Bearer [CENSORED]"
+        );
+    }
+
+    #[test]
+    fn leaves_plain_lines_untouched() {
+        assert_eq!(redact_token("[launcher] starting harness 0.1.2 on 127.0.0.1:3081"), "[launcher] starting harness 0.1.2 on 127.0.0.1:3081");
+        assert_eq!(redact_token("token="), "token=");
+        assert_eq!(redact_token("no tokens here"), "no tokens here");
     }
 }

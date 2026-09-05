@@ -83,6 +83,7 @@
   rootEl.innerHTML = `
     <div id="dsh-lc-panel">
       <div class="meta"><span class="big">Harness Launcher</span><span id="lc-ver" class="hint"></span></div>
+      <div class="hint" style="margin:4px 0 0">Status display — engine actions live in the Control Panel (menu bar → Control Panel…).</div>
       <h3>Status</h3>
       <div class="row">
         <span id="lc-state" class="hint">loading…</span>
@@ -125,12 +126,6 @@
         <span id="lc-actual" class="hint"></span>
       </div>
       <h3>Updates</h3>
-      <div class="row">
-        <label style="display:flex;align-items:center;gap:4px">
-          <input type="checkbox" id="lc-autoupdate"> Auto-check every
-        </label>
-        <input id="lc-interval" type="number" min="1" max="720" style="width:64px"> h
-      </div>
       <div class="row"><button id="lc-check" class="ghost">Check for updates now</button>
         <span id="lc-checkresult" class="hint"></span></div>
       <h3>Logs</h3>
@@ -142,7 +137,6 @@
       <div class="row">
         <button id="lc-start" class="ghost">Start</button>
         <button id="lc-stop" class="ghost">Stop</button>
-        <button id="lc-force" class="ghost">Force Restart</button>
         <button id="lc-settings" class="ghost" style="margin-left:auto">Settings…</button>
       </div>
       <div class="row" style="margin-top:10px">
@@ -224,9 +218,16 @@
       $('lc-state').textContent = ep;
       stateDot(ep === 'running');
       $('lc-start').disabled = ep !== 'stopped';
-      $('lc-stop').disabled = ep === 'stopped';
-      $('lc-force').disabled = ep === 'stopped';
-      $('lc-restart').disabled = ep === 'stopped';
+      // Least privilege: the harness window may not mutate versions, engine
+      // state (beyond start), ports or the app — those commands require the
+      // Control Panel. Reflect that here so buttons never promise otherwise.
+      var ro = 'Available in the Control Panel';
+      ['lc-install', 'lc-delete', 'lc-update', 'lc-rollback',
+       'lc-apply-port', 'lc-port',
+       'lc-stop', 'lc-restart', 'lc-quit'].forEach(function (id) {
+        var b = $(id);
+        if (b) { b.disabled = true; b.title = ro; }
+      });
       applyProgress(s.currentOp || null);
       // Window opened mid-download: seed the terminal with the snapshot.
       if (isDownloading(s.currentOp) && !$('lc-termout').childElementCount && s.console && s.console.length) {
@@ -249,7 +250,6 @@
       fillVersions(s);
       fillSettings(s);
       populatePreRelease(s.includePrerelease);
-      populateAutoUpdate(s.autoUpdateHarness, s.autoUpdateIntervalHours);
       const rb = $('lc-rollback'); rb.disabled = !s.previousVersion;
       rb.title = s.previousVersion ? 'Rollback to v' + s.previousVersion : 'No previous version installed';
       updateDeleteState(s);
@@ -264,7 +264,6 @@
     if ($('lc-port').value === '' && s.port) $('lc-port').value = String(s.port);
   }
   function populatePreRelease(on) { $('lc-prerelease').checked = !!on; }
-  function populateAutoUpdate(on, hours) { $('lc-autoupdate').checked = !!on; if (hours) $('lc-interval').value = String(hours); }
 
   // Track the selected version so the Delete button is only usable on an
   // installed, non-active version.
@@ -373,15 +372,6 @@
     invoke('set_prerelease', { include: this.checked }).then(refreshStatus).catch(function (e) { setMsg(String(e.message || e), true); });
   });
 
-  $('lc-autoupdate').addEventListener('change', function () {
-    invoke('set_auto_update', { enabled: this.checked }).catch(function (e) { setMsg(String(e.message || e), true); });
-  });
-
-  $('lc-interval').addEventListener('change', function () {
-    const h = parseInt(this.value, 10);
-    if (h >= 1) invoke('set_auto_update', { intervalHours: h }).catch(function (e) { setMsg(String(e.message || e), true); });
-  });
-
   $('lc-check').addEventListener('click', function () {
     withBusy(this, function () { return invoke('check_updates', {}); });
   });
@@ -403,7 +393,6 @@
 
   $('lc-start').addEventListener('click', function () { withBusy(this, function () { return invoke('engine_start', {}); }); });
   $('lc-stop').addEventListener('click', function () { withBusy(this, function () { return invoke('engine_stop', {}); }); });
-  $('lc-force').addEventListener('click', function () { withBusy(this, function () { return invoke('engine_force_restart', {}); }); });
   $('lc-settings').addEventListener('click', function () { invoke('open_settings', {}).catch(function (e) { setMsg(String(e.message || e), true); }); });
 
   var lcEvents = window.__TAURI__ && window.__TAURI__.event;
