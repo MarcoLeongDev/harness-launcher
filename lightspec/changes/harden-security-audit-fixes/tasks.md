@@ -11,11 +11,11 @@
 - [x] 2.4 Commit, release build, deploy, relaunch, verify
 
 ## 3. Capability split + CSP + force-stop hardening — SN1+SN6+SN7 (v0.1.66)
-- [ ] 3.1 Per-window capabilities (main: status/events only; settings: full)
-- [ ] 3.2 `withGlobalTauri` off for harness-served content; CSP on `dsh-ui://`
-- [ ] 3.3 Force-stop restricted to tracked child; UI confirmation for force restart
-- [ ] 3.4 cargo test; bump to 0.1.66
-- [ ] 3.5 Commit, release build, deploy, relaunch, verify
+- [x] 3.1 Per-window capabilities (main: status/events only; settings: full)
+- [x] 3.2 `withGlobalTauri` off for harness-served content; CSP on `dsh-ui://`
+- [x] 3.3 Force-stop restricted to tracked child; UI confirmation for force restart
+- [x] 3.4 cargo test; bump to 0.1.66
+- [x] 3.5 Commit, release build, deploy, relaunch, verify
 
 ## 4. Pinned + verified build toolchain — SN3 (v0.1.67)
 - [ ] 4.1 Pin Node + npm versions; SHA256 verify downloads in fetch/bundle scripts
