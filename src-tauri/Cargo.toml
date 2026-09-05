@@ -1,6 +1,6 @@
 [package]
 name = "dsh-launcher"
-version = "0.1.52"
+version = "0.1.54"
 description = "DeepSeek Harness Launcher - a Tauri macOS menubar app that installs, updates, versions and runs the DeepSeek Harness background engine"
 authors = ["hikarulsi"]
 edition = "2021"
@@ -22,6 +22,12 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 semver = "1"
 url = "2"
+
+# Local one-line patch of muda 0.19.3: mark custom menu-item icons as
+# template images so macOS tints them per menu appearance (see
+# vendor/muda/src/platform_impl/macos/icon.rs, to_nsimage).
+[patch.crates-io]
+muda = { path = "vendor/muda" }
 
 [profile.release]
 strip = true
