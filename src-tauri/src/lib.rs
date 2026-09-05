@@ -110,7 +110,7 @@ pub fn run() {
             Ok(())
         })
         .build(tauri::generate_context!())
-        .expect("error while building DeepSeek Harness Launcher")
+        .expect("error while building Harness Launcher")
         .run(|app_handle, event| {
             // Stop the harness child on ANY app exit path (tray/panel Quit,
             // AppleScript quit, Cmd+Q) so no orphaned harness process keeps
@@ -153,7 +153,7 @@ fn boot(app: AppHandle) {
             settings::log(&state::data_dir(&app), &format!("boot failed: {e}"));
             let _ = app.notification()
                 .builder()
-                .title("DeepSeek Harness Launcher - boot failed")
+                .title("Harness Launcher - boot failed")
                 .body(&e)
                 .show();
         }
