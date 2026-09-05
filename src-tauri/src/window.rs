@@ -30,7 +30,7 @@ pub fn ensure_window(app: &AppHandle, url: &str) -> Result<(), String> {
 
     let url2 = WebviewUrl::External(parse_url(url)?);
     let window = WebviewWindowBuilder::new(app, LABEL, url2)
-        .title("DeepSeek Harness Launcher - Harness")
+        .title("Harness Launcher - Harness")
         .inner_size(1280.0, 800.0)
         .min_inner_size(900.0, 600.0)
         .initialization_script(overlay_script())
@@ -56,7 +56,7 @@ pub fn open_settings_window(app: &AppHandle) -> Result<(), String> {
         return Ok(());
     }
     let window = WebviewWindowBuilder::new(app, SETTINGS_LABEL, dsh_ui_url("settings")?)
-        .title("DeepSeek Harness Launcher - Control Panel")
+        .title("Harness Launcher - Control Panel")
         .inner_size(680.0, 800.0)
         .min_inner_size(560.0, 640.0)
         .build()

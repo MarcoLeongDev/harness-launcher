@@ -63,7 +63,7 @@ pub fn check_harness_update(
         let _ = app
             .notification()
             .builder()
-            .title("DeepSeek Harness Launcher - harness update available")
+            .title("Harness Launcher - harness update available")
             .body(format!(
                 "Version {latest} is available (you are on {active}). Open the launcher panel to update."
             ))
