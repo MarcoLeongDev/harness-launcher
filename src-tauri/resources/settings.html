@@ -132,8 +132,6 @@
   @keyframes spin { to { transform: rotate(360deg); } }
   .ico.spin { animation: spin .9s linear infinite; display: inline-block; }
   @media (prefers-reduced-motion: reduce) { .ico.spin { animation: none; } }
-  /* Hide empty result cells */
-  #check-result:empty { display: none; }
   /* engine card */
   .ec-row { display: flex; align-items: center; gap: 12px; padding: 14px 16px; flex-wrap: nowrap; }
   .ec-status-icon { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center;
@@ -497,10 +495,9 @@
     host: $('host-text'), hostWrap: $('host-wrap'),
     port: $('inp-port'),
     
-    intervalSel: $('sel-interval'), installSel: $('sel-install-ver'), btnInstall: $('btn-install'),
+    installSel: $('sel-install-ver'), btnInstall: $('btn-install'), btnGetLatest: $('btn-get-latest'),
     verTbody: $('ver-tbody'),
     feedsBox: $('op-feeds'),
-    checkResult: $('check-result'),
     logFollow: $('btn-log-follow'), logTail: $('log-tail'),
     banner: $('update-banner'), bannerText: $('update-banner-text'), bannerBtn: $('btn-banner-update'),
     appVer: $('app-ver'), dshVer: $('dsh-ver'),
@@ -666,14 +663,8 @@
     f.finishSoon(8000);
   }
 
-  function setCheckResult(text, isErr) {
-    sel.checkResult.textContent = text || '';
-    // Result state lives in the row beside the Check button; the span is
-    // hidden when empty (:empty rule) so no empty cell ever shows.
-    sel.checkResult.className = isErr ? 'err' : (text ? 'ok2' : '');
-  }
   function busy(on) {
-    [sel.toggle, sel.restart, sel.check].forEach(function (b) { b.disabled = on; });
+    [sel.toggle, sel.restart].forEach(function (b) { b.disabled = on; });
   }
 
   function applyProgress(p) {
@@ -1029,22 +1020,7 @@
   sel.btnGetLatest.addEventListener('click', function () {
     withCmd(function () { return invoke('update_to_latest', { }); }, 'Updated');
   });
-  sel.btnInstall.addEventListener('click', function () {
-    var v = sel.installSel.value;
-    if (!v) return;
-    withCmd(function () { return invoke('download_version', { version: v }); }, 'Downloaded');
-  });
-  sel.installSel.addEventListener('change', function () { closePopovers(); });
-  sel.bannerBtn.addEventListener('click', function () { withCmd(function () { return invoke('update_to_latest', { }); }, 'Updated'); });
-    setCheckResult('Checking for updates…');
-    invoke('check_updates', {}).then(function (r) {
-      setCheckResult(r || 'Up to date');
-    }).catch(function (e) { setCheckResult(String(e && e.message || e), true); })
-      .finally(function () {
-        sel.check.disabled = false;
-        if (ico) ico.classList.remove('spin');
-      });
-  });
+
 
   // logs
   // Go to last line: jump to the end of the log and keep following it.
