@@ -1,7 +1,7 @@
 {
   "name": "dsh-launcher",
   "private": true,
-  "version": "0.1.46",
+  "version": "0.1.47",
   "description": "DeepSeek Harness Launcher - Tauri macOS menubar app to manage the DeepSeek Harness engine",
   "type": "module",
   "scripts": {
@@ -11,7 +11,8 @@
     "icons": "node scripts/gen-icons.mjs && tauri icon src-tauri/icons/icon.png",
     "deploy": "npm run build && node scripts/deploy.mjs",
     "deploy:install": "node scripts/deploy.mjs",
-    "deploy:relaunch": "npm run build && node scripts/deploy.mjs --relaunch"
+    "deploy:relaunch": "npm run build && node scripts/deploy.mjs --relaunch",
+    "test": "node scripts/test-panel-feed.mjs"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",
