@@ -87,7 +87,6 @@ pub fn run() {
             commands::rollback,
             commands::set_port,
             commands::set_prerelease,
-            commands::set_auto_update,
             commands::check_updates,
             commands::tail_logs,
             commands::open_in_browser,
@@ -110,9 +109,9 @@ pub fn run() {
             let saved = settings::load(&data_dir);
             *app.state::<AppState>().settings.lock().unwrap() = saved;
             tray::setup_tray(app.handle())?;
-            let handle = app.handle().clone();
-            boot(handle.clone());
-            update::spawn_auto_checker(handle, state::runtime_dir(app.handle()));
+            // No background update checker: update discovery is manual-only
+            // ("Check now"); the launcher never polls the registry on its own.
+            boot(app.handle().clone());
             Ok(())
         })
         .build(tauri::generate_context!())
