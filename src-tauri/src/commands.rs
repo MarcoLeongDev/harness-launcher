@@ -423,11 +423,12 @@ pub async fn update_to_latest(app: AppHandle) -> Result<String, String> {
                 progress::finish(&app, "update", None, &format!("already on latest ({latest})"));
                 return Ok(format!("already on latest ({latest})"));
             }
-            // Continue under the resolved version's own key so the terminal
-            // feed and cancellation target this update precisely.
-            let op = progress::op_key("update", Some(&latest));
-            progress::clear_op(&app, "update");
-            switch_version_inner(&app, &latest, &op)
+            // Keep the whole update under the one "update" op key: the
+            // registry phase already opened its terminal feed under this key,
+            // and a mid-flight key switch would orphan that feed — it would
+            // never see a terminal phase, linger as a stuck download in the
+            // panel and its stop button would target nothing.
+            switch_version_inner(&app, &latest, "update")
         })
     })
     .await
