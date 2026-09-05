@@ -177,6 +177,10 @@ pub fn emit_status(app: &AppHandle, runtime: &HarnessRuntime) {
 
 /// Stop the engine: kill the tracked child (SIGKILL via the shell plugin) and
 /// clear the process slot immediately. Returns true if a child was running.
+///
+/// NOTE: this deliberately signals ONLY the launcher-tracked child. A port
+/// held by any other process is never killed — use `port::holder_hint` to
+/// report the holder so the user can free the port or pick another one.
 pub fn stop(runtime: &HarnessRuntime, runtime_dir: &Path) -> bool {
     let mut proc = runtime.process.lock().unwrap();
     if let Some(state) = proc.take() {
@@ -190,55 +194,6 @@ pub fn stop(runtime: &HarnessRuntime, runtime_dir: &Path) -> bool {
         runtime.mark_phase(PHASE_STOPPED);
         false
     }
-}
-
-/// Force-stop the engine: kill the child, then verify the port is released and
-/// escalate to killing any process still bound to it (macOS `lsof` + SIGKILL).
-/// Returns Ok(true) if a child was running, Ok(false) if the engine was already
-/// stopped but the port was reclaimed.
-pub fn force_stop(
-    runtime: &HarnessRuntime,
-    runtime_dir: &Path,
-    port: u16,
-) -> Result<bool, String> {
-    let mut proc = runtime.process.lock().unwrap();
-    let had_child = if let Some(state) = proc.take() {
-        runtime.mark_phase(PHASE_STOPPING);
-        state.child.kill().map_err(|e| format!("force-stop kill failed: {e}"))?;
-        runtime.mark_phase(PHASE_STOPPED);
-        runtime.clear_web_url();
-        append_log(runtime_dir, "[launcher] force-stopping harness");
-        true
-    } else {
-        runtime.mark_phase(PHASE_STOPPED);
-        false
-    };
-    drop(proc);
-
-    // Give the child a moment to release the port, then escalate.
-    let deadline = std::time::Instant::now() + Duration::from_secs(2);
-    while std::time::Instant::now() < deadline {
-        if crate::port::is_free(port) {
-            return Ok(had_child);
-        }
-        std::thread::sleep(Duration::from_millis(150));
-    }
-
-    if !crate::port::is_free(port) {
-        // Escalate: kill anything still listening on the port.
-        if let Ok(out) = std::process::Command::new("lsof")
-            .args(["-ti", &format!("tcp:{port}")])
-            .output()
-        {
-            let pids = String::from_utf8_lossy(&out.stdout);
-            for pid in pids.split_whitespace() {
-                let _ = std::process::Command::new("kill").args(["-9", pid]).status();
-                append_log(runtime_dir, &format!("[launcher] killed lingering pid {pid} on port {port}"));
-            }
-            std::thread::sleep(Duration::from_millis(300));
-        }
-    }
-    Ok(had_child)
 }
 
 pub fn start(

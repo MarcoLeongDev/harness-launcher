@@ -1,0 +1,16 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main",
+  "description": "Least-privilege capability for the harness-content window: it renders engine-served (untrusted) pages, so it gets IPC + events only. Mutating commands additionally enforce the source window in Rust (require_panel) — this file scopes the WebView, the guard enforces the command set.",
+  "windows": [
+    "main"
+  ],
+  "remote": {
+    "urls": [
+      "http://127.0.0.1:*"
+    ]
+  },
+  "permissions": [
+    "core:default"
+  ]
+}
