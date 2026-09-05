@@ -52,26 +52,22 @@ relaunches; user data is never deleted by redeployment.
 
 ### Requirement: One Reusable Terminal Feed Per Operation
 The Versions tab SHALL render operation output through a reusable feed
-component — header (command + elapsed time), terminal body, and a circular
-stop-button overlay — of which one instance exists per in-flight operation.
-Parallel version downloads MUST each own their own feed (no shared output
-element), console lines MUST be tagged with their operation so a feed only
-shows its own lines, and cancellation MUST target a single operation. Feeds
-persist across panel refreshes (re-seeded from status + console snapshots)
-and the area collapses when no operation is active. The feeds SHALL live in
-their own section BELOW the versions table — never between the table's rows
-— and that section MUST be visible only while it has content to display,
-disappearing completely once the terminal output goes away.
+component — header (command + elapsed time) and a terminal body — of which
+one instance exists per in-flight operation. Parallel version downloads MUST
+each own their own feed (no shared output element), console lines MUST be
+tagged with their operation so a feed only shows its own lines. Feeds persist
+across panel refreshes (re-seeded from status + console snapshots) and the
+area collapses when no operation is active. The feeds SHALL live in their own
+section BELOW the versions table — never between the table's rows — and that
+section MUST be visible only while it has content to display, disappearing
+completely once the terminal output goes away. Terminals SHALL NOT render a
+stop/cancel control.
 
 #### Scenario: Two downloads run at the same time
 - **WHEN** the user starts downloading two different versions one after the
   other while the first is still running
 - **THEN** two independent feeds appear in the section below the versions
   table, each streaming only its own npm output with its own elapsed timer
-
-#### Scenario: Stop one of two downloads
-- **WHEN** the user taps the stop button on the first download's feed
-- **THEN** only that download is cancelled and the second continues unaffected
 
 #### Scenario: Panel opened mid-download
 - **WHEN** the Control Panel is opened while a download is in flight
@@ -87,22 +83,15 @@ disappearing completely once the terminal output goes away.
 The operation feed terminal in the Versions tab SHALL animate its showing and
 hiding (fade and slide) rather than appearing abruptly, and MUST respect the
 user's reduced-motion preference by skipping the animation. A feed whose
-operation reaches a terminal phase (done, failed, or cancelled — including a
-download stopped by the user) SHALL dismiss itself after a short delay, and
-its dismissal MUST be scheduled exactly once (repeat terminal events MUST
-NOT extend the wait). Once an operation is closed, late console lines for
-its key MUST NOT re-create its feed.
+operation reaches a terminal phase (done, failed, or cancelled) SHALL dismiss
+itself after a short delay, and its dismissal MUST be scheduled exactly once
+(repeat terminal events MUST NOT extend the wait). Once an operation is
+closed, late console lines for its key MUST NOT re-create its feed.
 
 #### Scenario: A download starts and finishes
 - **WHEN** a version download begins
 - **THEN** its feed animates in; when the operation settles the feed animates
   out and the area collapses
-
-#### Scenario: User stops a download
-- **WHEN** the user taps the stop button and the operation reports
-  cancelled
-- **THEN** the terminal stays briefly (to show the cancellation) and then
-  animates away on its own, without lingering indefinitely
 
 #### Scenario: Late console line after dismissal
 - **WHEN** a console line tagged with an already-closed operation arrives
@@ -223,27 +212,4 @@ working.
 - **WHEN** a version is downloading (an operation feed is visible in the
   section below the table)
 - **THEN** the install row remains the last row of the table itself
-
-### Requirement: Stop Button Only While Npm Runs
-The operation feed stop button SHALL be visible only while npm is actually
-running for that operation. The backend SHALL mark exactly those progress
-payloads as stoppable; pure message phases (registry checks, engine
-stop/start/restart, port changes, verification of an already-installed
-version, notices) MUST NOT show a stop button, because there is no download
-to stop. While npm is not running the stop button hides but the terminal
-output stays until the feed dismisses.
-
-#### Scenario: Update already on latest
-- **WHEN** the user runs update while the active version is already the
-  latest (a registry check with no npm install follows)
-- **THEN** the terminal shows the message without a stop button
-
-#### Scenario: Real download in flight
-- **WHEN** npm is installing a version for the operation
-- **THEN** the circular stop button is visible and cancels that operation
-
-#### Scenario: Verification after npm finished
-- **WHEN** the operation moves from installing to verifying (npm already
-  done)
-- **THEN** the stop button hides while the terminal output remains visible
 
