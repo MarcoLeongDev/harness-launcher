@@ -637,7 +637,9 @@ pub fn tail_logs(app: AppHandle, lines: Option<usize>) -> Result<String, String>
     let rd = state::runtime_dir(&app);
     let path = rd.join("logs").join("harness.log");
     let content = std::fs::read_to_string(&path).unwrap_or_default();
-    let wanted = lines.unwrap_or(200).max(10);
+    // Bounded both ways: at least a useful tail, at most a sane IPC payload
+    // (the file itself rotates at 2 MB, so this is belt-and-braces) (SN10).
+    let wanted = lines.unwrap_or(200).clamp(10, 2000);
     let all: Vec<&str> = content.lines().collect();
     let start = all.len().saturating_sub(wanted);
     // Redact here too: log files written before token redaction shipped may
