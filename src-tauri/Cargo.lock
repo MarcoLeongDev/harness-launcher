@@ -851,7 +851,7 @@ dependencies = [
 
 [[package]]
 name = "dsh-launcher"
-version = "0.1.47"
+version = "0.1.50"
 dependencies = [
  "semver",
  "serde",
