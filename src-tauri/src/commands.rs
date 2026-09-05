@@ -555,7 +555,7 @@ pub async fn check_updates(app: AppHandle) -> Result<String, String> {
                 if update::is_newer(&active, &latest) {
                     parts.push(format!("Harness update available: {active} → {latest}"));
                 } else {
-                    parts.push(format!("Harness is current at version {active} — press Get latest to check for a newer version"));
+                    parts.push(format!("Harness is current at version {active} — no update needed"));
                 }
             }
             Err(e) => parts.push(format!("harness check failed: {e}")),
