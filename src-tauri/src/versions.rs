@@ -275,7 +275,7 @@ pub fn install_version(
     crate::progress::reset_console(app, op);
     crate::progress::reset_cancel(app, op);
     crate::progress::push_console(app, op, "info", &format!("$ npm install {spec}"));
-    crate::progress::emit(app, op, Some(version), "installing", &format!("Installing {spec}…"), None);
+    crate::progress::emit_stoppable(app, op, Some(version), "installing", &format!("Installing {spec}…"), None, true);
     let app_sink = app.clone();
     let op_sink = op.to_string();
     let ver_sink = version.to_string();
@@ -311,7 +311,7 @@ pub fn install_version(
                 String::new()
             };
             if !preview.is_empty() {
-                crate::progress::emit(&app_sink, &op_sink, Some(&ver_sink), "installing", &preview, None);
+                crate::progress::emit_stoppable(&app_sink, &op_sink, Some(&ver_sink), "installing", &preview, None, true);
             }
         }
     };
@@ -447,13 +447,14 @@ pub fn ensure_peer_completion(
         "info",
         &format!("Installing {} missing peer packages...", extra.len()),
     );
-    crate::progress::emit(
+    crate::progress::emit_stoppable(
         app,
         op,
         Some(version),
         "installing",
         "Completing missing peer packages...",
         Some(88),
+        true,
     );
     let mut args: Vec<String> = vec![
         "install".into(),
