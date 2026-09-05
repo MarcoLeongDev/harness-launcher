@@ -316,7 +316,14 @@
      Directory cells stay empty. */
   .vc-ver-install { display: flex; }
   .vc-ver-install select { width: 100%; max-width: 240px; }
-  .btn.install { color: var(--accent2); }
+  /* Install action: white cloud-download glyph (same treatment as the delete
+     button) — dim backing disc in light mode so white stays readable, accent
+     disc on hover. */
+  .btn.install { color: #fff; }
+  .btn.install:hover { background: var(--accent); color: #fff; }
+  @media (prefers-color-scheme: light) {
+    .btn.install { background: rgba(29, 36, 48, 0.32); }
+  }
   .btn.danger { background: var(--err); border-color: var(--err); color: #fff; }
   .btn.danger:hover { background: #ff6259; }
   .btn.ghost-danger { background: transparent; border-color: rgba(255,69,58,0.45);
@@ -553,6 +560,9 @@
   // are disabled. Plain downloads (kind "download") never touch the engine.
   var engineBusyOps = { switch: 1, update: 1, rollback: 1, engine: 1, port: 1 };
   var feeds = {};        // op key -> feed object
+  var closedOps = {};    // op key -> true once the op reached a terminal phase
+                         // (done/failed/cancelled); late console lines for
+                         // closed ops must never re-create their feed
   var noticeFeed = null; // terminal surface for launcher-level notices
   var lastResultText = '', lastResultAt = 0;
 
@@ -571,7 +581,7 @@
       '<div class="op-feed-body">' +
         '<pre class="term-out terminal" aria-live="polite"></pre>' +
         '<button class="dl-cancel" title="Stop download" aria-label="Stop download" hidden>' +
-          '<i class="ico sm bi" data-ico="stop-circle"></i>' +
+          '<i class="ico sm bi" data-ico="stop-fill"></i>' +
         '</button>' +
       '</div>';
     sel.feedsBox.appendChild(el);
@@ -626,11 +636,14 @@
         }, 60000);
       },
       // Keep the terminal visible briefly after the operation settles, then
-      // animate the feed out and remove it — the container collapses.
+      // animate the feed out and remove it — the container collapses. The
+      // dismissal is scheduled EXACTLY ONCE: repeat terminal events (a
+      // cancelled op re-reported on refresh) must not extend the wait, or a
+      // stopped download would linger on screen.
       finishSoon: function (ms) {
         feed.done = true;
         feed.setDownloading(false);
-        if (feed.hideTimer) clearTimeout(feed.hideTimer);
+        if (feed.hideTimer) return;
         feed.hideTimer = setTimeout(function () {
           if (feed.downloading) return;
           el.classList.add('leaving');
@@ -697,6 +710,7 @@
     if (downloading && p.message) f.armStuck();
     if (engineBusyOps[kind]) busy(true);
     if (p.phase === 'done' || p.phase === 'failed' || p.phase === 'cancelled') {
+      closedOps[p.op || ''] = true;
       if (f.lastPhase !== p.phase) {
         f.lastPhase = p.phase;
         f.append(p.phase === 'done' ? 'info' : 'err', p.message || (p.phase === 'done' ? 'Completed' : p.phase));
@@ -1064,12 +1078,12 @@
     // Lines tagged with an operation stream into THAT operation's feed;
     // stray launcher-level lines (like delete confirmations) surface as
     // notifications instead of piling up invisibly.
-    if (line.op) {
+    if (line.op && !closedOps[line.op]) {
       var f = feedFor(line.op);
       f.seeded = true; // live lines supersede the snapshot seed
       f.append(line.stream || 'out', line.text);
       if (f.downloading) f.armStuck();
-    } else {
+    } else if (!line.op) {
       setResult(line.text, line.stream === 'err');
     }
   });
