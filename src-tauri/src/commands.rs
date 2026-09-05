@@ -30,8 +30,6 @@ pub struct StatusPayload {
     pub latest_remote: Option<String>,
     pub update_available: bool,
     pub include_prerelease: bool,
-    pub auto_update_harness: bool,
-    pub auto_update_interval_hours: u64,
     pub start_on_launch: bool,
     pub boot_error: Option<String>,
     /// In-flight long-running operation, if any (legacy single slot for the
@@ -45,6 +43,20 @@ pub struct StatusPayload {
     pub console: Vec<progress::ConsoleLine>,
     /// Authenticated WebUI URL captured from the engine (`?token=…`), if any.
     pub web_url: Option<String>,
+}
+
+/// Least-privilege IPC: the harness-content window (`main`) renders pages
+/// served by the engine, which is untrusted, so only read-only or benign
+/// commands run there. Everything mutating (versions, engine lifecycle,
+/// ports, settings, app exit) requires the launcher-owned Control Panel
+/// (`settings`) window. POLICY: allow = get_status, tail_logs, engine_start
+/// (stopped page), open_in_browser, open_settings, open_harness_window,
+/// set_prerelease (view filter), check_updates (read-only + notify).
+fn require_panel(window: &tauri::Window) -> Result<(), String> {
+    if window.label() == crate::window::LABEL {
+        return Err("not permitted from the harness window — use the Control Panel".into());
+    }
+    Ok(())
 }
 
 pub fn harness_url(actual_port: u16) -> String {
@@ -124,7 +136,10 @@ fn start_engine(app: &AppHandle, op: &str) -> Result<u16, String> {
     let served = port::wait_until_serving(actual, Duration::from_secs(30));
     if !served {
         runtime::stop(&st.runtime, &rd);
-        let msg = format!("harness did not answer on 127.0.0.1:{actual} within 30s");
+        let msg = format!(
+            "harness did not answer on 127.0.0.1:{actual} within 30s{}",
+            port::holder_hint(actual).map(|h| format!(" ({h})")).unwrap_or_default()
+        );
         progress::emit(app, op, Some(&version), "failed", &msg, Some(0));
         return Err(msg);
     }
@@ -134,9 +149,9 @@ fn start_engine(app: &AppHandle, op: &str) -> Result<u16, String> {
     Ok(actual)
 }
 
-/// Restart (or force-restart) the engine and wait until it serves again.
+/// Restart the engine and wait until it serves again.
 /// Used by version switches, port changes and explicit engine commands.
-fn restart_engine(app: &AppHandle, op: &str, version: Option<&str>, force: bool) -> Result<u16, String> {
+fn restart_engine(app: &AppHandle, op: &str, version: Option<&str>) -> Result<u16, String> {
     let st = app.state::<AppState>();
     let rd = state::runtime_dir(app);
     let version = match version {
@@ -145,14 +160,14 @@ fn restart_engine(app: &AppHandle, op: &str, version: Option<&str>, force: bool)
     };
     let actual = *st.effective_port.lock().unwrap();
 
-    let had_child = if force {
-        progress::emit(app, op, Some(&version), "restarting", "Force-restarting engine…", Some(60));
-        runtime::force_stop(&st.runtime, &rd, actual)?
-    } else {
+    // Only the tracked child is ever signalled (SIGKILL via the shell plugin).
+    // A port held by any other process is REPORTED, never killed: the error
+    // names the holder so the user can free the port or pick another one.
+    let had_child = {
         progress::emit(app, op, Some(&version), "restarting", "Restarting engine…", Some(60));
         runtime::stop(&st.runtime, &rd)
     };
-    if !had_child && !force {
+    if !had_child {
         progress::emit(app, op, Some(&version), "starting", &format!("Starting engine on 127.0.0.1:{actual}…"), None);
     }
 
@@ -161,7 +176,10 @@ fn restart_engine(app: &AppHandle, op: &str, version: Option<&str>, force: bool)
     let served = port::wait_until_serving(actual, Duration::from_secs(30));
     if !served {
         runtime::stop(&st.runtime, &rd);
-        let msg = format!("harness did not answer on 127.0.0.1:{actual} within 30s");
+        let msg = format!(
+            "harness did not answer on 127.0.0.1:{actual} within 30s{}",
+            port::holder_hint(actual).map(|h| format!(" ({h})")).unwrap_or_default()
+        );
         progress::emit(app, op, Some(&version), "failed", &msg, Some(0));
         return Err(msg);
     }
@@ -198,6 +216,11 @@ fn switch_running_feedback(version: &str, port: u16) -> String {
 /// never has to stop the engine by hand. When stopped, switching only records
 /// the default (it never auto-starts).
 fn switch_version_inner(app: &AppHandle, version: &str, op: &str) -> Result<String, String> {
+    // Defense in depth: install_version re-validates, but reject here before
+    // stopping a running engine for a bogus version.
+    if !versions::is_valid_version_name(version) {
+        return Err(format!("invalid version name: {version}"));
+    }
     ensure_runtime_dirs(app).map_err(|e| format!("runtime dirs: {e}"))?;
     let st = app.state::<AppState>();
     let was_running = st.runtime.is_running();
@@ -229,7 +252,7 @@ fn switch_version_inner(app: &AppHandle, version: &str, op: &str) -> Result<Stri
     }
 
     if was_running {
-        let actual = restart_engine(app, op, Some(version), false)?;
+        let actual = restart_engine(app, op, Some(version))?;
         let _ = window::navigate(app, &harness_web_url(app, actual, Some(Duration::from_secs(10))));
         let msg = switch_running_feedback(version, actual);
         progress::finish(app, op, Some(version), &msg);
@@ -354,8 +377,6 @@ pub async fn get_status(app: AppHandle) -> Result<StatusPayload, String> {
         latest_remote: remote,
         update_available,
         include_prerelease: settings.include_prerelease,
-        auto_update_harness: settings.auto_update_harness,
-        auto_update_interval_hours: settings.auto_update_interval_hours,
         start_on_launch: settings.start_on_launch,
         boot_error,
         current_op,
@@ -369,9 +390,18 @@ pub async fn get_status(app: AppHandle) -> Result<StatusPayload, String> {
 }
 
 #[tauri::command]
-pub async fn install_and_switch(app: AppHandle, version: String) -> Result<String, String> {
+pub async fn install_and_switch(app: AppHandle, window: tauri::Window, version: String) -> Result<String, String> {
+    require_panel(&window)?;
+    if !versions::is_valid_version_name(&version) {
+        return Err(format!("invalid version name: {version}"));
+    }
     let op = progress::op_key("switch", Some(&version));
     tauri::async_runtime::spawn_blocking(move || {
+        // SN12: serialize with concurrent version mutations (two lines: the
+        // State guard must be bound before locking through it). Inner helpers
+        // MUST NOT take this lock again.
+        let _state = app.state::<AppState>();
+        let _mutation = _state.version_mutation.lock().unwrap();
         with_progress_cleanup(&app, &op, || switch_version_inner(&app, &version, &op))
     })
     .await
@@ -384,9 +414,12 @@ pub async fn install_and_switch(app: AppHandle, version: String) -> Result<Strin
 /// npm installs into this version's own directory and only the shared
 /// (concurrency-safe) npm cache is touched.
 #[tauri::command]
-pub async fn download_version(app: AppHandle, version: String) -> Result<String, String> {
+pub async fn download_version(app: AppHandle, window: tauri::Window, version: String) -> Result<String, String> {
+    require_panel(&window)?;
     let op = progress::op_key("download", Some(&version));
     tauri::async_runtime::spawn_blocking(move || {
+        let _state = app.state::<AppState>();
+        let _mutation = _state.version_mutation.lock().unwrap();
         with_progress_cleanup(&app, &op, || {
             if !versions::is_valid_version_name(&version) {
                 return Err(format!("invalid version name: {version}"));
@@ -412,8 +445,11 @@ pub async fn download_version(app: AppHandle, version: String) -> Result<String,
 }
 
 #[tauri::command]
-pub async fn update_to_latest(app: AppHandle) -> Result<String, String> {
+pub async fn update_to_latest(app: AppHandle, window: tauri::Window) -> Result<String, String> {
+    require_panel(&window)?;
     tauri::async_runtime::spawn_blocking(move || {
+        let _state = app.state::<AppState>();
+        let _mutation = _state.version_mutation.lock().unwrap();
         with_progress_cleanup(&app, "update", || {
             let rd = state::runtime_dir(&app);
             progress::emit(&app, "update", None, "registry", "Checking npm registry for latest version…", Some(5));
@@ -436,11 +472,19 @@ pub async fn update_to_latest(app: AppHandle) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub async fn rollback(app: AppHandle) -> Result<String, String> {
+pub async fn rollback(app: AppHandle, window: tauri::Window) -> Result<String, String> {
+    require_panel(&window)?;
     tauri::async_runtime::spawn_blocking(move || {
+        let _state = app.state::<AppState>();
+        let _mutation = _state.version_mutation.lock().unwrap();
         let previous = state::read_settings(&app)
             .previous_version
             .ok_or_else(|| "no previous version to roll back to".to_string())?;
+        // `previous_version` is persisted state (user-writable file): validate
+        // before it becomes a path or npm spec.
+        if !versions::is_valid_version_name(&previous) {
+            return Err(format!("invalid version name: {previous}"));
+        }
         let op = progress::op_key("rollback", Some(&previous));
         with_progress_cleanup(&app, &op, || {
             let rd = state::runtime_dir(&app);
@@ -453,7 +497,7 @@ pub async fn rollback(app: AppHandle) -> Result<String, String> {
                 s.previous_version = current;
             });
             progress::emit(&app, &op, Some(&previous), "switching", "Switching active version…", Some(90));
-            let actual = restart_engine(&app, &op, Some(&previous), false)?;
+            let actual = restart_engine(&app, &op, Some(&previous))?;
             let _ = window::navigate(&app, &harness_url(actual));
             let msg = format!("rolled back to {previous} on port {actual}");
             progress::finish(&app, &op, Some(&previous), &msg);
@@ -465,7 +509,8 @@ pub async fn rollback(app: AppHandle) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub async fn set_port(app: AppHandle, port: u16) -> Result<String, String> {
+pub async fn set_port(app: AppHandle, window: tauri::Window, port: u16) -> Result<String, String> {
+    require_panel(&window)?;
     if port == 0 {
         return Err("port must be between 1 and 65535".into());
     }
@@ -493,7 +538,7 @@ pub async fn set_port(app: AppHandle, port: u16) -> Result<String, String> {
         }
 
         progress::emit(&app, "port", None, "restarting", &format!("Restarting engine on port {actual}…"), Some(40));
-        match restart_engine(&app, "port", None, false) {
+        match restart_engine(&app, "port", None) {
             Ok(actual2) => {
                 let _ = window::navigate(&app, &harness_web_url(&app, actual2, Some(Duration::from_secs(10))));
                 let msg = format!(
@@ -508,7 +553,7 @@ pub async fn set_port(app: AppHandle, port: u16) -> Result<String, String> {
                 // to bring the engine back on the previous effective port.
                 state::update_settings(&app, |s| s.port = previous_desired);
                 *st.effective_port.lock().unwrap() = previous_effective;
-                if let Err(revert_err) = restart_engine(&app, "port", None, false) {
+                if let Err(revert_err) = restart_engine(&app, "port", None) {
                     progress::emit(&app, "port", None, "failed", &format!("{e}; revert also failed: {revert_err}"), Some(0));
                     return Err(format!("{e}; revert also failed: {revert_err}"));
                 }
@@ -526,19 +571,6 @@ pub async fn set_port(app: AppHandle, port: u16) -> Result<String, String> {
 pub async fn set_prerelease(app: AppHandle, include: bool) -> Result<String, String> {
     state::update_settings(&app, |s| s.include_prerelease = include);
     Ok(format!("pre-release versions {}", if include { "shown" } else { "hidden" }))
-}
-
-#[tauri::command]
-pub async fn set_auto_update(app: AppHandle, enabled: Option<bool>, interval_hours: Option<u64>) -> Result<String, String> {
-    state::update_settings(&app, |s| {
-        if let Some(e) = enabled {
-            s.auto_update_harness = e;
-        }
-        if let Some(h) = interval_hours {
-            s.auto_update_interval_hours = h.max(1);
-        }
-    });
-    Ok("auto-update settings saved".into())
 }
 
 #[tauri::command]
@@ -598,10 +630,18 @@ pub fn tail_logs(app: AppHandle, lines: Option<usize>) -> Result<String, String>
     let rd = state::runtime_dir(&app);
     let path = rd.join("logs").join("harness.log");
     let content = std::fs::read_to_string(&path).unwrap_or_default();
-    let wanted = lines.unwrap_or(200).max(10);
+    // Bounded both ways: at least a useful tail, at most a sane IPC payload
+    // (the file itself rotates at 2 MB, so this is belt-and-braces) (SN10).
+    let wanted = lines.unwrap_or(200).clamp(10, 2000);
     let all: Vec<&str> = content.lines().collect();
     let start = all.len().saturating_sub(wanted);
-    Ok(all[start..].join("\n"))
+    // Redact here too: log files written before token redaction shipped may
+    // still contain raw launch tokens (SN9).
+    Ok(all[start..]
+        .iter()
+        .map(|l| crate::runtime::redact_token(l))
+        .collect::<Vec<_>>()
+        .join("\n"))
 }
 
 #[tauri::command]
@@ -619,10 +659,11 @@ pub fn open_in_browser(app: AppHandle) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub async fn restart_harness(app: AppHandle) -> Result<String, String> {
+pub async fn restart_harness(app: AppHandle, window: tauri::Window) -> Result<String, String> {
+    require_panel(&window)?;
     tauri::async_runtime::spawn_blocking(move || {
         with_progress_cleanup(&app, "engine", || {
-            let actual = restart_engine(&app, "engine", None, false)?;
+            let actual = restart_engine(&app, "engine", None)?;
             let _ = window::navigate(&app, &harness_web_url(&app, actual, Some(Duration::from_secs(10))));
             progress::clear_op(&app, "engine");
             Ok(format!("harness restarted on port {actual}"))
@@ -653,50 +694,45 @@ pub async fn engine_start(app: AppHandle) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn engine_stop(app: AppHandle) -> Result<String, String> {
+pub fn engine_stop(app: AppHandle, window: tauri::Window) -> Result<String, String> {
+    require_panel(&window)?;
+    stop_engine_now(&app)
+}
+
+/// Tray/direct entry point: same stop without a source window to authorize
+/// (the tray is launcher-owned UI, always trusted).
+pub fn stop_engine_now(app: &AppHandle) -> Result<String, String> {
     let st = app.state::<AppState>();
-    let rd = state::runtime_dir(&app);
+    let rd = state::runtime_dir(app);
     if !st.runtime.is_running() {
         return Ok("engine already stopped".into());
     }
-    progress::emit(&app, "engine", None, "stopping", "Stopping engine…", Some(10));
+    progress::emit(app, "engine", None, "stopping", "Stopping engine…", Some(10));
     runtime::stop(&st.runtime, &rd);
-    state::update_settings(&app, |s| s.start_on_launch = false);
+    state::update_settings(app, |s| s.start_on_launch = false);
     // Identical strings for the progress event and the command result so the
     // panel's terminal feed does not render the same notification twice.
-    progress::finish(&app, "engine", None, "engine stopped");
-    runtime::emit_status(&app, &st.runtime);
-    crate::tray::refresh(&app);
+    progress::finish(app, "engine", None, "engine stopped");
+    runtime::emit_status(app, &st.runtime);
+    crate::tray::refresh(app);
     Ok("engine stopped".into())
 }
 
 #[tauri::command]
-pub async fn engine_restart(app: AppHandle) -> Result<String, String> {
+pub async fn engine_restart(app: AppHandle, window: tauri::Window) -> Result<String, String> {
+    require_panel(&window)?;
+    restart_engine_now(app).await
+}
+
+/// Tray/direct entry point: same restart without a source window to authorize
+/// (the tray is launcher-owned UI, always trusted).
+pub async fn restart_engine_now(app: AppHandle) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
         with_progress_cleanup(&app, "engine", || {
-            let actual = restart_engine(&app, "engine", None, false)?;
+            let actual = restart_engine(&app, "engine", None)?;
             let _ = window::navigate(&app, &harness_web_url(&app, actual, Some(Duration::from_secs(10))));
             progress::clear_op(&app, "engine");
             Ok(format!("engine restarted on port {actual}"))
-        })
-    })
-    .await
-    .map_err(|e| e.to_string())?
-}
-
-#[tauri::command]
-pub async fn engine_force_restart(app: AppHandle) -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        with_progress_cleanup(&app, "engine", || {
-            let st = app.state::<AppState>();
-            if !st.runtime.is_running() && port::is_free(*st.effective_port.lock().unwrap()) {
-                progress::clear_op(&app, "engine");
-                return Ok("engine is stopped; use Start to launch it".into());
-            }
-            let actual = restart_engine(&app, "engine", None, true)?;
-            let _ = window::navigate(&app, &harness_web_url(&app, actual, Some(Duration::from_secs(10))));
-            progress::clear_op(&app, "engine");
-            Ok(format!("engine force-restarted on port {actual}"))
         })
     })
     .await
@@ -714,10 +750,16 @@ pub fn open_settings(app: AppHandle) -> Result<String, String> {
 /// next Start (or auto-launch) runs it. Used by the stopped-state version
 /// dropdown so picking a version persists the choice instead of auto-launching.
 #[tauri::command]
-pub async fn set_version(app: AppHandle, version: String) -> Result<String, String> {
+pub async fn set_version(app: AppHandle, window: tauri::Window, version: String) -> Result<String, String> {
+    require_panel(&window)?;
     // Async: selecting a version that is not installed yet shells out to npm
     // (install) and must never block the main thread.
+    if !versions::is_valid_version_name(&version) {
+        return Err(format!("invalid version name: {version}"));
+    }
     tauri::async_runtime::spawn_blocking(move || {
+        let _state = app.state::<AppState>();
+        let _mutation = _state.version_mutation.lock().unwrap();
         let rd = state::runtime_dir(&app);
         ensure_runtime_dirs(&app).map_err(|e| format!("runtime dirs: {e}"))?;
         let st = app.state::<AppState>();
@@ -750,8 +792,16 @@ pub fn open_harness_window(app: AppHandle) -> Result<String, String> {
 /// Delete an installed harness version directory. Refuses to remove the
 /// version that is currently active or running in the engine.
 #[tauri::command]
-pub async fn delete_version(app: AppHandle, version: String) -> Result<String, String> {
+pub async fn delete_version(app: AppHandle, window: tauri::Window, version: String) -> Result<String, String> {
+    require_panel(&window)?;
+    // Validate BEFORE resolving the path: this ends in remove_dir_all, so a
+    // traversal name must never reach version_dir.
+    if !versions::is_valid_version_name(&version) {
+        return Err(format!("invalid version name: {version}"));
+    }
     tauri::async_runtime::spawn_blocking(move || {
+        let _state = app.state::<AppState>();
+        let _mutation = _state.version_mutation.lock().unwrap();
         let rd = state::runtime_dir(&app);
         let dir = versions::version_dir(&rd, &version);
         if !dir.exists() {
@@ -785,7 +835,8 @@ pub async fn delete_version(app: AppHandle, version: String) -> Result<String, S
 /// system file manager (Finder). The version name is validated first so it
 /// can never escape the versions directory.
 #[tauri::command]
-pub fn open_version_dir(app: AppHandle, version: String) -> Result<String, String> {
+pub fn open_version_dir(app: AppHandle, window: tauri::Window, version: String) -> Result<String, String> {
+    require_panel(&window)?;
     if !versions::is_valid_version_name(&version) {
         return Err(format!("invalid version name: {version}"));
     }
@@ -802,9 +853,16 @@ pub fn open_version_dir(app: AppHandle, version: String) -> Result<String, Strin
 }
 
 #[tauri::command]
-pub fn quit_app(app: AppHandle) -> Result<(), String> {
-    let st = app.state::<AppState>();
-    let _ = runtime::stop(&st.runtime, &state::runtime_dir(&app));
-    app.exit(0);
+pub fn quit_app(app: AppHandle, window: tauri::Window) -> Result<(), String> {
+    require_panel(&window)?;
+    quit_app_now(&app);
     Ok(())
+}
+
+/// Tray/direct entry point: same quit without a source window to authorize
+/// (the tray is launcher-owned UI, always trusted).
+pub fn quit_app_now(app: &AppHandle) {
+    let st = app.state::<AppState>();
+    let _ = runtime::stop(&st.runtime, &state::runtime_dir(app));
+    app.exit(0);
 }

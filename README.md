@@ -32,12 +32,12 @@ without ever touching a terminal or keeping a browser tab open.
 
 | | |
 |---|---|
-| 🚀 **Engine lifecycle** | Start / Stop / Restart / Force-Restart the background harness right from the menu bar, the floating in-page panel, or the Control Panel window. |
+| 🚀 **Engine lifecycle** | Start / Stop / Restart the background harness right from the menu bar, the Control Panel window, or (Start only) the floating in-page panel. |
 | 📦 **Version management** | Install & switch between any published engine version with one click — the **Active** radio in the versions table picks the running version, **update to latest** and **roll back** to the previously installed version are one button each. Every version lives in its own isolated install, offline-safe. |
 | 🖥️ **Live download terminal** | While a version is downloading you see the real `npm install` output in a terminal view — each in-flight operation gets its own terminal, streams live, and dismisses itself when done (no manual cleanup, no dead controls). |
 | 🗑️ **Delete versions** | Remove installed engine versions you no longer need (the active version is protected by a confirmation popover). |
 | 🌐 **Choose your port** | Set any loopback port — the harness restarts on it and the window follows automatically, with transparent fallback if the port is busy. |
-| 🔔 **Auto-update** | Periodic harness update checks with a macOS notification (optional app self-update via the Tauri updater). |
+| 🔔 **Update checks** | Manual harness update checks from the panel or menubar ("Check now"); no background polling, no silent installs (optional app self-update via the Tauri updater). |
 | 📋 **Logs** | Follow the live harness log tail straight from the Control Panel (toggleable bottom drawer). |
 | 🧰 **No browser needed** | The harness WebUI opens in its own app window; “Open in Browser” is available when you *do* want a tab. |
 
@@ -52,8 +52,10 @@ without ever touching a terminal or keeping a browser tab open.
 
 The **Control Panel** (menu bar → `Control Panel…`) aggregates engine status,
 version management, downloads with live terminal output, port configuration,
-auto-update and logs. The **floating panel** in the bottom-left of the harness
-UI gives quick access to every control without leaving your chat.
+update checks and logs. The **floating panel** in the bottom-left of the harness
+UI shows live status without leaving your chat; mutating actions live in the
+Control Panel (the harness page is untrusted, so its window is intentionally
+read-only).
 
 ## 🚀 Quick start
 
@@ -78,8 +80,9 @@ npm run deploy:relaunch    # build, install, then restart the running instance
 1. Launch **DeepSeek Harness Launcher** — it's a menubar app (no Dock icon).
 2. On first launch it installs the latest engine version in the background.
 3. The engine starts and the harness UI opens in its own window.
-4. Use the floating **DSh panel** (bottom-left) or the **Control Panel** to
-   start/stop, switch versions, watch downloads and change the port.
+4. Use the **Control Panel** to start/stop, switch versions, watch downloads
+   and change the port (the floating **DSh panel** shows status and starts a
+   stopped engine).
 
 ## 🔒 Security & privacy
 
@@ -104,8 +107,8 @@ engine versions, settings or logs.
 
 ```
 ~/Library/Application Support/ai.dsh.launcher/
-├── settings.json          # port, auto-update flags, start_on_launch, active/previous version
-├── logs/launcher.log
+├── settings.json          # port, start_on_launch, active/previous version
+├── logs/launcher.log      # launcher events (rotated @ 1MB)
 └── runtime/
     ├── versions/<version>/   # one isolated npm install per engine version
     ├── logs/harness.log      # harness stdout/stderr (rotated @ 2MB)
@@ -129,7 +132,7 @@ self-contained at runtime).
 ## 🏗️ Architecture
 
 - `src-tauri/src/runtime.rs` — harness process lifecycle (spawn / stop /
-  restart / force-restart / supervise, phase tracking, log capture)
+  restart / supervise, phase tracking, log capture)
 - `src-tauri/src/versions.rs` — npm version listing, install, rollback
 - `src-tauri/src/progress.rs` — `launcher://progress` / `launcher://console`
   event streams + in-flight operation state

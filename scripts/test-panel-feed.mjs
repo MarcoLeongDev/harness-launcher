@@ -116,6 +116,7 @@ function boot(opts) {
       return doc._ids.get(id);
     },
     createElement: (tag) => makeElement(doc, tag),
+    createTextNode: (text) => ({ textContent: String(text), children: [], parentNode: null }),
     querySelector: () => null,
     querySelectorAll: () => [],
     addEventListener() {},
@@ -395,6 +396,31 @@ console.log("8. structure: no stop control; white install button glyph");
     /\.btn\.install \{ color: #fff; \}/.test(html));
   check("install button gets a light-mode backing disc",
     /\(prefers-color-scheme: light\)\s*\{\s*\.btn\.install \{ background: rgba\(29, 36, 48, 0\.32\); \}/.test(html));
+}
+
+console.log("9. versions table renders hostile version names as inert text");
+{
+  const EVIL = "<img src=x onerror=alert(1)>";
+  const h = boot({ invokeImpl: function (cmd) {
+    if (cmd === "get_status") return { phase: "stopped", version: "x", port: 3081, host: "127.0.0.1",
+      versions: [], installedVersions: ["0.1.1-rc.1", EVIL], activeVersion: "0.1.1-rc.1",
+      latestRemote: null };
+    if (cmd === "tail_logs") return "";
+    return {};
+  } });
+  await settle();
+  check("no init-time crash with hostile version name", h.error === null, h.error && String(h.error));
+  const tbody = h.doc.getElementById("ver-tbody");
+  const texts = [];
+  (function walk(el) {
+    if (el.textContent) texts.push(String(el.textContent));
+    (el.children || []).forEach(walk);
+  })(tbody);
+  check("hostile version name present as text", texts.some(function (t) { return t.indexOf(EVIL) !== -1; }),
+    texts.join("|").slice(0, 200));
+  check("no innerHTML sink interpolates a version variable",
+    !/\.innerHTML\s*=[^;]*\+\s*v\b/.test(html));
+  h.restore();
 }
 
 console.log("");

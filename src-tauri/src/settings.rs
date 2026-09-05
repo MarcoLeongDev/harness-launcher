@@ -5,12 +5,13 @@ use std::path::PathBuf;
 
 pub const DEFAULT_PORT: u16 = 3080;
 
+/// launcher.log rotates at 1 MB (SN10): it previously grew without bound.
+pub const LAUNCHER_LOG_MAX_BYTES: u64 = 1024 * 1024;
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(default)]
 pub struct Settings {
     pub port: u16,
-    pub auto_update_harness: bool,
-    pub auto_update_interval_hours: u64,
     pub include_prerelease: bool,
     pub update_endpoint: Option<String>,
     pub current_version: Option<String>,
@@ -24,8 +25,6 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             port: DEFAULT_PORT,
-            auto_update_harness: true,
-            auto_update_interval_hours: 6,
             include_prerelease: false,
             update_endpoint: None,
             current_version: None,
@@ -63,6 +62,11 @@ pub fn log(data_dir: &PathBuf, line: &str) {
     let dir = data_dir.join("logs");
     let _ = fs::create_dir_all(&dir);
     let path = dir.join("launcher.log");
+    if let Ok(meta) = fs::metadata(&path) {
+        if meta.len() > LAUNCHER_LOG_MAX_BYTES {
+            let _ = fs::rename(&path, path.with_extension("log.1"));
+        }
+    }
     if let Ok(mut f) = fs::OpenOptions::new().create(true).append(true).open(&path) {
         use std::io::Write;
         let _ = writeln!(f, "{}", timestamp());
@@ -85,9 +89,7 @@ mod tests {
     fn defaults_are_sane() {
         let s = Settings::default();
         assert_eq!(s.port, DEFAULT_PORT);
-        assert!(s.auto_update_harness);
         assert!(s.start_on_launch);
-        assert_eq!(s.auto_update_interval_hours, 6);
         assert!(!s.include_prerelease);
         assert!(s.current_version.is_none());
     }
@@ -117,6 +119,21 @@ mod tests {
         let _ = std::fs::write(settings_path(&dir), "{ not json !!!").unwrap();
         let s = load(&dir);
         assert_eq!(s.port, DEFAULT_PORT);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn launcher_log_rotates() {
+        let dir = std::env::temp_dir().join(format!("dsh-settings-logrot-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(dir.join("logs"));
+        // Pre-fill past the cap, then log once: the old file must move aside.
+        let big = "x".repeat((LAUNCHER_LOG_MAX_BYTES + 1024) as usize);
+        std::fs::write(dir.join("logs").join("launcher.log"), big).unwrap();
+        log(&dir, "after rotation");
+        assert!(dir.join("logs").join("launcher.log.1").exists());
+        let cur = std::fs::read_to_string(dir.join("logs").join("launcher.log")).unwrap();
+        assert!(cur.contains("after rotation"), "{cur}");
+        assert!((cur.len() as u64) < LAUNCHER_LOG_MAX_BYTES);
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

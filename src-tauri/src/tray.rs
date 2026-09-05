@@ -100,20 +100,20 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
             "stop" => {
                 let handle = app.clone();
                 tauri::async_runtime::spawn(async move {
-                    let _ = crate::commands::engine_stop(handle);
+                    let _ = crate::commands::stop_engine_now(&handle);
                 });
             }
             "restart" => {
                 let handle = app.clone();
                 tauri::async_runtime::spawn(async move {
-                    let _ = crate::commands::engine_restart(handle).await;
+                    let _ = crate::commands::restart_engine_now(handle).await;
                 });
             }
             "browser" => {
                 let _ = crate::commands::open_in_browser(app.clone());
             }
             "quit" => {
-                let _ = crate::commands::quit_app(app.clone());
+                crate::commands::quit_app_now(app);
             }
             _ => {}
         })

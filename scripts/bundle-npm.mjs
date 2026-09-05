@@ -4,29 +4,59 @@
 // machine's npm (arborist) and ship node_modules/npm as the vendored root.
 // NOTE: the build sandbox no-ops whole-tree cp/rename, so the final copy
 // is a manual per-file write.
+//
+// Supply-chain policy (SN3): the npm version is PINNED together with the
+// registry integrity hash below; the tarball bytes are verified BEFORE
+// extraction and the build FAILS CLOSED on mismatch. Bumping the version
+// REQUIRES updating both constants from the packument
+// (https://registry.npmjs.org/npm/<version> -> dist.integrity).
+// DSH_NPM_VERSION override is verified against that version's packument
+// instead (transport trust only — prefer pinning).
 import { createWriteStream } from "node:fs";
 import { mkdir, readFile, writeFile, rm, access, chmod, readdir } from "node:fs/promises";
 import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
+import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { gunzipSync } from "node:zlib";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const NPM_VERSION = process.env.DSH_NPM_VERSION ?? (async () => {
-  const res = await fetch("https://registry.npmjs.org/-/package/npm/dist-tags");
-  if (!res.ok) throw new Error("cannot resolve npm dist-tags: " + res.status);
-  return (await res.json()).latest;
-})();
+const PINNED_NPM_VERSION = "12.0.2";
+const PINNED_NPM_INTEGRITY = "sha512-uIXokLlBj6FpNUTQX1PmT5pz7BlIN9QlixX+zdaSNHsd0qUXsbDLr50xzY6Sw7cJVr0uzHKDOle0swmPW/p5Qw==";
+const NPM_VERSION = process.env.DSH_NPM_VERSION ?? PINNED_NPM_VERSION;
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const destDir = path.join(root, "src-tauri", "resources", "npm");
 const marker = path.join(destDir, ".version");
 
 async function exists(p) { try { await access(p); return true; } catch { return false; } }
 
-const version = await NPM_VERSION;
+const version = NPM_VERSION;
 console.log("[bundle-npm] vendoring npm@" + version);
-if (await exists(marker)) {
+
+/// Expected tarball integrity: the repo pin, or the version's packument
+/// dist.integrity for overrides (fail closed when unreachable).
+async function expectedIntegrity(ver) {
+  if (ver === PINNED_NPM_VERSION) return PINNED_NPM_INTEGRITY;
+  console.log("[bundle-npm] non-pinned version", ver, "— verifying against packument integrity");
+  const res = await fetch("https://registry.npmjs.org/npm/" + encodeURIComponent(ver));
+  if (!res.ok) throw new Error("cannot fetch packument for npm@" + ver + ": " + res.status);
+  const integrity = (await res.json())?.dist?.integrity;
+  if (typeof integrity !== "string" || !integrity.startsWith("sha512-")) {
+    throw new Error("no sha512 integrity in packument for npm@" + ver);
+  }
+  return integrity;
+}
+
+function verifyIntegrity(buf, integrity) {
+  const m = /^(sha512)-(.+)$/.exec(integrity);
+  if (!m) throw new Error("unsupported integrity format: " + integrity);
+  const got = createHash("sha512").update(buf).digest("base64");
+  if (got !== m[2]) throw new Error("[bundle-npm] CHECKSUM MISMATCH for npm-" + version + ".tgz");
+  console.log("[bundle-npm] checksum OK (sha512:" + got.slice(0, 16) + "…)");
+}
+
+if (!process.argv.includes("--force") && await exists(marker)) {
   const cur = (await readFile(marker, "utf8")).trim();
   if (cur === version) { console.log("[bundle-npm] vendored npm", version, "already present"); process.exit(0); }
   console.log("[bundle-npm] version changed, re-vendoring");
@@ -61,6 +91,7 @@ async function vendoring(version) {
   if (!res.ok) throw new Error("npm tarball fetch failed: " + res.status);
   const tgz = path.join(stage, ".npm.tgz");
   await pipeline(Readable.fromWeb(res.body), createWriteStream(tgz));
+  verifyIntegrity(await readFile(tgz), await expectedIntegrity(version));
 
   const unpack = path.join(stage, "unpack");
   await mkdir(unpack, { recursive: true });

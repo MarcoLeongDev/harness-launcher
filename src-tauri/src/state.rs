@@ -33,6 +33,11 @@ pub struct AppState {
     pub tray_state: Mutex<Option<crate::tray::TrayState>>,
     /// Cached remote version list to avoid spawning npm every 3 s.
     pub version_cache: Mutex<VersionCache>,
+    /// Serializes version-set mutations (install/switch/download/rollback/
+    /// set/delete) so concurrent operations cannot interleave directory,
+    /// engine or settings changes (SN12). Held only by the outermost IPC
+    /// entry bodies — never nested — so queued operations simply wait.
+    pub version_mutation: Mutex<()>,
 }
 
 pub struct VersionCache {
@@ -65,6 +70,7 @@ impl Default for AppState {
             console: Mutex::new(VecDeque::new()),
                 tray_state: Mutex::new(None),
             version_cache: Mutex::new(VersionCache::default()),
+            version_mutation: Mutex::new(()),
         }
     }
 }
@@ -94,4 +100,36 @@ pub fn update_settings(app: &tauri::AppHandle, mutate: impl FnOnce(&mut Settings
 
 pub fn active_version(app: &tauri::AppHandle) -> Option<String> {
     read_settings(app).current_version
+}
+
+#[cfg(test)]
+mod tests {
+    use super::AppState;
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    #[test]
+    fn version_mutation_lock_excludes_concurrent_holders() {
+        let state = Arc::new(AppState::default());
+        let counter = Arc::new(AtomicUsize::new(0));
+        let max_seen = Arc::new(AtomicUsize::new(0));
+        let mut handles = Vec::new();
+        for _ in 0..8 {
+            let (s, c, m) = (state.clone(), counter.clone(), max_seen.clone());
+            handles.push(std::thread::spawn(move || {
+                for _ in 0..50 {
+                    let _guard = s.version_mutation.lock().unwrap();
+                    let n = c.fetch_add(1, Ordering::SeqCst) + 1;
+                    m.fetch_max(n, Ordering::SeqCst);
+                    std::thread::yield_now();
+                    let left = c.fetch_sub(1, Ordering::SeqCst) - 1;
+                    assert_eq!(left, 0, "two mutation bodies overlapped");
+                }
+            }));
+        }
+        for h in handles {
+            h.join().unwrap();
+        }
+        assert_eq!(max_seen.load(Ordering::SeqCst), 1);
+    }
 }
