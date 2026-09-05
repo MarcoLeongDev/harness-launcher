@@ -198,6 +198,11 @@ fn switch_running_feedback(version: &str, port: u16) -> String {
 /// never has to stop the engine by hand. When stopped, switching only records
 /// the default (it never auto-starts).
 fn switch_version_inner(app: &AppHandle, version: &str, op: &str) -> Result<String, String> {
+    // Defense in depth: install_version re-validates, but reject here before
+    // stopping a running engine for a bogus version.
+    if !versions::is_valid_version_name(version) {
+        return Err(format!("invalid version name: {version}"));
+    }
     ensure_runtime_dirs(app).map_err(|e| format!("runtime dirs: {e}"))?;
     let st = app.state::<AppState>();
     let was_running = st.runtime.is_running();
@@ -370,6 +375,9 @@ pub async fn get_status(app: AppHandle) -> Result<StatusPayload, String> {
 
 #[tauri::command]
 pub async fn install_and_switch(app: AppHandle, version: String) -> Result<String, String> {
+    if !versions::is_valid_version_name(&version) {
+        return Err(format!("invalid version name: {version}"));
+    }
     let op = progress::op_key("switch", Some(&version));
     tauri::async_runtime::spawn_blocking(move || {
         with_progress_cleanup(&app, &op, || switch_version_inner(&app, &version, &op))
@@ -441,6 +449,11 @@ pub async fn rollback(app: AppHandle) -> Result<String, String> {
         let previous = state::read_settings(&app)
             .previous_version
             .ok_or_else(|| "no previous version to roll back to".to_string())?;
+        // `previous_version` is persisted state (user-writable file): validate
+        // before it becomes a path or npm spec.
+        if !versions::is_valid_version_name(&previous) {
+            return Err(format!("invalid version name: {previous}"));
+        }
         let op = progress::op_key("rollback", Some(&previous));
         with_progress_cleanup(&app, &op, || {
             let rd = state::runtime_dir(&app);
@@ -717,6 +730,9 @@ pub fn open_settings(app: AppHandle) -> Result<String, String> {
 pub async fn set_version(app: AppHandle, version: String) -> Result<String, String> {
     // Async: selecting a version that is not installed yet shells out to npm
     // (install) and must never block the main thread.
+    if !versions::is_valid_version_name(&version) {
+        return Err(format!("invalid version name: {version}"));
+    }
     tauri::async_runtime::spawn_blocking(move || {
         let rd = state::runtime_dir(&app);
         ensure_runtime_dirs(&app).map_err(|e| format!("runtime dirs: {e}"))?;
@@ -751,6 +767,11 @@ pub fn open_harness_window(app: AppHandle) -> Result<String, String> {
 /// version that is currently active or running in the engine.
 #[tauri::command]
 pub async fn delete_version(app: AppHandle, version: String) -> Result<String, String> {
+    // Validate BEFORE resolving the path: this ends in remove_dir_all, so a
+    // traversal name must never reach version_dir.
+    if !versions::is_valid_version_name(&version) {
+        return Err(format!("invalid version name: {version}"));
+    }
     tauri::async_runtime::spawn_blocking(move || {
         let rd = state::runtime_dir(&app);
         let dir = versions::version_dir(&rd, &version);

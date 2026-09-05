@@ -239,6 +239,34 @@ mod name_tests {
         assert!(!is_valid_version_name("has space"));
         assert!(!is_valid_version_name(&"x".repeat(65)));
     }
+
+    #[test]
+    fn rejects_registry_shaped_attack_strings() {
+        // Values a compromised registry (or a crafted settings.json) could
+        // feed into install/switch/rollback paths.
+        for evil in [
+            "@deepseek-ai/dsh@9.9.9",
+            "1.2.3 --ignore-scripts=false",
+            "1.2.3; rm -rf ~",
+            "1.2.3$(id)",
+            "1.2.3`id`",
+            "..\\..\\evil",
+            "v1.2.3/../../evil",
+        ] {
+            assert!(!is_valid_version_name(evil), "{evil}");
+        }
+    }
+
+    #[test]
+    fn validated_names_stay_inside_versions_dir() {
+        use super::version_dir;
+        let base = std::path::Path::new("/tmp/rd");
+        let parent = base.join("versions");
+        for good in ["0.1.29", "0.1.2-alpha.3", "0.1.0-rc.7", "v1.2.3+build.4_meta~x"] {
+            assert!(is_valid_version_name(good));
+            assert!(version_dir(base, good).starts_with(&parent), "{good}");
+        }
+    }
 }
 
 pub fn harness_entry(runtime_dir: &Path, version: &str) -> Option<PathBuf> {
@@ -256,6 +284,13 @@ pub fn install_version(
     version: &str,
     op: &str,
 ) -> Result<(), String> {
+    // Choke point: every install/switch/update/boot path funnels through here,
+    // so a single gate covers registry-supplied and caller-supplied names.
+    // Without this, `runtime/versions/<version>` could escape its parent and
+    // the npm spec `@deepseek-ai/dsh@<version>` could be attacker-shaped.
+    if !is_valid_version_name(version) {
+        return Err(format!("invalid version name: {version}"));
+    }
     if is_installed(runtime_dir, version) {
         return Ok(());
     }
