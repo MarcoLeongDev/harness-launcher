@@ -17,6 +17,6 @@
 - [x] 3.4 Verify; bump to 0.1.53
 
 ## 4. Build, deploy & verify
-- [ ] 4.1 Tests + syntax + ID checks
-- [ ] 4.2 Release build + deploy to /Applications
-- [ ] 4.3 Relaunch, confirm version live; keep the app running
+- [x] 4.1 Tests + syntax + ID checks
+- [x] 4.2 Release build + deploy to /Applications
+- [x] 4.3 Relaunch, confirm version live; keep the app running
