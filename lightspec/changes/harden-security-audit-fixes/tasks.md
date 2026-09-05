@@ -23,10 +23,10 @@
 - [x] 4.3 Commit (no rebuild needed unless toolchain changes)
 
 ## 5. Token redaction — SN9 (v0.1.68)
-- [ ] 5.1 Never log launch-token URLs; centralize redaction in `tail_logs`
-- [ ] 5.2 Overlay log viewer redacts like the Control Panel
-- [ ] 5.3 cargo test; bump to 0.1.68
-- [ ] 5.4 Commit, release build, deploy, relaunch, verify
+- [x] 5.1 Never log launch-token URLs; centralize redaction in `tail_logs`
+- [x] 5.2 Overlay log viewer redacts like the Control Panel
+- [x] 5.3 cargo test; bump to 0.1.68
+- [x] 5.4 Commit, release build, deploy, relaunch, verify
 
 ## 6. Log bounds — SN10 (v0.1.69)
 - [ ] 6.1 Clamp `tail_logs` line count; rotate `launcher.log`
