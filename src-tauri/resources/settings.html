@@ -35,7 +35,6 @@
     .switch input:checked + .slider { background: var(--ok); }
     input[type=number], select { background: rgba(255,255,255,0.85); }
     .pop { background: #ffffff; box-shadow: 0 12px 32px rgba(0,0,0,0.18); }
-    .tab[aria-selected="true"] { box-shadow: inset 0 -1px 0 rgba(0,0,0,0.12); }
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; }
@@ -79,23 +78,33 @@
   .pill i.ok { background: var(--ok); box-shadow: 0 0 8px rgba(48,209,88,0.9); }
   .pill i.stop { background: var(--faint); }
   .pill i.err { background: var(--err); }
-  /* tabs */
-  nav.tabs { display: flex; gap: 4px; padding: 6px 22px; margin: 0 auto; width: 100%; max-width: 640px; }
-  .tab { display: inline-flex; align-items: center; justify-content: center; gap: 7px; flex: 1;
-    padding: 8px 10px; border-radius: 9px; border: 1px solid transparent; background: transparent;
-    color: var(--dim); font-size: 12.5px; font-weight: 550; cursor: pointer; transition: all .15s; }
-  .tab:hover { color: var(--text); background: var(--cell); }
-  .tab[aria-selected="true"] { color: var(--text); background: var(--cell);
-    border-color: var(--hair); box-shadow: inset 0 -1px 0 rgba(255,255,255,0.12); }
-  .tab svg { width: 15px; height: 15px; }
   main { flex: 1; min-height: 0; padding: 12px 22px 24px; margin: 0 auto; width: 100%;
     max-width: 640px; display: flex; flex-direction: column; overflow: hidden; }
   .tabpanel { display: none; flex-direction: column; gap: 14px;
     flex: 1; min-height: 0; overflow: auto; }
   .tabpanel.active { display: flex; }
-  /* The Logs tab manages its own height: the log fills the panel and scrolls
-     internally — the window itself never scrolls for this tab. */
-  #tab-logs.active { overflow: hidden; }
+  /* Log drawer: an in-flow bottom drawer of the merged panel, hidden by
+     default; the bottom-left circular button toggles it. When open it takes
+     a fixed band at the bottom of the window and the panel scrolls above. */
+  .log-drawer { display: none; flex: none; border-top: 1px solid var(--hair2);
+    background: var(--bg2); }
+  .log-drawer.open { display: flex; flex-direction: column; height: 250px;
+    animation: drawer-in .18s ease-out both; }
+  @keyframes drawer-in { from { opacity: 0; transform: translateY(10px); } }
+  @media (prefers-reduced-motion: reduce) { .log-drawer.open { animation: none; } }
+  /* Log toggle: circle button, image only — no background or border (only a
+     hover background), pinned bottom-left of the window. aria-pressed shows
+     the toggled (open) state. */
+  .log-toggle { position: fixed; left: 14px; bottom: 14px; z-index: 30;
+    width: 34px; height: 34px; border-radius: 50%; border: none; padding: 0;
+    background: transparent; color: var(--dim); cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: background .15s, color .15s; }
+  .log-toggle:hover { background: var(--cell-hover); color: var(--accent2); }
+  .log-toggle:active { transform: translateY(1px); }
+  .log-toggle:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
+  .log-toggle[aria-pressed="true"] { color: var(--accent2); }
+  .log-toggle svg { width: 17px; height: 17px; }
   /* grouped macOS-style rows */
   .group { background: var(--cell); border: 1px solid var(--hair); border-radius: var(--radius);
     overflow: visible; backdrop-filter: blur(8px); }
@@ -342,21 +351,11 @@
   <button class="hdr-quit" id="btn-quit" title="Quit"><i class="ico sm bi" data-ico="power"></i></button>
 </header>
 
-<nav class="tabs" role="tablist" aria-label="Sections">
-  <button class="tab" role="tab" id="tab-btn-engine" aria-selected="true" aria-controls="tab-engine">
-    <i class="ico sm bi" data-ico="cpu"></i> Engine
-  </button>
-  <button class="tab" role="tab" id="tab-btn-versions" aria-selected="false" aria-controls="tab-versions">
-    <i class="ico sm bi" data-ico="hdd-stack"></i> Versions
-  </button>
-  <button class="tab" role="tab" id="tab-btn-logs" aria-selected="false" aria-controls="tab-logs">
-    <i class="ico sm bi" data-ico="journal-text"></i> Logs
-  </button>
-</nav>
-
+<!-- Single merged view: Engine + Versions (no tab bar; the log lives in a
+     bottom drawer toggled by the bottom-left button). -->
 <main>
   <!-- ============ ENGINE ============ -->
-  <section class="tabpanel active" id="tab-engine" role="tabpanel" aria-labelledby="tab-btn-engine">
+  <section class="tabpanel active" id="tab-main" role="tabpanel">
     <div class="group">
       <div class="ec-row">
         <div class="ec-status-icon stopped" id="st-icon" aria-label="Engine status">
@@ -379,9 +378,8 @@
         </div>
       </div>
     </div>
-  </section>
 
-  <section class="tabpanel" id="tab-versions" role="tabpanel" aria-labelledby="tab-btn-versions" hidden>
+    <!-- Update banner (versions flow) sits right under the engine card -->
     <div class="group" id="update-banner" style="display:none">
       <div class="cell">
         <i class="ico sm bi" style="color:var(--accent2)" data-ico="cloud-arrow-down-fill"></i>
@@ -400,8 +398,8 @@
           <i class="ico sm bi" data-ico="cloud-arrow-down-fill"></i>
         </button>
       </div>
-      <!-- Result / progress notifications for this tab live in the terminal
-           cell at the end of the installed-versions table above. -->
+      <!-- Result / progress notifications for this panel live in the
+           terminal cells at the end of the installed-versions table above. -->
     </div>
 
     <!-- Section 2: the installed-version table -->
@@ -414,27 +412,32 @@
           <span class="vc-acts">Actions</span>
         </div>
         <div id="ver-tbody"></div>
-        <!-- Operation feeds: notifications for this tab (progress messages,
-             npm output, result/error lines) render here as the last cell of
-             the table section. One REUSABLE feed component per operation —
-             parallel downloads each get their own terminal (head + output +
-             circular stop button overlay) instead of fighting over one div. -->
+        <!-- Operation feeds: notifications (progress messages, npm output,
+             result/error lines) render here as the last cell of the table
+             section. One REUSABLE feed per operation — parallel downloads
+             each get their own terminal (head + output + circular stop
+             button overlay) instead of fighting over one div. -->
         <div id="op-feeds"></div>
       </div>
     </div>
   </section>
 
-
-  <!-- ============ LOGS ============ -->
-  <section class="tabpanel" id="tab-logs" role="tabpanel" aria-labelledby="tab-btn-logs" hidden>
-    <div class="group log-group">
+  <!-- ============ LOG DRAWER (hidden by default; toggled by the bottom-left button) ============ -->
+  <div class="log-drawer" id="log-drawer" hidden>
+    <div class="log-group">
       <div class="log-wrap">
         <pre class="log-view terminal" id="log-tail">No output yet</pre>
         <button class="log-overlay bottom pressed" id="btn-log-follow" title="Go to last line" aria-pressed="true"><i class="ico sm bi" data-ico="arrow-down-circle-fill"></i></button>
       </div>
     </div>
-  </section>
+  </div>
 </main>
+
+<!-- Log visibility toggle: circular borderless button pinned bottom-left.
+     Image only — no background or border except while hovered. -->
+<button class="log-toggle" id="btn-log-toggle" type="button" aria-pressed="false" aria-controls="log-drawer" title="Show log">
+  <i class="ico sm bi" data-ico="journal-text"></i>
+</button>
 
 <script>
 (function () {
@@ -496,6 +499,7 @@
     verTbody: $('ver-tbody'),
     feedsBox: $('op-feeds'),
     logFollow: $('btn-log-follow'), logTail: $('log-tail'),
+    logToggle: $('btn-log-toggle'), logDrawer: $('log-drawer'),
     banner: $('update-banner'), bannerText: $('update-banner-text'), bannerBtn: $('btn-banner-update'),
     appVer: $('app-ver'), dshVer: $('dsh-ver'),
     browser: $('btn-open'), quit: $('btn-quit')
@@ -505,25 +509,9 @@
   var lastPhase = 'stopped';
 
 
-  // ---------- tabs ----------
-  var tabs = ['engine', 'versions', 'logs'];
-  function selectTab(name) {
-    tabs.forEach(function (t) {
-      var btn = $('tab-btn-' + t), panel = $('tab-' + t), on = t === name;
-      btn.setAttribute('aria-selected', on ? 'true' : 'false');
-      if (on) { panel.classList.add('active'); panel.hidden = false; }
-      else { panel.classList.remove('active'); panel.hidden = true; }
-    });
-  }
-  tabs.forEach(function (t) { $('tab-btn-' + t).addEventListener('click', function () { selectTab(t); }); });
-  document.addEventListener('keydown', function (e) {
-    if (!e.target.closest || !e.target.closest('.tab')) return;
-    var idx = tabs.indexOf(e.target.id.replace('tab-btn-', ''));
-    if (idx === -1 || (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft')) return;
-    e.preventDefault();
-    var next = (idx + (e.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
-    selectTab(tabs[next]); $('tab-btn-' + tabs[next]).focus();
-  });
+  // ---------- merged single view ----------
+  // Engine + Versions are one panel with no tab bar; the log lives in a
+  // bottom drawer toggled by the bottom-left button below.
 
   // ---------- operation feed (terminal cell of the versions table) ----------
   function fmtTime(secs) {
@@ -1024,6 +1012,16 @@
 
 
   // logs
+  // Log drawer toggle: bottom-left circular image-only button. The drawer is
+  // hidden by default; the button shows/hides it (aria-pressed tracks state).
+  sel.logToggle.addEventListener('click', function () {
+    var open = sel.logDrawer.hidden;
+    sel.logDrawer.hidden = !open;
+    sel.logDrawer.classList.toggle('open', open);
+    sel.logToggle.setAttribute('aria-pressed', open ? 'true' : 'false');
+    sel.logToggle.title = open ? 'Hide log' : 'Show log';
+    if (open) refreshLog();
+  });
   // Go to last line: jump to the end of the log and keep following it.
   sel.logFollow.addEventListener('click', function () {
     followOn = true;
