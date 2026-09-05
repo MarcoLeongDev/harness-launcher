@@ -33,7 +33,11 @@
     "resources": [
       "resources/tray",
       "resources/npm",
-      "resources/bootstrap-icons"
+      "resources/bootstrap-icons",
+      "resources/brand",
+      "resources/settings.html",
+      "resources/overlay.js",
+      "resources/stopped.html"
     ],
     "macOS": {
       "minimumSystemVersion": "11.0"
