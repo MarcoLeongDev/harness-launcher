@@ -5,16 +5,16 @@
 - [x] 1.4 cargo test; verify; bump to 0.1.51
 
 ## 2. Control panel: merge Engine + Versions (v0.1.52)
-- [ ] 2.1 Merged default section: engine table cell, then Install version, then version table
-- [ ] 2.2 Remove separate Engine/Versions/Logs tab bar; merged view is the default
-- [ ] 2.3 Keep update banner and operation feeds behaviour intact
-- [ ] 2.4 Verify; bump to 0.1.52
+- [x] 2.1 Merged default section: engine table cell, then Install version, then version table
+- [x] 2.2 Remove separate Engine/Versions/Logs tab bar; merged view is the default
+- [x] 2.3 Keep update banner and operation feeds behaviour intact
+- [x] 2.4 Verify; bump to 0.1.52
 
 ## 3. Log toggle button (v0.1.53)
-- [ ] 3.1 Bottom-left circular icon-only toggle (log icon, no bg/border except hover)
-- [ ] 3.2 Log pane hidden by default; button toggles show/hide
-- [ ] 3.3 Accessibility (aria-pressed/expanded), keyboard support
-- [ ] 3.4 Verify; bump to 0.1.53
+- [x] 3.1 Bottom-left circular icon-only toggle (log icon, no bg/border except hover)
+- [x] 3.2 Log pane hidden by default; button toggles show/hide
+- [x] 3.3 Accessibility (aria-pressed/expanded), keyboard support
+- [x] 3.4 Verify; bump to 0.1.53
 
 ## 4. Build, deploy & verify
 - [ ] 4.1 Tests + syntax + ID checks
