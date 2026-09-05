@@ -40,9 +40,9 @@
 - [x] 7.4 Commit, release build, deploy, relaunch, verify
 
 ## 8. Version-mutation serialization — SN12 (v0.1.71)
-- [ ] 8.1 Serialize install/switch/delete/rollback mutations
-- [ ] 8.2 cargo test; bump to 0.1.71
-- [ ] 8.3 Commit, release build, deploy, relaunch, verify
+- [x] 8.1 Serialize install/switch/delete/rollback mutations
+- [x] 8.2 cargo test; bump to 0.1.71
+- [x] 8.3 Commit, release build, deploy, relaunch, verify
 
 ## 9. Release hygiene — SN13 (v0.1.72)
 - [ ] 9.1 CHANGELOG.md; README/SECURITY release notes touch-up
