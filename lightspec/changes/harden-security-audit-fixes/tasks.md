@@ -5,10 +5,10 @@
 - [x] 1.4 Commit, release build, deploy, relaunch, verify
 
 ## 2. Delete-popover XSS fix — SN5 (v0.1.65)
-- [ ] 2.1 Rebuild delete-confirm popover with DOM/`textContent` (no version string in `innerHTML`)
-- [ ] 2.2 Audit remaining `innerHTML` sinks in settings.html/overlay.js
-- [ ] 2.3 Panel feed test; bump to 0.1.65
-- [ ] 2.4 Commit, release build, deploy, relaunch, verify
+- [x] 2.1 Rebuild delete-confirm popover with DOM/`textContent` (no version string in `innerHTML`)
+- [x] 2.2 Audit remaining `innerHTML` sinks in settings.html/overlay.js
+- [x] 2.3 Panel feed test; bump to 0.1.65
+- [x] 2.4 Commit, release build, deploy, relaunch, verify
 
 ## 3. Capability split + CSP + force-stop hardening — SN1+SN6+SN7 (v0.1.66)
 - [ ] 3.1 Per-window capabilities (main: status/events only; settings: full)
