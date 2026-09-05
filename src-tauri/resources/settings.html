@@ -291,7 +291,8 @@
     .btn.del:hover { background: var(--err); }
   }
   .vc-def { width: 64px; flex: none; display: flex; align-items: center; justify-content: center; }
-  /* custom radio for the "Default" (active) version selector */
+  /* custom radio for the "Active" version selector (the radio makes this
+     version the active engine version) */
   .vc-radio { appearance: none; -webkit-appearance: none; width: 16px; height: 16px;
     border: 1.5px solid var(--hair2); border-radius: 50%; background: transparent;
     cursor: pointer; position: relative; transition: border-color .15s, background .15s; flex: none; }
@@ -303,7 +304,7 @@
   .vc-radio:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
   /* Install row: the persistent LAST row of the versions table — the
      published-version dropdown sits in the Version column and the
-     cloud-download install button in the Actions column; the Default and
+     cloud-download install button in the Actions column; the Active and
      Directory cells stay empty. */
   .vc-ver-install { display: flex; }
   .vc-ver-install select { width: 100%; max-width: 240px; }
@@ -399,7 +400,7 @@
     </div>
 
     <!-- The installed-versions table. Installation is merged into the table:
-         the header is Default | Version | Directory | Actions, installed
+         the header is Active | Version | Directory | Actions, installed
          versions occupy the middle rows (radio | version | open-directory |
          delete), and the LAST row is always the install row — empty | dropdown
          | empty | cloud-download. The standalone "Install version" group is
@@ -408,14 +409,14 @@
     <div class="group">
       <div class="vtable">
         <div class="vrow vhead-row">
-          <span class="vc-def" title="Default version">Default</span>
+          <span class="vc-def" title="Active version">Active</span>
           <span class="vc-ver">Version</span>
           <span class="vc-dir" title="Open the version directory">Directory</span>
           <span class="vc-acts">Actions</span>
         </div>
         <div id="ver-tbody"></div>
         <!-- Install row: the persistent LAST row of the table. Empty
-             Default/Directory cells keep the columns aligned with the rows
+             Active/Directory cells keep the columns aligned with the rows
              above; the button downloads the selected version without touching
              the running engine (switching stays on the radio / engine card). -->
         <div class="vrow vinstall-row">
@@ -730,16 +731,16 @@
       row.className = 'vrow';
       var isActive = s.activeVersion === v;
 
-      // Default column: a radio that selects this version as the active one.
+      // Active column: a radio that selects this version as the active one.
       var defCell = document.createElement('span');
       defCell.className = 'vc-def';
       var radio = document.createElement('input');
       radio.type = 'radio';
-      radio.name = 'dsh-default-version';
+      radio.name = 'dsh-active-version';
       radio.className = 'vc-radio';
       radio.checked = isActive;
       radio.disabled = isActive || !!s.currentOp;
-      radio.title = isActive ? 'This is the default version' : 'Make v' + v + ' the default version';
+      radio.title = isActive ? 'This is the active version' : 'Make v' + v + ' the active version';
       radio.addEventListener('change', function () {
         if (radio.checked && !isActive) {
           withCmd(function () { return invoke('install_and_switch', { version: v }); }, 'Switched');
@@ -1025,7 +1026,7 @@
   sel.btnInstall.addEventListener('click', function () {
     var v = sel.installSel.value;
     if (!v) return;
-    // Download only: never switches the default version and never touches a
+    // Download only: never switches the active version and never touches a
     // running engine — downloading works while the engine runs. Switching is
     // the versions-table radio / engine-card dropdown.
     withCmd(function () { return invoke('download_version', { version: v }); }, 'Downloaded');
