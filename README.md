@@ -5,29 +5,23 @@
 </p>
 
 <h3 align="center">
-  Run, manage and version the <a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a> engine — no browser, no terminal, no fuss.
+  Run, manage and version the DeepSeek Harness engine — no browser, no terminal, no fuss.
 </h3>
 
 <p align="center">
-  <a href="#features"><img src="https://img.shields.io/badge/platform-macOS-333333?logo=apple&logoColor=white" alt="Platform: macOS" /></a>
+  <img src="https://img.shields.io/badge/platform-macOS%2011%2B%20(Apple%20Silicon)-333333?logo=apple&logoColor=white" alt="Platform: macOS 11+" />
   <a href="https://tauri.app"><img src="https://img.shields.io/badge/built%20with-Tauri%202-24c8db?logo=tauri&logoColor=white" alt="Built with Tauri 2" /></a>
-  <a href="https://github.com/deepseek-ai/deepseek-harness"><img src="https://img.shields.io/badge/manages-DeepSeek%20Harness-4f46e5" alt="Manages DeepSeek Harness" /></a>
   <img src="https://img.shields.io/badge/productivity-menubar%20app-22c55e" alt="Menubar app" />
   <img src="https://img.shields.io/badge/license-MIT-3b82f6" alt="License: MIT" />
-</p>
-
-<p align="center">
-  <img src="logo/Screenshot.png" alt="DeepSeek Harness Launcher screenshot" width="820" />
 </p>
 
 ---
 
 **DeepSeek Harness Launcher** is a polished macOS menubar app that wraps the
-[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (`dsh`) in a
-self-contained Tauri shell. It encapsulates all the complexity of running an AI
-harness engine: install, update, switch versions, start, stop — everything a
-harness developer needs, without ever touching a terminal or keeping a
-browser tab open.
+DeepSeek Harness (`dsh`) engine in a self-contained Tauri shell. It
+encapsulates all the complexity of running an AI harness engine: install,
+update, switch versions, start, stop — everything a harness developer needs,
+without ever touching a terminal or keeping a browser tab open.
 
 > **The engine runs in the background.** The launcher installs and manages the
 > harness inside the app (bundled Node runtime + vendored npm), serves the
@@ -39,22 +33,25 @@ browser tab open.
 | | |
 |---|---|
 | 🚀 **Engine lifecycle** | Start / Stop / Restart / Force-Restart the background harness right from the menu bar, the floating in-page panel, or the Control Panel window. |
-| 📦 **Version management** | Install & switch between any published `dsh` version, **update to latest**, or **roll back** to the previously installed version — each in its own isolated install, offline-safe. |
-| 🖥️ **Live download terminal** | While a version is downloading you see the real `npm install` output in a terminal view — with a **Stop** button to cancel the download. |
-| 🗑️ **Delete versions** | Remove installed harness versions you no longer need (the active version is protected). |
+| 📦 **Version management** | Install & switch between any published engine version with one click — the **Active** radio in the versions table picks the running version, **update to latest** and **roll back** to the previously installed version are one button each. Every version lives in its own isolated install, offline-safe. |
+| 🖥️ **Live download terminal** | While a version is downloading you see the real `npm install` output in a terminal view — each in-flight operation gets its own terminal, streams live, and dismisses itself when done (no manual cleanup, no dead controls). |
+| 🗑️ **Delete versions** | Remove installed engine versions you no longer need (the active version is protected by a confirmation popover). |
 | 🌐 **Choose your port** | Set any loopback port — the harness restarts on it and the window follows automatically, with transparent fallback if the port is busy. |
 | 🔔 **Auto-update** | Periodic harness update checks with a macOS notification (optional app self-update via the Tauri updater). |
-| 📋 **Logs** | Follow the live harness log tail straight from the Control Panel. |
+| 📋 **Logs** | Follow the live harness log tail straight from the Control Panel (toggleable bottom drawer). |
 | 🧰 **No browser needed** | The harness WebUI opens in its own app window; “Open in Browser” is available when you *do* want a tab. |
 
 ## 🖼️ What it looks like
 
 <p align="center">
-  <img src="logo/Screenshot.png" alt="Launcher main window" width="820" />
+  <img src="logo/Screenshot.png" alt="DeepSeek Harness Launcher Control Panel" width="420" />
+</p>
+<p align="center">
+  <sub>The Control Panel: engine card (version · host · port), update banner, the versions table (<b>Active</b> radio, open-directory, delete) with the install row last, and a live operation terminal below.</sub>
 </p>
 
-The **Control Panel** (tray → `Control Panel…`) aggregates engine status, version
-management, downloads (with terminal output and Stop), port configuration,
+The **Control Panel** (menu bar → `Control Panel…`) aggregates engine status,
+version management, downloads with live terminal output, port configuration,
 auto-update and logs. The **floating panel** in the bottom-left of the harness
 UI gives quick access to every control without leaving your chat.
 
@@ -79,24 +76,38 @@ npm run deploy:relaunch    # build, install, then restart the running instance
 ### Day-to-day use
 
 1. Launch **DeepSeek Harness Launcher** — it's a menubar app (no Dock icon).
-2. On first launch it installs the latest harness version in the background.
+2. On first launch it installs the latest engine version in the background.
 3. The engine starts and the harness UI opens in its own window.
 4. Use the floating **DSh panel** (bottom-left) or the **Control Panel** to
    start/stop, switch versions, watch downloads and change the port.
 
+## 🔒 Security & privacy
+
+- **Loopback only.** The engine and the launcher UI are served on
+  `127.0.0.1` — nothing is exposed to the network by the launcher.
+- **No telemetry.** The launcher collects nothing and phones nothing home;
+  all state stays under `~/Library/Application Support/ai.dsh.launcher/`.
+- **Capability-gated IPC.** The WebViews reach the Rust core through a Tauri
+  capability file with an explicit allow-list; harness-served content is
+  treated as untrusted.
+- Found a vulnerability? Please see [SECURITY.md](SECURITY.md) — do not open
+  a public issue for security problems.
+
 ## 🔧 How it works
 
-A *thin, replaceable shell*: the harness (`@deepseek-ai/dsh`) is installed,
-updated, versioned and rolled back **inside** the app with a bundled Node
-runtime and vendored npm. The Tauri binary never needs rebuilding when the
-harness releases a new version — updates happen at the click of a button.
+A *thin, replaceable shell*: the harness engine (`@deepseek-ai/dsh`) is
+installed, updated, versioned and rolled back **inside** the app with a
+bundled Node runtime and vendored npm. The Tauri binary never needs rebuilding
+when the engine releases a new version — updates happen at the click of a
+button. Redeploying or updating the launcher never touches your installed
+engine versions, settings or logs.
 
 ```
 ~/Library/Application Support/ai.dsh.launcher/
 ├── settings.json          # port, auto-update flags, start_on_launch, active/previous version
 ├── logs/launcher.log
 └── runtime/
-    ├── versions/<version>/   # one isolated npm install per harness version
+    ├── versions/<version>/   # one isolated npm install per engine version
     ├── logs/harness.log      # harness stdout/stderr (rotated @ 2MB)
     └── npm-cache/            # npm cache for the vendored npm
 ```
@@ -107,11 +118,13 @@ harness releases a new version — updates happen at the click of a button.
 cd source
 npm run assets
 npx tauri dev              # or: cargo run --manifest-path src-tauri/Cargo.toml
+npm test                   # panel/feed integration checks (scripts/test-panel-feed.mjs)
+cd src-tauri && cargo test # Rust unit tests
 ```
 
-Prerequisites: **macOS** (Apple Silicon), **Rust** stable, Xcode Command Line
-Tools, Node.js 20+ (build-time only — the app is fully self-contained at
-runtime).
+Prerequisites: **macOS 11 or later (Apple Silicon)**, Rust stable, Xcode
+Command Line Tools, Node.js 20+ (build-time only — the app is fully
+self-contained at runtime).
 
 ## 🏗️ Architecture
 
@@ -121,7 +134,8 @@ runtime).
 - `src-tauri/src/progress.rs` — `launcher://progress` / `launcher://console`
   event streams + in-flight operation state
 - `src-tauri/src/commands.rs` — IPC surface for the overlay, Control Panel
-  and tray (including `cancel_operation` and `delete_version`)
+  and tray (status, install/switch, download, update, rollback, delete,
+  port, logs, window and quit controls)
 - `src-tauri/src/window.rs` — harness window (+ injected overlay panel) and
   Control Panel window (`dsh-ui://` custom protocol)
 - `src-tauri/resources/settings.html` / `stopped.html` / `overlay.js` —
@@ -129,4 +143,5 @@ runtime).
 
 ## 📜 License
 
-MIT — see [LICENSE](LICENSE). The harness itself is a separate MIT-licensed project.
+MIT — see [LICENSE](LICENSE). The harness engine itself is a separate
+MIT-licensed project.
