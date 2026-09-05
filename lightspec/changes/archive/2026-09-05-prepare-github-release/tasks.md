@@ -14,6 +14,6 @@
 - [x] 3.1 README refresh for release (accurate commands/paths, security notes); screenshot replaced (old one showed private session content)
 - [x] 3.2 Add SECURITY.md (supported versions, how to report a vulnerability)
 - [x] 3.3 Sanitize .env.example (no local usernames); drop stale internal REPORT.md
-- [ ] 3.4 Commit; bump to 0.1.63
-- [ ] 3.5 Build, deploy, relaunch, verify; keep the app running
-- [ ] 3.6 Archive lightspec change; merge feature branch into main
+- [x] 3.4 Commit; bump to 0.1.63
+- [x] 3.5 Build, deploy, relaunch, verify; keep the app running
+- [x] 3.6 Archive lightspec change; merge feature branch into main
