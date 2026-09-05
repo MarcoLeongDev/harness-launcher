@@ -1,0 +1,13 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "settings",
+  "description": "Full capability set for the launcher-owned Control Panel window (local dsh-ui protocol only — no remote content). This is the only window authorized for version, engine-lifecycle, port and app-exit commands.",
+  "windows": [
+    "settings"
+  ],
+  "permissions": [
+    "core:default",
+    "notification:default",
+    "updater:default"
+  ]
+}
