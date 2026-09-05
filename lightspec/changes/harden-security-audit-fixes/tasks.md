@@ -29,9 +29,9 @@
 - [x] 5.4 Commit, release build, deploy, relaunch, verify
 
 ## 6. Log bounds — SN10 (v0.1.69)
-- [ ] 6.1 Clamp `tail_logs` line count; rotate `launcher.log`
-- [ ] 6.2 cargo test; bump to 0.1.69
-- [ ] 6.3 Commit, release build, deploy, relaunch, verify
+- [x] 6.1 Clamp `tail_logs` line count; rotate `launcher.log`
+- [x] 6.2 cargo test; bump to 0.1.69
+- [x] 6.3 Commit, release build, deploy, relaunch, verify; keep the app running
 
 ## 7. Engine auto-update cleanup — SN11 (v0.1.70)
 - [ ] 7.1 Verify auto-check wiring; remove auto-checker, flags, UI; keep manual check

@@ -12,8 +12,6 @@ pub const LAUNCHER_LOG_MAX_BYTES: u64 = 1024 * 1024;
 #[serde(default)]
 pub struct Settings {
     pub port: u16,
-    pub auto_update_harness: bool,
-    pub auto_update_interval_hours: u64,
     pub include_prerelease: bool,
     pub update_endpoint: Option<String>,
     pub current_version: Option<String>,
@@ -27,8 +25,6 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             port: DEFAULT_PORT,
-            auto_update_harness: true,
-            auto_update_interval_hours: 6,
             include_prerelease: false,
             update_endpoint: None,
             current_version: None,
@@ -93,9 +89,7 @@ mod tests {
     fn defaults_are_sane() {
         let s = Settings::default();
         assert_eq!(s.port, DEFAULT_PORT);
-        assert!(s.auto_update_harness);
         assert!(s.start_on_launch);
-        assert_eq!(s.auto_update_interval_hours, 6);
         assert!(!s.include_prerelease);
         assert!(s.current_version.is_none());
     }

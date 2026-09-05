@@ -126,12 +126,6 @@
         <span id="lc-actual" class="hint"></span>
       </div>
       <h3>Updates</h3>
-      <div class="row">
-        <label style="display:flex;align-items:center;gap:4px">
-          <input type="checkbox" id="lc-autoupdate"> Auto-check every
-        </label>
-        <input id="lc-interval" type="number" min="1" max="720" style="width:64px"> h
-      </div>
       <div class="row"><button id="lc-check" class="ghost">Check for updates now</button>
         <span id="lc-checkresult" class="hint"></span></div>
       <h3>Logs</h3>
@@ -229,7 +223,7 @@
       // Control Panel. Reflect that here so buttons never promise otherwise.
       var ro = 'Available in the Control Panel';
       ['lc-install', 'lc-delete', 'lc-update', 'lc-rollback',
-       'lc-apply-port', 'lc-port', 'lc-autoupdate', 'lc-interval',
+       'lc-apply-port', 'lc-port',
        'lc-stop', 'lc-restart', 'lc-quit'].forEach(function (id) {
         var b = $(id);
         if (b) { b.disabled = true; b.title = ro; }
@@ -256,7 +250,6 @@
       fillVersions(s);
       fillSettings(s);
       populatePreRelease(s.includePrerelease);
-      populateAutoUpdate(s.autoUpdateHarness, s.autoUpdateIntervalHours);
       const rb = $('lc-rollback'); rb.disabled = !s.previousVersion;
       rb.title = s.previousVersion ? 'Rollback to v' + s.previousVersion : 'No previous version installed';
       updateDeleteState(s);
@@ -271,7 +264,6 @@
     if ($('lc-port').value === '' && s.port) $('lc-port').value = String(s.port);
   }
   function populatePreRelease(on) { $('lc-prerelease').checked = !!on; }
-  function populateAutoUpdate(on, hours) { $('lc-autoupdate').checked = !!on; if (hours) $('lc-interval').value = String(hours); }
 
   // Track the selected version so the Delete button is only usable on an
   // installed, non-active version.
@@ -378,15 +370,6 @@
 
   $('lc-prerelease').addEventListener('change', function () {
     invoke('set_prerelease', { include: this.checked }).then(refreshStatus).catch(function (e) { setMsg(String(e.message || e), true); });
-  });
-
-  $('lc-autoupdate').addEventListener('change', function () {
-    invoke('set_auto_update', { enabled: this.checked }).catch(function (e) { setMsg(String(e.message || e), true); });
-  });
-
-  $('lc-interval').addEventListener('change', function () {
-    const h = parseInt(this.value, 10);
-    if (h >= 1) invoke('set_auto_update', { intervalHours: h }).catch(function (e) { setMsg(String(e.message || e), true); });
   });
 
   $('lc-check').addEventListener('click', function () {

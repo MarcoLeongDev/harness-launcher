@@ -30,8 +30,6 @@ pub struct StatusPayload {
     pub latest_remote: Option<String>,
     pub update_available: bool,
     pub include_prerelease: bool,
-    pub auto_update_harness: bool,
-    pub auto_update_interval_hours: u64,
     pub start_on_launch: bool,
     pub boot_error: Option<String>,
     /// In-flight long-running operation, if any (legacy single slot for the
@@ -379,8 +377,6 @@ pub async fn get_status(app: AppHandle) -> Result<StatusPayload, String> {
         latest_remote: remote,
         update_available,
         include_prerelease: settings.include_prerelease,
-        auto_update_harness: settings.auto_update_harness,
-        auto_update_interval_hours: settings.auto_update_interval_hours,
         start_on_launch: settings.start_on_launch,
         boot_error,
         current_op,
@@ -564,20 +560,6 @@ pub async fn set_port(app: AppHandle, window: tauri::Window, port: u16) -> Resul
 pub async fn set_prerelease(app: AppHandle, include: bool) -> Result<String, String> {
     state::update_settings(&app, |s| s.include_prerelease = include);
     Ok(format!("pre-release versions {}", if include { "shown" } else { "hidden" }))
-}
-
-#[tauri::command]
-pub async fn set_auto_update(app: AppHandle, window: tauri::Window, enabled: Option<bool>, interval_hours: Option<u64>) -> Result<String, String> {
-    require_panel(&window)?;
-    state::update_settings(&app, |s| {
-        if let Some(e) = enabled {
-            s.auto_update_harness = e;
-        }
-        if let Some(h) = interval_hours {
-            s.auto_update_interval_hours = h.max(1);
-        }
-    });
-    Ok("auto-update settings saved".into())
 }
 
 #[tauri::command]
