@@ -399,9 +399,6 @@
         <button class="btn icon primary" id="btn-install" title="Install selected version" aria-label="Install selected version">
           <i class="ico sm bi" data-ico="cloud-arrow-down-fill"></i>
         </button>
-        <button class="btn" id="btn-get-latest" title="Get latest version" aria-label="Get latest version">
-          <i class="ico sm bi" data-ico="cloud-arrow-down-fill"></i> Get latest
-        </button>
       </div>
       <!-- Result / progress notifications for this tab live in the terminal
            cell at the end of the installed-versions table above. -->
@@ -495,7 +492,7 @@
     host: $('host-text'), hostWrap: $('host-wrap'),
     port: $('inp-port'),
     
-    installSel: $('sel-install-ver'), btnInstall: $('btn-install'), btnGetLatest: $('btn-get-latest'),
+    installSel: $('sel-install-ver'), btnInstall: $('btn-install'),
     verTbody: $('ver-tbody'),
     feedsBox: $('op-feeds'),
     logFollow: $('btn-log-follow'), logTail: $('log-tail'),
@@ -914,9 +911,18 @@
       o.textContent = 'v' + v + (s.installedVersions && s.installedVersions.indexOf(v) !== -1 ? '  ✓' : '');
       sel.installSel.appendChild(o);
     });
-    if (cur && all.indexOf(cur) !== -1) sel.installSel.value = cur;
-    else if (s.latestRemote && all.indexOf(s.latestRemote) !== -1) sel.installSel.value = s.latestRemote;
-    else if (s.activeVersion && all.indexOf(s.activeVersion) !== -1) sel.installSel.value = s.activeVersion;
+    // The dropdown defaults to the NEWEST published version — the backend
+    // returns the list sorted ascending, so the last option is the latest.
+    // When that version is not installed yet it renders without a ✓, so the
+    // Versions page instantly shows what's worth downloading next and a
+    // separate "Get latest" button is unnecessary (the installed-versions
+    // table + radio already cover switching the active version).
+    var latest =
+      (s.latestRemote && all.indexOf(s.latestRemote) !== -1) ? s.latestRemote :
+      (all.length ? all[all.length - 1] : null);
+    if (cur && all.indexOf(cur) !== -1) { sel.installSel.value = cur; return; }
+    if (latest && all.indexOf(latest) !== -1) { sel.installSel.value = latest; return; }
+    if (s.activeVersion && all.indexOf(s.activeVersion) !== -1) sel.installSel.value = s.activeVersion;
   }
 
   function refresh() {
@@ -1015,11 +1021,6 @@
   sel.installSel.addEventListener('change', function () { closePopovers(); });
   sel.bannerBtn.addEventListener('click', function () { withCmd(function () { return invoke('update_to_latest', {}); }, 'Updated'); });
 
-
-
-  sel.btnGetLatest.addEventListener('click', function () {
-    withCmd(function () { return invoke('update_to_latest', { }); }, 'Updated');
-  });
 
 
   // logs
