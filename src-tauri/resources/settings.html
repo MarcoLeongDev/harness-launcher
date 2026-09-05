@@ -485,6 +485,9 @@
         if (el.getAttribute('data-loaded')) return;
         var name = el.getAttribute('data-ico');
         if (!name) return;
+        // The fetched SVG is injected as markup, so the icon name is
+        // constrained to the bundled set (lowercase letters, digits, dashes).
+        if (!/^[a-z0-9-]+$/.test(name)) return;
         var url = 'dsh-ui://localhost/bootstrap-icons/' + name + '.svg';
         fetch(url).then(function (r) {
           if (!r.ok) return;
@@ -773,11 +776,29 @@
       pop.className = 'pop';
       pop.setAttribute('role', 'dialog');
       pop.setAttribute('aria-label', 'Delete version v' + v + '?');
-      pop.innerHTML = '<div class="pop-txt">Delete <b>v' + v + '</b>? This cannot be undone.</div>' +
-        '<div class="pop-acts">' +
-        '<button class="btn" data-act="cancel">Cancel</button>' +
-        '<button class="btn danger" data-act="confirm">Delete</button>' +
-        '</div>';
+      // Built with DOM nodes (never innerHTML with the version string): `v`
+      // comes from the registry version list and must render as inert text.
+      var popTxt = document.createElement('div');
+      popTxt.className = 'pop-txt';
+      popTxt.appendChild(document.createTextNode('Delete '));
+      var popVer = document.createElement('b');
+      popVer.textContent = 'v' + v;
+      popTxt.appendChild(popVer);
+      popTxt.appendChild(document.createTextNode('? This cannot be undone.'));
+      var popActs = document.createElement('div');
+      popActs.className = 'pop-acts';
+      var cancelBtn = document.createElement('button');
+      cancelBtn.className = 'btn';
+      cancelBtn.setAttribute('data-act', 'cancel');
+      cancelBtn.textContent = 'Cancel';
+      var confirmBtn = document.createElement('button');
+      confirmBtn.className = 'btn danger';
+      confirmBtn.setAttribute('data-act', 'confirm');
+      confirmBtn.textContent = 'Delete';
+      popActs.appendChild(cancelBtn);
+      popActs.appendChild(confirmBtn);
+      pop.appendChild(popTxt);
+      pop.appendChild(popActs);
       del.addEventListener('click', function (e) {
         e.stopPropagation();
         closePopovers();

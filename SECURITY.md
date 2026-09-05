@@ -61,5 +61,10 @@ Out of scope:
 ## Hardening history
 
 Security-relevant changes are tracked as regular releases; search the commit
-log for `security`, `harden`, or see the change log in
-`lightspec/` (spec-driven development records).
+log for `security`, `harden`, or see [CHANGELOG.md](CHANGELOG.md). Notable
+for the public release: per-window IPC least privilege (the harness window is
+read-only — mutating commands require the Control Panel), Content Security
+Policy on launcher pages, version-name validation on every IPC entry, no
+cross-process signalling (port conflicts are reported, never killed),
+launch-token redaction in all log surfaces, and a pinned, checksum-verified
+Node/npm build toolchain.

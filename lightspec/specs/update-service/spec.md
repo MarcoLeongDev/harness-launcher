@@ -4,15 +4,22 @@
 TBD - created by archiving change add-dsh-launcher. Update Purpose after archive.
 ## Requirements
 ### Requirement: Harness Auto-Update Checks
-The launcher SHALL check the npm registry for a newer `@deepseek-ai/dsh` version than the active one, SHALL be toggleable by the user, SHALL run at startup and on a user-configurable interval, and SHALL notify via tray/panel when an update is available. Manual update, install and rollback operations SHALL surface live progress (registry lookup, install, verify, switch, restart) instead of running silently.
+The launcher SHALL NOT run automatic background update checks for the harness
+engine. Update discovery SHALL be manual only: the user triggers a check from
+the panel ("Check now"), which queries the npm registry for a newer
+`@deepseek-ai/dsh` version than the active one and notifies via panel when an
+update is available. Manual update, install and rollback operations SHALL
+surface live progress (registry lookup, install, verify, switch, restart)
+instead of running silently. No background thread, schedule, or persisted
+auto-check setting SHALL remain.
 
-#### Scenario: New version available
-- **WHEN** an auto-update check finds a newer version
-- **THEN** the user is notified and can update from the panel in one action
+#### Scenario: Manual check finds a newer version
+- **WHEN** the user triggers a manual update check and a newer version exists
+- **THEN** the user is notified in the panel and can update in one action
 
-#### Scenario: Auto-update disabled
-- **WHEN** the user disables auto-update checks
-- **THEN** no background version checks occur until re-enabled or manually triggered
+#### Scenario: No background checks
+- **WHEN** the launcher runs for any length of time without user action
+- **THEN** it never contacts the npm registry for version discovery on its own
 
 #### Scenario: Manual update shows progress
 - **WHEN** the user triggers a manual update or install
