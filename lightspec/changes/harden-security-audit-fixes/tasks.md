@@ -18,9 +18,9 @@
 - [x] 3.5 Commit, release build, deploy, relaunch, verify
 
 ## 4. Pinned + verified build toolchain — SN3 (v0.1.67)
-- [ ] 4.1 Pin Node + npm versions; SHA256 verify downloads in fetch/bundle scripts
-- [ ] 4.2 Reproducible-asset check; bump to 0.1.67
-- [ ] 4.3 Commit (no rebuild needed unless toolchain changes)
+- [x] 4.1 Pin Node + npm versions; SHA256 verify downloads in fetch/bundle scripts
+- [x] 4.2 Reproducible-asset check; bump to 0.1.67
+- [x] 4.3 Commit (no rebuild needed unless toolchain changes)
 
 ## 5. Token redaction — SN9 (v0.1.68)
 - [ ] 5.1 Never log launch-token URLs; centralize redaction in `tail_logs`

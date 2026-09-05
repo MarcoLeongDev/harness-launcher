@@ -640,7 +640,13 @@ pub fn tail_logs(app: AppHandle, lines: Option<usize>) -> Result<String, String>
     let wanted = lines.unwrap_or(200).max(10);
     let all: Vec<&str> = content.lines().collect();
     let start = all.len().saturating_sub(wanted);
-    Ok(all[start..].join("\n"))
+    // Redact here too: log files written before token redaction shipped may
+    // still contain raw launch tokens (SN9).
+    Ok(all[start..]
+        .iter()
+        .map(|l| crate::runtime::redact_token(l))
+        .collect::<Vec<_>>()
+        .join("\n"))
 }
 
 #[tauri::command]
