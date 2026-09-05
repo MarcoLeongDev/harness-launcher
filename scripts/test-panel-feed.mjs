@@ -295,9 +295,16 @@ console.log("6. install row merged into the versions table; log toggle bottom-ri
   const opFeeds = html.indexOf('id="op-feeds"');
   const installSel = html.indexOf('id="sel-install-ver"');
   const btnInstall = html.indexOf('id="btn-install"');
-  check("install dropdown + button live in the table after the feeds",
-    vtable !== -1 && vtable < opFeeds && opFeeds < installSel && installSel < btnInstall &&
-    btnInstall < html.indexOf("</main>"));
+  // Order: table (rows + install row LAST inside it), then the feeds section
+  // below the table group — feeds never sit between the table's rows.
+  check("install dropdown + button are the table's last row",
+    vtable !== -1 && vtable < installSel && installSel < btnInstall &&
+    btnInstall < opFeeds && opFeeds < html.indexOf("</main>"));
+  check("feeds render in their own section below the table",
+    html.includes('class="group op-feeds-group" id="op-feeds"') &&
+    html.indexOf('vinstall-row') < opFeeds);
+  check("feeds section collapses when empty",
+    /#op-feeds:empty \{ display: none; \}/.test(html));
   check("install button uses the cloud-down icon",
     /id="btn-install"[^>]*>\s*<i class="ico sm bi" data-ico="cloud-arrow-down-fill"><\/i>/.test(html));
   check("install row keeps the 4-column layout (empty | dropdown | empty | button)",
