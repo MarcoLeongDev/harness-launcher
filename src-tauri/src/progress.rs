@@ -5,11 +5,10 @@
 //! start/stop/restart, port change) emit phase updates so UIs can show a
 //! live progress bar and message. Every operation carries a unique key
 //! (`op:version` for version operations) so SEVERAL downloads can run at the
-//! same time without fighting over one progress slot, one console or one
-//! cancel flag: consoles are tagged per operation, cancellation is per
-//! operation, and the most recent payload of every in-flight operation is
-//! mirrored into `AppState.current_ops` so windows opening mid-operation can
-//! render all of them.
+//! same time without fighting over one progress slot or one console:
+//! consoles are tagged per operation, and the most recent payload of every
+//! in-flight operation is mirrored into `AppState.current_ops` so windows
+//! opening mid-operation can render all of them.
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
@@ -17,9 +16,6 @@ use tauri::{AppHandle, Emitter, Manager};
 use crate::state::AppState;
 
 pub const CONSOLE_MAX_LINES: usize = 600;
-
-/// Sentinel operation key meaning "cancel every in-flight operation".
-pub const CANCEL_ALL: &str = "*";
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -39,12 +35,6 @@ pub struct ProgressPayload {
     pub message: String,
     /// 0-100 when known; `None` means indeterminate.
     pub percent: Option<u8>,
-    /// True only while npm is actually running for this operation (its
-    /// cancellation flag is polled by `run_npm`). UIs show the terminal stop
-    /// button only for stoppable payloads — pure message phases (registry
-    /// checks, engine/port ops, verification, notices) have nothing to stop.
-    #[serde(default)]
-    pub stoppable: bool,
 }
 
 /// A single line of an operation console (npm output while downloading).
@@ -103,53 +93,16 @@ pub fn reset_console(app: &AppHandle, op: &str) {
     }
 }
 
-/// Arm cancellation for one operation: the in-flight work aborts once it
-/// observes the flag.
-pub fn request_cancel(app: &AppHandle, op: &str) {
-    let st = app.state::<AppState>();
-    let mut set = st.cancel.lock().unwrap();
-    if op.is_empty() {
-        set.insert(CANCEL_ALL.to_string());
-    } else {
-        set.insert(op.to_string());
-    }
-}
-
-/// Clear any pending cancellation request for one operation (called when that
-/// operation starts). Also clears a global stop-all so fresh work can run.
-pub fn reset_cancel(app: &AppHandle, op: &str) {
-    let st = app.state::<AppState>();
-    let mut set = st.cancel.lock().unwrap();
-    set.remove(op);
-    set.remove(CANCEL_ALL);
-}
-
-/// Whether the user has asked to stop this operation (or all operations).
-pub fn cancel_requested(app: &AppHandle, op: &str) -> bool {
-    let st = app.state::<AppState>();
-    let set = st.cancel.lock().unwrap();
-    set.contains(op) || set.contains(CANCEL_ALL)
-}
-
 /// Emit a progress update and record it as the current state of that
 /// operation. The legacy single-slot `current_op` keeps mirroring the
 /// first (deterministic) in-flight operation for older UIs (overlay).
-/// Progress emitted here is never stoppable — use [`emit_stoppable`] for
-/// phases where npm is actually running.
 pub fn emit(app: &AppHandle, op: &str, version: Option<&str>, phase: &str, message: &str, percent: Option<u8>) {
-    emit_stoppable(app, op, version, phase, message, percent, false)
-}
-
-/// Like [`emit`], with an explicit `stoppable` flag: true only for phases
-/// where npm is running and the user could cancel the download.
-pub fn emit_stoppable(app: &AppHandle, op: &str, version: Option<&str>, phase: &str, message: &str, percent: Option<u8>, stoppable: bool) {
     let payload = ProgressPayload {
         op: op.to_string(),
         version: version.map(|s| s.to_string()),
         phase: phase.to_string(),
         message: message.to_string(),
         percent,
-        stoppable,
     };
     {
         let st = app.state::<AppState>();
@@ -194,12 +147,11 @@ pub fn current_ops(app: &AppHandle) -> Vec<ProgressPayload> {
     app.state::<AppState>().current_ops.lock().unwrap().values().cloned().collect()
 }
 
-/// Convenience: emit a "done" phase for an operation, drop its in-flight
-/// record and its pending cancellation.
+/// Convenience: emit a "done" phase for an operation and drop its in-flight
+/// record.
 pub fn finish(app: &AppHandle, op: &str, version: Option<&str>, message: &str) {
     emit(app, op, version, "done", message, Some(100));
     clear_op(app, op);
-    reset_cancel(app, op);
 }
 
 // BTreeMap is re-exported nowhere but used through AppState; keep the import
