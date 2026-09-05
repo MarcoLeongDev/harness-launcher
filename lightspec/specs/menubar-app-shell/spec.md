@@ -15,7 +15,7 @@ The launcher SHALL run as a macOS menu-bar (tray) application: it SHALL show a t
 - **THEN** the Finder/Dock application icon and the menu-bar icon visually match the provided logo (or its mark)
 
 ### Requirement: Tray Menu Controls
-The launcher SHALL provide a tray menu offering at least: show/hide the window, open the settings window, start/stop/restart/force-restart the engine, open the harness in the default browser, update the harness, and quit the app. Start/Stop items SHALL be enabled or disabled according to the current engine state.
+The launcher SHALL provide a tray menu offering at least: show/hide the window, open the settings window, start/stop/restart the engine, open the harness in the default browser, and quit the app. Start/Stop/Restart items SHALL be enabled or disabled according to the current engine state. The tray menu SHALL NOT offer a force-restart or an update-harness item. Every tray menu item SHALL carry a native macOS menu glyph (template icon) representing its action.
 
 #### Scenario: Quit from tray
 - **WHEN** the user selects Quit from the tray menu
@@ -26,8 +26,12 @@ The launcher SHALL provide a tray menu offering at least: show/hide the window, 
 - **THEN** the window is shown and refocused
 
 #### Scenario: Engine controls reflect state
-- **WHEN** the engine is running, Stop/Restart/Force are enabled and Start is disabled; when stopped, Start is enabled and Stop/Restart/Force are disabled
+- **WHEN** the engine is running, Stop/Restart are enabled and Start is disabled; when stopped, Start is enabled and Stop/Restart are disabled
 - **THEN** the tray items reflect the current engine phase
+
+#### Scenario: Menu items are glyph-labelled
+- **WHEN** the user opens the tray menu
+- **THEN** every item shows a native macOS icon glyph alongside its text
 
 ### Requirement: Hidden-Window Lifecycle
 The launcher SHALL intercept window close requests and hide instead of closing, and SHALL quit only through the explicit tray Quit action (or an in-app quit control), guaranteeing no orphaned harness processes.
