@@ -280,6 +280,32 @@ console.log("5. install dropdown defaults to the newest published version");
   h.restore();
 }
 
+// ---------- 6. structure: install row merged into the versions table ----------
+// The standalone "Install version" group is gone; the dropdown + cloud
+// download live in the table's persistent LAST row, the header column reads
+// "Directory", and the log toggle is pinned bottom-right.
+console.log("6. install row merged into the versions table; log toggle bottom-right");
+{
+  check("header column renamed to Directory",
+    /<span class="vc-dir" title="Open the version directory">Directory<\/span>/.test(html));
+  check("no Folder header label remains", !/>Folder</.test(html));
+  check("row labels say directory, not folder", !/Open the folder/.test(html));
+  check("standalone Install version group removed", !/Install version<\/span>/.test(html));
+  const vtable = html.indexOf('<div class="vtable">');
+  const opFeeds = html.indexOf('id="op-feeds"');
+  const installSel = html.indexOf('id="sel-install-ver"');
+  const btnInstall = html.indexOf('id="btn-install"');
+  check("install dropdown + button live in the table after the feeds",
+    vtable !== -1 && vtable < opFeeds && opFeeds < installSel && installSel < btnInstall &&
+    btnInstall < html.indexOf("</main>"));
+  check("install button uses the cloud-down icon",
+    /id="btn-install"[^>]*>\s*<i class="ico sm bi" data-ico="cloud-arrow-down-fill"><\/i>/.test(html));
+  check("install row keeps the 4-column layout (empty | dropdown | empty | button)",
+    /vrow vinstall-row">\s*<span class="vc-def"[^>]*><\/span>\s*<span class="vc-ver vc-ver-install">\s*<select id="sel-install-ver"/.test(html));
+  check("log toggle pinned bottom-right", /\.log-toggle \{ position: fixed; right: 14px/.test(html));
+  check("log toggle no longer pinned left", !/\.log-toggle \{[^}]*left: 14px/.test(html));
+}
+
 console.log("");
 console.log(passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);

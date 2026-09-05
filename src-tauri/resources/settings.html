@@ -84,7 +84,7 @@
     flex: 1; min-height: 0; overflow: auto; }
   .tabpanel.active { display: flex; }
   /* Log drawer: an in-flow bottom drawer of the merged panel, hidden by
-     default; the bottom-left circular button toggles it. When open it takes
+     default; the bottom-right circular button toggles it. When open it takes
      a fixed band at the bottom of the window and the panel scrolls above. */
   .log-drawer { display: none; flex: none; border-top: 1px solid var(--hair2);
     background: var(--bg2); }
@@ -93,9 +93,9 @@
   @keyframes drawer-in { from { opacity: 0; transform: translateY(10px); } }
   @media (prefers-reduced-motion: reduce) { .log-drawer.open { animation: none; } }
   /* Log toggle: circle button, image only — no background or border (only a
-     hover background), pinned bottom-left of the window. aria-pressed shows
+     hover background), pinned bottom-right of the window. aria-pressed shows
      the toggled (open) state. */
-  .log-toggle { position: fixed; left: 14px; bottom: 14px; z-index: 30;
+  .log-toggle { position: fixed; right: 14px; bottom: 14px; z-index: 30;
     width: 34px; height: 34px; border-radius: 50%; border: none; padding: 0;
     background: transparent; color: var(--dim); cursor: pointer;
     display: inline-flex; align-items: center; justify-content: center;
@@ -267,7 +267,7 @@
   .vc-ver { flex: 1; font-family: var(--mono); font-size: 12.5px; min-width: 0;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .vc-dir { width: 64px; flex: none; display: flex; align-items: center; justify-content: center; }
-  /* Folder link: circular borderless button revealing the version directory */
+  /* Directory link: circular borderless button revealing the version directory */
   .btn.dir { width: 30px; height: 30px; padding: 0; border-radius: 50%;
     border: none; background: transparent; color: var(--dim);
     display: inline-flex; align-items: center; justify-content: center;
@@ -305,6 +305,13 @@
     border-radius: 50%; background: #04231a; left: 50%; top: 50%; transform: translate(-50%,-50%); }
   .vc-radio:disabled { opacity: 0.35; cursor: default; }
   .vc-radio:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
+  /* Install row: the persistent LAST row of the versions table — the
+     published-version dropdown sits in the Version column and the
+     cloud-download install button in the Actions column; the Default and
+     Directory cells stay empty. */
+  .vc-ver-install { display: flex; }
+  .vc-ver-install select { width: 100%; max-width: 240px; }
+  .btn.install { color: var(--accent2); }
   .btn.danger { background: var(--err); border-color: var(--err); color: #fff; }
   .btn.danger:hover { background: #ff6259; }
   .btn.ghost-danger { background: transparent; border-color: rgba(255,69,58,0.45);
@@ -352,7 +359,7 @@
 </header>
 
 <!-- Single merged view: Engine + Versions (no tab bar; the log lives in a
-     bottom drawer toggled by the bottom-left button). -->
+     bottom drawer toggled by the bottom-right button). -->
 <main>
   <!-- ============ ENGINE ============ -->
   <section class="tabpanel active" id="tab-main" role="tabpanel">
@@ -388,27 +395,19 @@
       </div>
     </div>
 
-    <!-- Section 1: install a published version (moved to top) -->
-    <div class="group">
-      <div class="cell" style="gap:10px">
-        <span class="lbl">Install version</span>
-        <span style="flex:1"></span>
-        <select id="sel-install-ver" aria-label="Published version"></select>
-        <button class="btn icon primary" id="btn-install" title="Install selected version" aria-label="Install selected version">
-          <i class="ico sm bi" data-ico="cloud-arrow-down-fill"></i>
-        </button>
-      </div>
-      <!-- Result / progress notifications for this panel live in the
-           terminal cells at the end of the installed-versions table above. -->
-    </div>
-
-    <!-- Section 2: the installed-version table -->
+    <!-- The installed-versions table. Installation is merged into the table:
+         the header is Default | Version | Directory | Actions, installed
+         versions occupy the middle rows (radio | version | open-directory |
+         delete), and the LAST row is always the install row — empty | dropdown
+         | empty | cloud-download. The standalone "Install version" group is
+         gone; the dropdown and button keep their IDs so the script logic is
+         untouched. -->
     <div class="group">
       <div class="vtable">
         <div class="vrow vhead-row">
           <span class="vc-def" title="Default version">Default</span>
           <span class="vc-ver">Version</span>
-          <span class="vc-dir" title="Open the version folder">Folder</span>
+          <span class="vc-dir" title="Open the version directory">Directory</span>
           <span class="vc-acts">Actions</span>
         </div>
         <div id="ver-tbody"></div>
@@ -418,11 +417,27 @@
              each get their own terminal (head + output + circular stop
              button overlay) instead of fighting over one div. -->
         <div id="op-feeds"></div>
+        <!-- Install row: the persistent LAST row of the table. Empty
+             Default/Directory cells keep the columns aligned with the rows
+             above; the button downloads the selected version without touching
+             the running engine (switching stays on the radio / engine card). -->
+        <div class="vrow vinstall-row">
+          <span class="vc-def" aria-hidden="true"></span>
+          <span class="vc-ver vc-ver-install">
+            <select id="sel-install-ver" aria-label="Version to install"></select>
+          </span>
+          <span class="vc-dir" aria-hidden="true"></span>
+          <span class="vc-acts">
+            <button class="btn icon install" id="btn-install" title="Download selected version" aria-label="Download selected version">
+              <i class="ico sm bi" data-ico="cloud-arrow-down-fill"></i>
+            </button>
+          </span>
+        </div>
       </div>
     </div>
   </section>
 
-  <!-- ============ LOG DRAWER (hidden by default; toggled by the bottom-left button) ============ -->
+  <!-- ============ LOG DRAWER (hidden by default; toggled by the bottom-right button) ============ -->
   <div class="log-drawer" id="log-drawer" hidden>
     <div class="log-group">
       <div class="log-wrap">
@@ -433,7 +448,7 @@
   </div>
 </main>
 
-<!-- Log visibility toggle: circular borderless button pinned bottom-left.
+<!-- Log visibility toggle: circular borderless button pinned bottom-right.
      Image only — no background or border except while hovered. -->
 <button class="log-toggle" id="btn-log-toggle" type="button" aria-pressed="false" aria-controls="log-drawer" title="Show log">
   <i class="ico sm bi" data-ico="journal-text"></i>
@@ -511,7 +526,7 @@
 
   // ---------- merged single view ----------
   // Engine + Versions are one panel with no tab bar; the log lives in a
-  // bottom drawer toggled by the bottom-left button below.
+  // bottom drawer toggled by the bottom-right button below.
 
   // ---------- operation feed (terminal cell of the versions table) ----------
   function fmtTime(secs) {
@@ -697,7 +712,7 @@
     if (!list.length) {
       var empty = document.createElement('div');
       empty.className = 'vrow';
-      empty.innerHTML = '<span class="hint">No versions installed — pick one above to install.</span>';
+      empty.innerHTML = '<span class="hint">No versions installed — pick one below to install.</span>';
       sel.verTbody.appendChild(empty);
       return;
     }
@@ -726,13 +741,13 @@
       var ver = document.createElement('span');
       ver.className = 'vc-ver'; ver.textContent = 'v' + v;
 
-      // Folder column: opens the directory this version is installed in.
+      // Directory column: opens the directory this version is installed in.
       var dirCell = document.createElement('span');
       dirCell.className = 'vc-dir';
       var dirBtn = document.createElement('button');
       dirBtn.className = 'btn dir';
-      dirBtn.title = 'Open the folder for v' + v;
-      dirBtn.setAttribute('aria-label', 'Open the folder for v' + v);
+      dirBtn.title = 'Open the directory for v' + v;
+      dirBtn.setAttribute('aria-label', 'Open the directory for v' + v);
       dirBtn.innerHTML = '<i class="ico sm bi" data-ico="folder2-open"></i>';
       dirBtn.addEventListener('click', function () {
         invoke('open_version_dir', { version: v }).catch(function (e) {
@@ -902,7 +917,7 @@
     // The dropdown defaults to the NEWEST published version — the backend
     // returns the list sorted ascending, so the last option is the latest.
     // When that version is not installed yet it renders without a ✓, so the
-    // Versions page instantly shows what's worth downloading next and a
+    // versions table instantly shows what's worth downloading next and a
     // separate "Get latest" button is unnecessary (the installed-versions
     // table + radio already cover switching the active version).
     var latest =
@@ -1012,8 +1027,8 @@
 
 
   // logs
-  // Log drawer toggle: bottom-left circular image-only button. The drawer is
-  // hidden by default; the button shows/hides it (aria-pressed tracks state).
+  // Log drawer toggle: bottom-right circular image-only button. The drawer
+  // is hidden by default; the button shows/hides it (aria-pressed tracks state).
   sel.logToggle.addEventListener('click', function () {
     var open = sel.logDrawer.hidden;
     sel.logDrawer.hidden = !open;
