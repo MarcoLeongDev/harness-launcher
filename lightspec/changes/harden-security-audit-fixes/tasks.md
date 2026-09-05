@@ -45,10 +45,10 @@
 - [x] 8.3 Commit, release build, deploy, relaunch, verify
 
 ## 9. Release hygiene — SN13 (v0.1.72)
-- [ ] 9.1 CHANGELOG.md; README/SECURITY release notes touch-up
-- [ ] 9.2 Bump to 0.1.72
-- [ ] 9.3 Commit, release build, deploy, relaunch, verify; keep the app running
+- [x] 9.1 CHANGELOG.md; README/SECURITY release notes touch-up
+- [x] 9.2 Bump to 0.1.72
+- [x] 9.3 Commit, release build, deploy, relaunch, verify; keep the app running
 
 ## 10. Close-out
-- [ ] 10.1 Archive lightspec change; merge feature branch into main
-- [ ] 10.2 Final report (completed items, commits, versions)
+- [x] 10.1 Archive lightspec change; merge feature branch into main
+- [x] 10.2 Final report (completed items, commits, versions)
