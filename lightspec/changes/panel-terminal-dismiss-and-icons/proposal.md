@@ -28,4 +28,8 @@ white cloud-download glyph like the other action buttons.
   scripts/test-panel-feed.mjs (cancelled-feed lifecycle + late-line guard).
 - User data/content safety: UI/timer-only; no engine, install or settings
   changes.
-- Version: patch bump 0.1.57 -> 0.1.58.
+- Stop button visibility (v0.1.59): the backend marks progress payloads
+  `stoppable` only while npm actually runs; the Control Panel stop button
+  shows only for those payloads, so pure message feeds (registry checks,
+  engine/port ops, verification) never offer a stop.
+- Version: patch bump 0.1.57 -> 0.1.58, then 0.1.58 -> 0.1.59.

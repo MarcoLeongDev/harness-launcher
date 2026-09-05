@@ -60,3 +60,28 @@ already circular.
 #### Scenario: Feed stop button renders
 - **WHEN** a download feed is in the downloading state
 - **THEN** the circular stop button shows the filled-square glyph
+
+## ADDED Requirements
+
+### Requirement: Stop Button Only While Npm Runs
+The operation feed stop button SHALL be visible only while npm is actually
+running for that operation. The backend SHALL mark exactly those progress
+payloads as stoppable; pure message phases (registry checks, engine
+stop/start/restart, port changes, verification of an already-installed
+version, notices) MUST NOT show a stop button, because there is no download
+to stop. While npm is not running the stop button hides but the terminal
+output stays until the feed dismisses.
+
+#### Scenario: Update already on latest
+- **WHEN** the user runs update while the active version is already the
+  latest (a registry check with no npm install follows)
+- **THEN** the terminal shows the message without a stop button
+
+#### Scenario: Real download in flight
+- **WHEN** npm is installing a version for the operation
+- **THEN** the circular stop button is visible and cancels that operation
+
+#### Scenario: Verification after npm finished
+- **WHEN** the operation moves from installing to verifying (npm already
+  done)
+- **THEN** the stop button hides while the terminal output remains visible

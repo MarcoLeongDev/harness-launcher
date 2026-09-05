@@ -554,8 +554,6 @@
   // Every in-flight operation (parallel version downloads included) owns one
   // feed — head (npm command + elapsed), terminal output and stop button —
   // so concurrent downloads never fight over a single output div.
-  var downloadingOps = { download: 1, switch: 1, update: 1, rollback: 1, install: 1, select: 1 };
-  var downloadingPhases = { registry: 1, installing: 1, verifying: 1 };
   // Ops that stop/start/restart the engine: while any runs, engine controls
   // are disabled. Plain downloads (kind "download") never touch the engine.
   var engineBusyOps = { switch: 1, update: 1, rollback: 1, engine: 1, port: 1 };
@@ -693,12 +691,21 @@
     if (!p) return;
     var kind = opKind(p.op);
     var f = feedFor(p.op || '');
-    var downloading = !!downloadingOps[kind] && !!downloadingPhases[p.phase];
+    // The stop button exists ONLY while npm is actually running for this
+    // operation — the backend marks exactly those payloads "stoppable".
+    // Pure message phases (registry checks, engine stop/start/restart, port
+    // changes, verification of an installed version, notices) have nothing
+    // to stop: they render as terminal lines with no stop button.
+    var downloading = !!p.stoppable;
+    var terminal = p.phase === 'done' || p.phase === 'failed' || p.phase === 'cancelled';
     if (downloading) {
       f.done = false;
       f.setDownloading(true);
-      if (p.phase === 'registry') f.setHeader('Checking DeepSeek Harness versions');
-      else f.setHeader('Installing DeepSeek Harness version@' + (p.version || ''));
+      f.setHeader('Installing DeepSeek Harness version@' + (p.version || ''));
+    } else if (f.downloading && !terminal) {
+      // npm finished (or the op moved to a non-download phase) — nothing
+      // left to stop; keep the output visible but hide the stop button.
+      f.setDownloading(false);
     }
     // Milestone messages (registry → installing → verifying, stopping →
     // starting → running) stream in as info lines so the terminal tells the
