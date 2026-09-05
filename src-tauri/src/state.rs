@@ -1,5 +1,5 @@
 //! Shared application state + path helpers.
-use std::collections::{BTreeMap, HashSet, VecDeque};
+use std::collections::{BTreeMap, VecDeque};
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::sync::Mutex;
@@ -29,9 +29,6 @@ pub struct AppState {
     /// to the Control Panel and overlay as a "terminal" while downloading.
     /// Lines are tagged with their operation key.
     pub console: Mutex<VecDeque<crate::progress::ConsoleLine>>,
-    /// Per-operation user cancellation requests (the in-flight operation
-    /// aborts once it observes its key; "*" cancels everything).
-    pub cancel: Mutex<HashSet<String>>,
     /// Tray menu items that reflect engine state (set by tray::setup_tray).
     pub tray_state: Mutex<Option<crate::tray::TrayState>>,
     /// Cached remote version list to avoid spawning npm every 3 s.
@@ -66,8 +63,7 @@ impl Default for AppState {
             current_op: Mutex::new(None),
             current_ops: Mutex::new(BTreeMap::new()),
             console: Mutex::new(VecDeque::new()),
-            cancel: Mutex::new(HashSet::new()),
-            tray_state: Mutex::new(None),
+                tray_state: Mutex::new(None),
             version_cache: Mutex::new(VersionCache::default()),
         }
     }

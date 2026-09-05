@@ -91,8 +91,7 @@ pub fn run() {
             commands::set_version,
             commands::open_settings,
             commands::open_harness_window,
-            commands::cancel_operation,
-            commands::delete_version,
+                    commands::delete_version,
             commands::open_version_dir,
             commands::quit_app
         ])
