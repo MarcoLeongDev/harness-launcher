@@ -190,14 +190,19 @@
   .ecterm-toggle.open svg { transform: rotate(180deg); }
   .ecterm { border-top: 1px solid var(--hair); background: rgba(0,0,0,0.35); display: none; }
   .ecterm.open { display: block; }
-  /* Operation feeds: the notification surface of the Versions tab, appended
-     as the LAST CELL of the installed-versions table group. Each in-flight
-     operation owns one feed — header with npm command + elapsed time, mono
-     output lines, and the circular stop button overlaid on the output while
-     that version downloads. Feeds stack; parallel downloads never share one. */
+  /* Operation feeds: the notification surface of the panel, in their OWN
+     section BELOW the versions table group (never between the table's rows).
+     Each in-flight operation owns one feed — header with npm command +
+     elapsed time, mono output lines, and the circular stop button overlaid
+     on the output while that version downloads. Feeds stack; parallel
+     downloads never share one. #op-feeds:empty (below) collapses the whole
+     section once the last feed is removed. */
   .op-feed { border-top: 1px solid var(--hair); overflow: hidden;
     animation: feed-in .18s ease-out both; }
   .op-feed + .op-feed { border-top: 1px solid var(--hair); }
+  /* Inside its own group the first feed's top border would double the group
+     border — drop it. */
+  .op-feeds-group .op-feed:first-child { border-top: none; }
   .op-feed.leaving { animation: feed-out .16s ease-in both; }
   #op-feeds:empty { display: none; }
   @keyframes feed-in { from { opacity: 0; transform: translateY(-6px); } }
@@ -411,12 +416,6 @@
           <span class="vc-acts">Actions</span>
         </div>
         <div id="ver-tbody"></div>
-        <!-- Operation feeds: notifications (progress messages, npm output,
-             result/error lines) render here as the last cell of the table
-             section. One REUSABLE feed per operation — parallel downloads
-             each get their own terminal (head + output + circular stop
-             button overlay) instead of fighting over one div. -->
-        <div id="op-feeds"></div>
         <!-- Install row: the persistent LAST row of the table. Empty
              Default/Directory cells keep the columns aligned with the rows
              above; the button downloads the selected version without touching
@@ -435,6 +434,16 @@
         </div>
       </div>
     </div>
+
+    <!-- Operation feeds: notifications (progress messages, npm output,
+         result/error lines) render in their own section BELOW the versions
+         table — never between the table's rows. One REUSABLE feed per
+         operation — parallel downloads each get their own terminal (head +
+         output + circular stop button overlay) instead of fighting over one
+         div. The section is only visible while it has content: #op-feeds:empty
+         (CSS) collapses it once the last feed animates out. NOTE: keep this
+         element empty (no whitespace inside) so :empty keeps matching. -->
+    <div class="group op-feeds-group" id="op-feeds"></div>
   </section>
 
   <!-- ============ LOG DRAWER (hidden by default; toggled by the bottom-right button) ============ -->
@@ -648,8 +657,8 @@
   }
 
   // Launcher-level notices (delete confirmations, engine results) surface in
-  // a dedicated notice feed inside the same terminal area, instead of a
-  // stray line under the install row.
+  // a dedicated notice feed inside the feeds section below the versions
+  // table, instead of a stray line under the install row.
   function setResult(text, isErr) {
     if (!text) return;
     var now = Date.now();
