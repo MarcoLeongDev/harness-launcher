@@ -1,8 +1,8 @@
 ## 1. Version-name validation on all IPC entries — SN2+SN4 (v0.1.64)
-- [ ] 1.1 Gate `delete_version`, `set_version`, `install_and_switch`, `rollback` on `is_valid_version_name`
-- [ ] 1.2 Unit tests for traversal rejection on each entry path
-- [ ] 1.3 cargo test + panel feed test; bump to 0.1.64
-- [ ] 1.4 Commit, release build, deploy, relaunch, verify
+- [x] 1.1 Gate `delete_version`, `set_version`, `install_and_switch`, `rollback` on `is_valid_version_name`
+- [x] 1.2 Unit tests for traversal rejection on each entry path
+- [x] 1.3 cargo test + panel feed test; bump to 0.1.64
+- [x] 1.4 Commit, release build, deploy, relaunch, verify
 
 ## 2. Delete-popover XSS fix — SN5 (v0.1.65)
 - [ ] 2.1 Rebuild delete-confirm popover with DOM/`textContent` (no version string in `innerHTML`)
