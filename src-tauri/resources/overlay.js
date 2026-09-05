@@ -89,7 +89,7 @@
   rootEl.id = 'dsh-lc';
   rootEl.innerHTML = `
     <div id="dsh-lc-panel">
-      <div class="meta"><span class="big">DeepSeek Harness Launcher</span><span id="lc-ver" class="hint"></span></div>
+      <div class="meta"><span class="big">Harness Launcher</span><span id="lc-ver" class="hint"></span></div>
       <h3>Status</h3>
       <div class="row">
         <span id="lc-state" class="hint">loading…</span>
@@ -159,8 +159,8 @@
         <button id="lc-quit" class="danger" style="margin-left:auto">Quit</button>
       </div>
     </div>
-    <div id="dsh-lc-toggle" title="DeepSeek Harness Launcher controls">
-      <span id="dsh-lc-dot"></span><span>DeepSeek</span>
+    <div id="dsh-lc-toggle" title="Harness Launcher controls">
+      <span id="dsh-lc-dot"></span><span>Harness</span>
     </div>
   `;
   document.body.appendChild(rootEl);

@@ -250,6 +250,36 @@ console.log("4. stuck hint appears while genuinely stalled; console output re-ar
   h.restore();
 }
 
+// ---------- 5. install dropdown defaults to the newest published version ----------
+// The Versions tab must present the latest version as the pre-selected choice
+// (no separate "Get latest" button): with the newest version not installed it
+// shows without the ✓ so the user instantly knows to download it.
+console.log("5. install dropdown defaults to the newest published version");
+{
+  const STATUS5 = {
+    phase: "stopped", version: "0.1.1-rc.1", port: 3081, host: "127.0.0.1",
+    versions: ["0.1.1-rc.1", "0.1.2-rc.1"],
+    installedVersions: ["0.1.1-rc.1"], activeVersion: "0.1.1-rc.1",
+    latestRemote: null,
+  };
+  const h = boot({ invokeImpl: function (cmd) {
+    if (cmd === "get_status") return STATUS5;
+    if (cmd === "tail_logs") return "[launcher] harness stopped";
+    return {};
+  } });
+  await settle();
+  const installSel = h.doc.getElementById("sel-install-ver");
+  check("no init-time crash", h.error === null, h.error && String(h.error));
+  check("dropdown defaults to newest version, not the active one",
+    installSel.value === "0.1.2-rc.1", "got " + installSel.value);
+  const opts = installSel.children;
+  const activeOpt = opts.find(function (o) { return o.value === "0.1.1-rc.1"; });
+  const latestOpt = opts.find(function (o) { return o.value === "0.1.2-rc.1"; });
+  check("installed option carries the checkmark", /✓/.test(String(activeOpt && activeOpt.textContent)));
+  check("uninstalled latest option has no checkmark", !/✓/.test(String(latestOpt && latestOpt.textContent)));
+  h.restore();
+}
+
 console.log("");
 console.log(passed + " passed, " + failed + " failed");
 process.exit(failed ? 1 : 0);
