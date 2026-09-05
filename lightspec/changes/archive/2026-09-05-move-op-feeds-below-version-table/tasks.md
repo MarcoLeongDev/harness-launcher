@@ -6,5 +6,5 @@
 - [ ] 1.5 npm test green; bump to 0.1.57; commit
 
 ## 2. Build, deploy & verify
-- [ ] 2.1 Release build + deploy:relaunch to /Applications
-- [ ] 2.2 Verify live: feeds section below table, install row last, empty state collapses
+- [x] 2.1 Release build + deploy:relaunch to /Applications
+- [x] 2.2 Verify live: feeds section below table, install row last, empty state collapses

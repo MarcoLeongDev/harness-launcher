@@ -17,5 +17,5 @@
 - [x] 3.4 Bump to 0.1.59; commit
 
 ## 2. Build, deploy & verify
-- [ ] 2.1 Release build + deploy:relaunch to /Applications
-- [ ] 2.2 Verify live: v0.1.58 running, panel renders, feed dismiss behaviour
+- [x] 2.1 Release build + deploy:relaunch to /Applications
+- [x] 2.2 Verify live: v0.1.58 running, panel renders, feed dismiss behaviour
