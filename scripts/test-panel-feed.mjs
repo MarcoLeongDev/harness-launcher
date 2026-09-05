@@ -203,10 +203,10 @@ console.log("2. single-key update lifecycle: feed closes, no stuck line after do
   const feedEl = feedsBox.children[feedsBox.children.length - 1];
   const out = feedEl._qs.get(".term-out");
   check("registry phase opens one feed", feedsBox.children.length === 1 && feedEl.hidden === false);
-  check("registry check has no stop button (pure message)", feedEl._qs.get(".dl-cancel").hidden === true);
+  check("registry check shows no header (pure message)", feedEl._qs.get(".op-feed-head").hidden === true);
   h.emit("launcher://progress", { op: "update", version: "0.1.2-rc.1", phase: "stopping", message: "Stopping the running engine to switch versions…", percent: 10 });
-  h.emit("launcher://progress", { op: "update", version: "0.1.2-rc.1", phase: "installing", message: "Installing DeepSeek Harness version@0.1.2-rc.1", percent: 40, stoppable: true });
-  check("stop button visible while npm installs", feedEl._qs.get(".dl-cancel").hidden === false);
+  h.emit("launcher://progress", { op: "update", version: "0.1.2-rc.1", phase: "installing", message: "Installing DeepSeek Harness version@0.1.2-rc.1", percent: 40 });
+  check("npm install shows the command header", feedEl._qs.get(".op-feed-head").hidden === false);
   h.emit("launcher://progress", { op: "update", version: "0.1.2-rc.1", phase: "verifying", message: "Verifying v0.1.2-rc.1…", percent: 80 });
   check("still a single feed (no orphaned key switch)", feedsBox.children.length === 1);
   h.emit("launcher://progress", { op: "update", version: "0.1.2-rc.1", phase: "done", message: "switched to v0.1.2-rc.1 — engine running on port 3081", percent: 100 });
@@ -224,7 +224,7 @@ console.log("3. done phase clears a pending stuck timer (reported bug)");
 {
   const h = boot({ invokeImpl: invokeImpl });
   const feedsBox = h.doc.getElementById("op-feeds");
-  h.emit("launcher://progress", { op: "update", version: "0.1.2-rc.1", phase: "installing", message: "Installing DeepSeek Harness version@0.1.2-rc.1", percent: 40, stoppable: true });
+  h.emit("launcher://progress", { op: "update", version: "0.1.2-rc.1", phase: "installing", message: "Installing DeepSeek Harness version@0.1.2-rc.1", percent: 40 });
   const feedEl = feedsBox.children[0];
   h.sched.advance(30000);
   h.emit("launcher://progress", { op: "update", version: "0.1.2-rc.1", phase: "done", message: "switched to v0.1.2-rc.1", percent: 100 });
@@ -239,7 +239,7 @@ console.log("4. stuck hint appears while genuinely stalled; console output re-ar
 {
   const h = boot({ invokeImpl: invokeImpl });
   const feedsBox = h.doc.getElementById("op-feeds");
-  h.emit("launcher://progress", { op: "update", version: "0.1.2-rc.1", phase: "installing", message: "Installing DeepSeek Harness version@0.1.2-rc.1", percent: 40, stoppable: true });
+  h.emit("launcher://progress", { op: "update", version: "0.1.2-rc.1", phase: "installing", message: "Installing DeepSeek Harness version@0.1.2-rc.1", percent: 40 });
   const feedEl = feedsBox.children[0];
   const out = feedEl._qs.get(".term-out");
   h.sched.advance(61000);
@@ -324,9 +324,9 @@ console.log("7. stopped download: feed dismisses once; late lines never resurrec
   const h = boot({ invokeImpl: invokeImpl });
   const feedsBox = h.doc.getElementById("op-feeds");
   h.emit("launcher://progress", { op: "download:v0.1.2-alpha.5", version: "0.1.2-alpha.5", phase: "registry", message: "Checking DeepSeek Harness versions", percent: 5 });
-  h.emit("launcher://progress", { op: "download:v0.1.2-alpha.5", version: "0.1.2-alpha.5", phase: "installing", message: "Installing DeepSeek Harness version@0.1.2-alpha.5", percent: 40, stoppable: true });
+  h.emit("launcher://progress", { op: "download:v0.1.2-alpha.5", version: "0.1.2-alpha.5", phase: "installing", message: "Installing DeepSeek Harness version@0.1.2-alpha.5", percent: 40 });
   const feedEl = feedsBox.children[feedsBox.children.length - 1];
-  check("download feed is downloading", feedEl.hidden === false);
+  check("download feed shows its command header", feedEl.hidden === false && feedEl._qs.get(".op-feed-head").hidden === false);
   // The user taps stop: the backend reports the cancelled phase (twice — the
   // second report mirrors the first on a refresh-driven progress replay).
   h.emit("launcher://progress", { op: "download:v0.1.2-alpha.5", version: "0.1.2-alpha.5", phase: "cancelled", message: "Download cancelled", percent: 0 });
@@ -347,54 +347,54 @@ console.log("7. stopped download: feed dismisses once; late lines never resurrec
   h.restore();
 }
 
-// ---------- 9. stop button only while npm runs ----------
-// Pure message feeds (registry checks, verification after npm, launcher
-// notices) must never offer the stop button; a real npm install shows it,
-// and the button hides again once npm is done while the output stays.
-console.log("9. stop button appears only for stoppable (npm-running) payloads");
+// ---------- 9. minimal terminal: header only for download phases ----------
+// Terminals render command header + output for download phases; pure message
+// phases (registry checks, launcher notices) stream as info lines with no
+// header and no stop/cancel control anywhere.
+console.log("9. minimal terminal: header for download phases only, no stop control");
 {
   const h = boot({ invokeImpl: invokeImpl });
   const feedsBox = h.doc.getElementById("op-feeds");
-  // Registry check: pure message, nothing to stop.
+  // Registry check: pure message — output line only, no header.
   h.emit("launcher://progress", { op: "update", version: null, phase: "registry", message: "Checking npm registry for latest version…", percent: 5 });
   let feedEl = feedsBox.children[0];
-  check("registry feed visible but not stoppable",
-    feedEl.hidden === false && feedEl._qs.get(".dl-cancel").hidden === true);
-  // Real npm install: stoppable.
-  h.emit("launcher://progress", { op: "update", version: "0.1.2-rc.1", phase: "installing", message: "Installing DeepSeek Harness version@0.1.2-rc.1", percent: 40, stoppable: true });
-  check("npm install shows the stop button", feedEl._qs.get(".dl-cancel").hidden === false);
-  // npm done — verification has nothing to stop; output stays visible.
-  h.emit("launcher://progress", { op: "update", version: "0.1.2-rc.1", phase: "verifying", message: "Verifying v0.1.2-rc.1…", percent: 85 });
-  check("verification hides the stop button", feedEl._qs.get(".dl-cancel").hidden === true);
-  check("terminal output still visible during verification", feedEl.hidden === false);
-  // Launcher-level notice (no op key): pure message, no stop.
+  check("registry feed visible without header",
+    feedEl.hidden === false && feedEl._qs.get(".op-feed-head").hidden === true);
+  check("registry message streamed as info line",
+    feedEl._qs.get(".term-out").children.some(function (c) { return /Checking npm registry/.test(String(c.textContent)); }));
+  // Real npm install: header + elapsed.
+  h.emit("launcher://progress", { op: "update", version: "0.1.2-rc.1", phase: "installing", message: "Installing DeepSeek Harness version@0.1.2-rc.1", percent: 40 });
+  check("npm install shows the header", feedEl._qs.get(".op-feed-head").hidden === false);
+  // Launcher-level notice (no op key): pure message, no header.
   h.emit("launcher://console", { stream: "info", text: "Removed installed version 0.1.1-rc.1" });
   const noticeEl = feedsBox.children[feedsBox.children.length - 1];
-  check("notice feed has no stop button",
-    noticeEl._qs.get(".dl-cancel").hidden === true);
+  check("notice feed has no header",
+    noticeEl._qs.get(".op-feed-head").hidden === true);
   h.sched.advance(10000);
   await settle();
   h.restore();
 }
 
-// ---------- 8. structure: square stop glyph + white install icon ----------
-console.log("8. structure: square stop glyph; white install button glyph");
+// ---------- 8. structure: minimal terminal + white install icon ----------
+console.log("8. structure: no stop control; white install button glyph");
 {
-  check("feed stop button uses the plain square glyph (stop-fill)",
-    /dl-cancel"[\s\S]{0,140}data-ico="stop-fill"/.test(html));
-  check("no stop-circle glyph reference remains", !/stop-circle/.test(html));
-  check("install button glyph is white",
-    /\.btn\.install \{ color: #fff; \}/.test(html));
-  check("install button gets a light-mode backing disc",
-    /\(prefers-color-scheme: light\)\s*\{\s*\.btn\.install \{ background: rgba\(29, 36, 48, 0\.32\); \}/.test(html));
-  check("stop-fill.svg is bundled",
-    html.includes("bootstrap-icons/") === false || true); // icon lives on disk:
+  check("no stop button in the panel markup",
+    !html.includes("dl-cancel") && !/aria-label="Stop download"/.test(html));
+  check("no stop glyph reference remains",
+    !/data-ico="stop-(fill|circle)"/.test(html));
   const fs = await import("node:fs");
   const path = await import("node:path");
   const url = await import("node:url");
   const root = path.resolve(path.dirname(url.fileURLToPath(import.meta.url)), "..");
-  check("stop-fill.svg exists in resources",
-    fs.existsSync(path.join(root, "src-tauri", "resources", "bootstrap-icons", "stop-fill.svg")));
+  check("stop-fill.svg removed from resources",
+    !fs.existsSync(path.join(root, "src-tauri", "resources", "bootstrap-icons", "stop-fill.svg")));
+  const overlay = fs.readFileSync(path.join(root, "src-tauri", "resources", "overlay.js"), "utf8");
+  check("no stop button in the overlay panel",
+    !overlay.includes("lc-stopdown") && !overlay.includes("stop-btn"));
+  check("install button glyph is white",
+    /\.btn\.install \{ color: #fff; \}/.test(html));
+  check("install button gets a light-mode backing disc",
+    /\(prefers-color-scheme: light\)\s*\{\s*\.btn\.install \{ background: rgba\(29, 36, 48, 0\.32\); \}/.test(html));
 }
 
 console.log("");

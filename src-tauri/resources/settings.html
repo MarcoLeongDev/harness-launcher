@@ -227,15 +227,6 @@
   .term-out .ln.out { color: #a9d5ff; }
   .term-out .ln.info { color: #8ecdf7; font-weight: 600; }
   .term-out .ln.err { color: #ff8a8a; }
-  .dl-cancel { position: absolute; right: 10px; bottom: 10px; width: 30px; height: 30px;
-    border-radius: 50%; border: none; background: var(--err); color: #fff; cursor: pointer;
-    display: inline-flex; align-items: center; justify-content: center; padding: 0; flex: none;
-    box-shadow: 0 3px 10px rgba(255,69,58,0.45); transition: background .15s, opacity .15s; }
-  .dl-cancel svg { width: 15px; height: 15px; }
-  .dl-cancel:hover { background: #ff6259; }
-  .dl-cancel:active { transform: translateY(1px); }
-  .dl-cancel:disabled { opacity: 0.55; cursor: default; transform: none; }
-  .dl-cancel:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
   /* Logs tab now also surfaces the live engine run output (merged view) */
 
   /* version tiles */
@@ -552,8 +543,14 @@
   }
   // ---------- operation feeds: one reusable terminal per operation ----------
   // Every in-flight operation (parallel version downloads included) owns one
-  // feed — head (npm command + elapsed), terminal output and stop button —
-  // so concurrent downloads never fight over a single output div.
+  // feed — head (npm command + elapsed) and terminal output — so concurrent
+  // downloads never fight over a single output div. There is no stop/cancel
+  // control: stuck npm operations are bounded by the run timeout.
+  // Download-ish operations during npm phases show the header (command +
+  // elapsed); pure message phases (registry checks, engine stop/start/
+  // restart, port changes, notices) render as terminal info lines only.
+  var downloadingOps = { download: 1, switch: 1, update: 1, rollback: 1, install: 1, select: 1 };
+  var downloadingPhases = { installing: 1, verifying: 1 };
   // Ops that stop/start/restart the engine: while any runs, engine controls
   // are disabled. Plain downloads (kind "download") never touch the engine.
   var engineBusyOps = { switch: 1, update: 1, rollback: 1, engine: 1, port: 1 };
@@ -578,9 +575,6 @@
       '</div>' +
       '<div class="op-feed-body">' +
         '<pre class="term-out terminal" aria-live="polite"></pre>' +
-        '<button class="dl-cancel" title="Stop download" aria-label="Stop download" hidden>' +
-          '<i class="ico sm bi" data-ico="stop-fill"></i>' +
-        '</button>' +
       '</div>';
     sel.feedsBox.appendChild(el);
     loadIconsIn(el);
@@ -588,7 +582,6 @@
     var cmd = el.querySelector('.op-feed-cmd');
     var elapsedEl = el.querySelector('.op-feed-elapsed');
     var out = el.querySelector('.term-out');
-    var stop = el.querySelector('.dl-cancel');
     var feed = {
       opKey: opKey, el: el, downloading: false, done: false,
       start: null, lastPhase: null,
@@ -611,7 +604,6 @@
         feed.downloading = on;
         el.classList.toggle('idle', !on);
         el.hidden = false;
-        stop.hidden = !on;
         head.hidden = !on;
         if (!on) {
           if (feed.elapsedTimer) { clearInterval(feed.elapsedTimer); feed.elapsedTimer = null; }
@@ -630,7 +622,7 @@
       armStuck: function () {
         if (feed.stuckTimer) clearTimeout(feed.stuckTimer);
         feed.stuckTimer = setTimeout(function () {
-          if (feed.downloading) feed.append('info', 'no progress for 60s — still working? tap the stop button to cancel');
+          if (feed.downloading) feed.append('info', 'no progress for 60s — still working…');
         }, 60000);
       },
       // Keep the terminal visible briefly after the operation settles, then
@@ -652,13 +644,6 @@
         }, ms);
       }
     };
-    stop.addEventListener('click', function () {
-      stop.disabled = true;
-      feed.append('info', 'Stopping download…');
-      invoke('cancel_operation', { op: feed.opKey })
-        .catch(function (e) { feed.append('err', String(e && e.message || e)); })
-        .finally(function () { setTimeout(function () { stop.disabled = false; }, 2000); });
-    });
     feeds[opKey] = feed;
     return feed;
   }
@@ -691,21 +676,15 @@
     if (!p) return;
     var kind = opKind(p.op);
     var f = feedFor(p.op || '');
-    // The stop button exists ONLY while npm is actually running for this
-    // operation — the backend marks exactly those payloads "stoppable".
-    // Pure message phases (registry checks, engine stop/start/restart, port
-    // changes, verification of an installed version, notices) have nothing
-    // to stop: they render as terminal lines with no stop button.
-    var downloading = !!p.stoppable;
-    var terminal = p.phase === 'done' || p.phase === 'failed' || p.phase === 'cancelled';
+    // Download-ish operations during download phases show the feed header
+    // (npm command + elapsed timer); pure message phases (engine
+    // stop/start/restart, port changes, verification-only runs, notices)
+    // stream as terminal info lines only. There is no stop/cancel control.
+    var downloading = !!downloadingOps[kind] && !!downloadingPhases[p.phase];
     if (downloading) {
       f.done = false;
       f.setDownloading(true);
       f.setHeader('Installing DeepSeek Harness version@' + (p.version || ''));
-    } else if (f.downloading && !terminal) {
-      // npm finished (or the op moved to a non-download phase) — nothing
-      // left to stop; keep the output visible but hide the stop button.
-      f.setDownloading(false);
     }
     // Milestone messages (registry → installing → verifying, stopping →
     // starting → running) stream in as info lines so the terminal tells the

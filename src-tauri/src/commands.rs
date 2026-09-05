@@ -747,34 +747,6 @@ pub fn open_harness_window(app: AppHandle) -> Result<String, String> {
     Ok("harness window opened".into())
 }
 
-/// Ask the backend to stop an in-flight download/operation. With `op` set
-/// only that operation is targeted (parallel downloads cancel independently);
-/// without it every in-flight operation is cancelled. The running npm child
-/// is killed as soon as it observes the cancellation flag.
-#[tauri::command]
-pub fn cancel_operation(app: AppHandle, op: Option<String>) -> Result<String, String> {
-    let ops = progress::current_ops(&app);
-    match op {
-        Some(key) if !key.is_empty() => {
-            if !ops.iter().any(|p| p.op == key) {
-                return Ok("no operation in progress".into());
-            }
-            progress::request_cancel(&app, &key);
-            Ok("stop requested — the operation will abort shortly".into())
-        }
-        _ => {
-            if ops.is_empty() {
-                return Ok("no operation in progress".into());
-            }
-            progress::request_cancel(&app, "");
-            Ok(format!(
-                "stop requested for {} operation(s) — they will abort shortly",
-                ops.len()
-            ))
-        }
-    }
-}
-
 /// Delete an installed harness version directory. Refuses to remove the
 /// version that is currently active or running in the engine.
 #[tauri::command]
