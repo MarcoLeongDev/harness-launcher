@@ -20,6 +20,7 @@ function npx(cliArgs) {
 }
 
 run("gen-icons.mjs");
+run("gen-symbols.mjs");
 const iconRes = npx(["icon", "src-tauri/icons/icon.png"]);
 if (iconRes.status !== 0) {
   console.warn("[prepare] tauri icon step failed (needs @tauri-apps/cli installed); bundle icons may be missing");
