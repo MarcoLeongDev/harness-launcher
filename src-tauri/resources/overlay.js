@@ -71,13 +71,6 @@
   #dsh-lc .term-out .ln.out { color: #a5e3ff; }
   #dsh-lc .term-out .ln.info { color: #8ecdf7; font-weight: 600; }
   #dsh-lc .term-out .ln.err { color: #ff8a8a; }
-  #dsh-lc .stop-btn { position: absolute; right: 8px; bottom: 8px; display: inline-flex;
-    align-items: center; gap: 5px; background: rgba(239,68,68,0.92); border: 1px solid rgba(255,255,255,0.18);
-    color: #fff; border-radius: 6px; padding: 4px 10px; font-size: 11px; font-weight: 600; cursor: pointer;
-    box-shadow: 0 3px 10px rgba(239,68,68,0.4); }
-  #dsh-lc .stop-btn:hover { background: #ff5252; }
-  #dsh-lc .stop-btn:disabled { opacity: 0.55; cursor: default; }
-  #dsh-lc .stop-btn .sq { width: 7px; height: 7px; background: #fff; border-radius: 1.5px; display: inline-block; }
   #dsh-lc button.sm { padding: 2px 8px; font-size: 11px; }
   `;
 
@@ -107,7 +100,6 @@
         <div class="term-head"><span class="term-title" id="lc-termtitle">Installing DeepSeek Harness version@…</span></div>
         <div class="term-body">
           <pre class="term-out" id="lc-termout"></pre>
-          <button class="stop-btn" id="lc-stopdown"><span class="sq"></span> Stop</button>
         </div>
       </div>
       <h3>Version</h3>
@@ -347,20 +339,6 @@
 
   $('lc-rollback').addEventListener('click', function () {
     withBusy(this, function () { return invoke('rollback', {}); });
-  });
-
-  // Stop the in-flight download via the terminal overlay button.
-  $('lc-stopdown').addEventListener('click', function () {
-    this.disabled = true;
-    appendTermLine('err', 'Stopping download…');
-    invoke('cancel_operation').then(function (res) {
-      appendTermLine('info', (res && res.message) || 'stop requested');
-    }).catch(function (e) {
-      appendTermLine('err', String(e && e.message || e));
-    }).finally(function () {
-      var btn = $('lc-stopdown');
-      setTimeout(function () { btn.disabled = false; }, 1500);
-    });
   });
 
   // Delete the currently selected version (two-step confirm).
