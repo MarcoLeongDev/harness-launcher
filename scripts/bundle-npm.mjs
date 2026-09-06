@@ -129,12 +129,18 @@ async function vendoring(version) {
   await writeFile(marker, version + "\n").catch((e) => console.warn("[bundle-npm] marker write skipped:", e.code));
   console.log("[bundle-npm] vendored npm " + version + " -> " + destDir);
 
-  const nodeSidecar = path.join(root, "src-tauri", "binaries", "node-aarch64-apple-darwin");
-  if (await exists(nodeSidecar)) {
-    const check = spawnSync(nodeSidecar, [path.join(destDir, "bin", "npm-cli.js"), "--version"], { encoding: "utf8" });
-    console.log("[bundle-npm] verified:", (check.stdout || "?").trim(), "(npm " + version + ")");
-    if (check.status !== 0) throw new Error("vendored npm failed to run: " + (check.stderr || ""));
+  const nodeSidecars = ["node-aarch64-apple-darwin", "node-x86_64-apple-darwin"]
+    .map((n) => path.join(root, "src-tauri", "binaries", n));
+  let checked = 0;
+  for (const nodeSidecar of nodeSidecars) {
+    if (await exists(nodeSidecar)) {
+      const check = spawnSync(nodeSidecar, [path.join(destDir, "bin", "npm-cli.js"), "--version"], { encoding: "utf8" });
+      console.log("[bundle-npm] verified:", (check.stdout || "?").trim(), "(npm " + version + ", " + path.basename(nodeSidecar) + ")");
+      if (check.status !== 0) throw new Error("vendored npm failed to run: " + (check.stderr || ""));
+      checked++;
+    }
   }
+  if (checked === 0) console.log("[bundle-npm] no node sidecar present yet — skipping smoke check");
 }
 
 async function* walk(dir) {
