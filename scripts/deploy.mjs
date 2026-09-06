@@ -8,12 +8,19 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const bundle = path.join(root, "src-tauri", "target", "release", "bundle", "macos", "DeepSeek Harness Launcher.app");
+// Default builds are universal, so prefer that bundle dir; fall back to the
+// host-arch dir (e.g. after `npm run build:host`).
+const candidates = [
+  path.join(root, "src-tauri", "target", "universal-apple-darwin", "release", "bundle", "macos", "DeepSeek Harness Launcher.app"),
+  path.join(root, "src-tauri", "target", "release", "bundle", "macos", "DeepSeek Harness Launcher.app"),
+];
+const bundle = candidates.find((p) => existsSync(p));
 const dest = "/Applications/DeepSeek Harness Launcher.app";
 const relaunch = process.argv.includes("--relaunch");
 
-if (!existsSync(bundle)) {
-  console.error("Release bundle not found:", bundle);
+if (!bundle) {
+  console.error("Release bundle not found. Looked in:");
+  for (const p of candidates) console.error("  " + p);
   console.error("Run `npm run build` first (assets + tauri build).");
   process.exit(1);
 }
