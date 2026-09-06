@@ -65,6 +65,7 @@ read-only).
 
 ```bash
 brew tap MarcoLeongDev/tap
+brew trust MarcoLeongDev/tap
 brew install --cask harness-launcher
 ```
 
@@ -72,8 +73,14 @@ China (中国大陆) users, if GitHub is slow:
 
 ```bash
 brew tap MarcoLeongDev/tap https://gitee.com/MarcoLeongDev/homebrew-tap
+brew trust MarcoLeongDev/tap
 brew install --cask harness-launcher
 ```
+
+> Unsigned build: the app is ad-hoc signed (free Apple account, no
+> notarization). The cask strips the quarantine attribute on install so it
+> launches cleanly. For a manual `.dmg` install, right-click
+> `Harness Launcher.app` → **Open** on first launch instead.
 
 Or download the `.dmg` from the **Releases** page (GitHub or Gitee) and drag
 `Harness Launcher.app` into `/Applications`.
