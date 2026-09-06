@@ -6,11 +6,11 @@
 - [x] 1.5 Commit, universal release build, deploy, relaunch, verify (lipo arches)
 
 ## 2. Release-doc polish (v0.1.74)
-- [ ] 2.1 README: trademark disclaimer, network note, prereqs + commands, Intel support
-- [ ] 2.2 Slim CONTRIBUTING.md (muda sync note)
-- [ ] 2.3 Bump to 0.1.74
-- [ ] 2.4 Commit, release build, deploy, relaunch, verify; keep the app running
+- [x] 2.1 README: trademark disclaimer, network note, prereqs + commands, Intel support
+- [x] 2.2 Slim CONTRIBUTING.md (muda sync note)
+- [x] 2.3 Bump to 0.1.74
+- [x] 2.4 Commit, release build, deploy, relaunch, verify; keep the app running
 
 ## 3. Close-out
-- [ ] 3.1 Archive lightspec change; merge feature branch into main
-- [ ] 3.2 Final report (completed items, commits, versions)
+- [x] 3.1 Archive lightspec change; merge feature branch into main
+- [x] 3.2 Final report (completed items, commits, versions)
