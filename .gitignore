@@ -34,3 +34,6 @@ id_rsa*
 # spec-driven process files (local workflow only, never published)
 lightspec/
 .agents/
+
+# agent instructions live alongside the local-only workflow files
+AGENTS.md
