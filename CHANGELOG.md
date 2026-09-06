@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.1.77 — Brew trust + unsigned-build notes
+- Install docs now include `brew trust MarcoLeongDev/tap` (required for
+  third-party taps) and explain the ad-hoc-signed (free Apple account)
+  first-launch flow.
+
 ## v0.1.74 — Release-doc polish
 - README: unofficial-project trademark disclaimer, first-launch network
   note, full prerequisites + commands, universal (Intel) support statement.
