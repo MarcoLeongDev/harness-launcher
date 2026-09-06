@@ -30,3 +30,7 @@ secrets*
 .npmrc
 id_rsa*
 *.pwd
+
+# spec-driven process files (local workflow only, never published)
+lightspec/
+.agents/
