@@ -52,6 +52,12 @@
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px;
     max-height: 180px; overflow: auto; white-space: pre-wrap; word-break: break-all; color: #a5b4fc; }
   #dsh-lc a { color: #60a5fa; }
+  /* Brand link: the app name and launcher version open the project GitHub
+     page. Overrides the default anchor color/underline so the line looks
+     exactly as before — only clickable. */
+  #dsh-lc a.repo { flex: 1; display: flex; justify-content: space-between; align-items: center;
+    color: inherit; text-decoration: none; cursor: pointer; border-radius: 4px; }
+  #dsh-lc a.repo:focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; }
   #dsh-lc .meta { display: flex; justify-content: space-between; align-items: center; }
   #dsh-lc .spin { display: inline-block; width: 10px; height: 10px; border: 2px solid #64748b;
     border-top-color: #fff; border-radius: 50%; animation: dsh-lc-spin 0.8s linear infinite; }
@@ -82,7 +88,7 @@
   rootEl.id = 'dsh-lc';
   rootEl.innerHTML = `
     <div id="dsh-lc-panel">
-      <div class="meta"><span class="big">Harness Launcher</span><span id="lc-ver" class="hint"></span></div>
+      <div class="meta"><a id="lc-repo" class="repo" href="https://github.com/MarcoLeongDev/harness-launcher" target="_blank" rel="noreferrer noopener" title="Open Harness Launcher on GitHub"><span class="big">Harness Launcher</span><span id="lc-ver" class="hint"></span></a></div>
       <div class="hint" style="margin:4px 0 0">Status display — engine actions live in the Control Panel (menu bar → Control Panel…).</div>
       <h3>Status</h3>
       <div class="row">
@@ -387,6 +393,15 @@
     $('lc-logs').style.display = logsVisible ? 'block' : 'none';
   });
 
+  // Brand line (app name, launcher version): opens the project GitHub page.
+  // preventDefault keeps the harness view in place; falls back to a plain
+  // new-tab open when Tauri IPC is unavailable in this context.
+  $('lc-repo').addEventListener('click', function (e) {
+    e.preventDefault();
+    invoke('open_repo_page', {}).catch(function () {
+      window.open('https://github.com/MarcoLeongDev/harness-launcher', '_blank', 'noopener');
+    });
+  });
   $('lc-browser').addEventListener('click', function () { invoke('open_in_browser', {}).catch(function (e) { setMsg(String(e.message || e), true); }); });
   $('lc-restart').addEventListener('click', function () { withBusy(this, function () { return invoke('restart_harness', {}); }); });
   $('lc-quit').addEventListener('click', function () { invoke('quit_app', {}); });
