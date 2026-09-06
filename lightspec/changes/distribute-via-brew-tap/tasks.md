@@ -1,8 +1,14 @@
 ## 1. Brew distribution plumbing (v0.1.75)
-- [ ] 1.1 Bundle `dmg` target in tauri.conf.json
-- [ ] 1.2 README: brew-first install, source builds for contributors
-- [ ] 1.3 cargo test; bump to 0.1.75
-- [ ] 1.4 Commit, universal build (app + DMG), deploy, relaunch, verify
+- [x] 1.1 Bundle `dmg` target in tauri.conf.json
+- [x] 1.2 README: brew-first install, source builds for contributors
+- [x] 1.3 cargo test; bump to 0.1.75
+- [x] 1.4 Commit, universal build (app + DMG), deploy, relaunch, verify
+
+## 1b. Rebrand app identity to Harness Launcher (v0.1.76)
+- [ ] 1b.1 productName + descriptions + deploy script + README app mentions
+- [ ] 1b.2 Keep: bundle id (data continuity), binary name, engine strings
+- [ ] 1b.3 cargo test; bump to 0.1.76
+- [ ] 1b.4 Commit, universal build, deploy (migrate old app path), relaunch, verify
 
 ## 2. Private forge setup + first release
 - [ ] 2.1 Create PRIVATE GitHub + Gitee repos, remotes, push main
