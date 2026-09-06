@@ -1,3 +1,10 @@
+<p>
+  <img src="https://img.shields.io/badge/platform-macOS%2011%2B%20(universal%3A%20Apple%20Silicon%20%2B%20Intel)-333333?logo=apple&logoColor=white" alt="Platform: macOS 11+ universal" />
+  <a href="https://tauri.app"><img src="https://img.shields.io/badge/built%20with-Tauri%202-24c8db?logo=tauri&logoColor=white" alt="Built with Tauri 2" /></a>
+  <img src="https://img.shields.io/badge/productivity-menubar%20app-22c55e" alt="Menubar app" />
+  <img src="https://img.shields.io/badge/license-MIT-3b82f6" alt="License: MIT" />
+</p>
+
 # Harness Launcher
 
 <p align="center">
@@ -7,13 +14,6 @@
 <h3 align="center">
   Run, manage and version the DeepSeek Harness engine — no browser, no terminal, no fuss.
 </h3>
-
-<p align="center">
-  <img src="https://img.shields.io/badge/platform-macOS%2011%2B%20(universal%3A%20Apple%20Silicon%20%2B%20Intel)-333333?logo=apple&logoColor=white" alt="Platform: macOS 11+ universal" />
-  <a href="https://tauri.app"><img src="https://img.shields.io/badge/built%20with-Tauri%202-24c8db?logo=tauri&logoColor=white" alt="Built with Tauri 2" /></a>
-  <img src="https://img.shields.io/badge/productivity-menubar%20app-22c55e" alt="Menubar app" />
-  <img src="https://img.shields.io/badge/license-MIT-3b82f6" alt="License: MIT" />
-</p>
 
 ---
 
@@ -32,26 +32,11 @@ without ever touching a terminal or keeping a browser tab open.
 > DeepSeek. The harness engine (`@deepseek-ai/dsh`) is a separate
 > MIT-licensed project; this launcher just manages it.
 
-## ✨ Features
 
-| | |
-|---|---|
-| 🚀 **Engine lifecycle** | Start / Stop / Restart the background harness right from the menu bar, the Control Panel window, or (Start only) the floating in-page panel. |
-| 📦 **Version management** | Install & switch between any published engine version with one click — the **Active** radio in the versions table picks the running version, **update to latest** and **roll back** to the previously installed version are one button each. Every version lives in its own isolated install, offline-safe. |
-| 🖥️ **Live download terminal** | While a version is downloading you see the real `npm install` output in a terminal view — each in-flight operation gets its own terminal, streams live, and dismisses itself when done (no manual cleanup, no dead controls). |
-| 🗑️ **Delete versions** | Remove installed engine versions you no longer need (the active version is protected by a confirmation popover). |
-| 🌐 **Choose your port** | Set any loopback port — the harness restarts on it and the window follows automatically, with transparent fallback if the port is busy. |
-| 🔔 **Update checks** | Manual harness update checks from the panel or menubar ("Check now"); no background polling, no silent installs (optional app self-update via the Tauri updater). |
-| 📋 **Logs** | Follow the live harness log tail straight from the Control Panel (toggleable bottom drawer). |
-| 🧰 **No browser needed** | The harness WebUI opens in its own app window; “Open in Browser” is available when you *do* want a tab. |
-
-## 🖼️ What it looks like
+## 🖼️ Screenshots
 
 <p align="center">
   <img src="logo/Screenshot.png" alt="Harness Launcher Control Panel" width="420" />
-</p>
-<p align="center">
-  <sub>The Control Panel: engine card (version · host · port), update banner, the versions table (<b>Active</b> radio, open-directory, delete) with the install row last, and a live operation terminal below.</sub>
 </p>
 
 The **Control Panel** (menu bar → `Control Panel…`) aggregates engine status,
@@ -61,7 +46,8 @@ UI shows live status without leaving your chat; mutating actions live in the
 Control Panel (the harness page is untrusted, so its window is intentionally
 read-only).
 
-## 🚀 Install (recommended)
+
+## 🚀 Quickstart (recommended)
 
 ```bash
 brew tap MarcoLeongDev/tap
@@ -85,10 +71,26 @@ brew install --cask harness-launcher
 Or download the `.dmg` from the **Releases** page (GitHub or Gitee) and drag
 `Harness Launcher.app` into `/Applications`.
 
-> Building from source is for contributors only — see
+
+## ✨ Features
+
+| | |
+|---|---|
+| 🚀 **Engine lifecycle** | Start / Stop / Restart the background harness right from the menu bar, the Control Panel window, or (Start only) the floating in-page panel. |
+| 📦 **Version management** | Install & switch between any published engine version with one click — the **Active** radio in the versions table picks the running version, **update to latest** and **roll back** to the previously installed version are one button each. Every version lives in its own isolated install, offline-safe. |
+| 🖥️ **Live download terminal** | While a version is downloading you see the real `npm install` output in a terminal view — each in-flight operation gets its own terminal, streams live, and dismisses itself when done (no manual cleanup, no dead controls). |
+| 🗑️ **Delete versions** | Remove installed engine versions you no longer need (the active version is protected by a confirmation popover). |
+| 🌐 **Choose your port** | Set any loopback port — the harness restarts on it and the window follows automatically, with transparent fallback if the port is busy. |
+| 🔔 **Update checks** | Manual harness update checks from the panel or menubar ("Check now"); no background polling, no silent installs (optional app self-update via the Tauri updater). |
+| 📋 **Logs** | Follow the live harness log tail straight from the Control Panel (toggleable bottom drawer). |
+| 🧰 **No browser needed** | The harness WebUI opens in its own app window; “Open in Browser” is available when you *do* want a tab. |
+
+
+## 🧰 Build from source
+
+> Building from source is recommended for contributors — see
 > [Development](#-development) below.
 
-## 🧰 Build from source (contributors)
 
 ### From a release build
 
