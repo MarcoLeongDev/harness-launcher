@@ -50,8 +50,9 @@ pub struct StatusPayload {
 /// commands run there. Everything mutating (versions, engine lifecycle,
 /// ports, settings, app exit) requires the launcher-owned Control Panel
 /// (`settings`) window. POLICY: allow = get_status, tail_logs, engine_start
-/// (stopped page), open_in_browser, open_settings, open_harness_window,
-/// set_prerelease (view filter), check_updates (read-only + notify).
+/// (stopped page), open_in_browser, open_repo_page, open_settings,
+/// open_harness_window, set_prerelease (view filter), check_updates
+/// (read-only + notify).
 fn require_panel(window: &tauri::Window) -> Result<(), String> {
     if window.label() == crate::window::LABEL {
         return Err("not permitted from the harness window — use the Control Panel".into());
@@ -850,6 +851,37 @@ pub fn open_version_dir(app: AppHandle, window: tauri::Window, version: String) 
         .spawn()
         .map_err(|e| format!("failed to open directory: {e}"))?;
     Ok(format!("opened {}", dir.display()))
+}
+
+/// Project homepage opened by the brand header (logo, app name, launcher
+/// version) in the Control Panel, the engine-stopped page and the
+/// harness-window overlay. A single allowlisted constant: callers cannot
+/// choose the URL, so this stays a benign open-external action.
+pub const REPO_URL: &str = "https://github.com/MarcoLeongDev/harness-launcher";
+
+/// Open the project GitHub page in the default browser. Read-only and
+/// benign, so it is callable from any window (no Control Panel gate) —
+/// same OS-opener pattern as `open_in_browser`, but fixed to REPO_URL.
+#[tauri::command]
+pub fn open_repo_page() -> Result<String, String> {
+    std::process::Command::new("open")
+        .arg(REPO_URL)
+        .spawn()
+        .map_err(|e| format!("failed to open browser: {e}"))?;
+    Ok(format!("opened {REPO_URL}"))
+}
+
+#[cfg(test)]
+mod repo_tests {
+    use super::REPO_URL;
+
+    #[test]
+    fn repo_url_points_at_the_project_page() {
+        assert_eq!(
+            REPO_URL,
+            "https://github.com/MarcoLeongDev/harness-launcher"
+        );
+    }
 }
 
 #[tauri::command]

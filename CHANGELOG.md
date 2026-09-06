@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.1.79 — Brand header opens the GitHub project page
+- The logo, app name and launcher version now open the project GitHub page in the default browser (Control Panel header, engine-stopped page, harness-window overlay brand line). Visual style unchanged: no underline, color shift or extra decoration. New benign read-only `open_repo_page` command (allowlisted URL, callable from any window).
+
 ## v0.1.78 — README quickstart + new screenshot
 - README reorganized around a quickstart flow (badges, screenshots,
   install, features, source build); new Control Panel + harness screenshot.

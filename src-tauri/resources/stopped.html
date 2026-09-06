@@ -44,12 +44,20 @@
   button.ghost { background: transparent; border: 1px solid #2a3d61; color: #c7d6ec; }
   button.ghost:hover { background: rgba(59,130,246,0.12); }
   .hint { margin-top: 18px; font-size: 11px; color: #5f7294; min-height: 16px; }
+  /* Brand link: the logo and app name open the project GitHub page.
+     Unstyled — inherits the card look (no underline, no color shift, no
+     extra decoration); only clickable. */
+  a.brand-link { display: block; text-decoration: none; color: inherit; cursor: pointer;
+    border-radius: 12px; }
+  a.brand-link:focus-visible { outline: 2px solid #3b82f6; outline-offset: 4px; }
 </style>
 </head>
 <body>
   <div class="card">
-    <div class="logo"><img id="brand-logo" src="dsh-ui://localhost/brand/logo.png" alt="Harness Launcher logo" /></div>
-    <h1>Harness Launcher</h1>
+    <a class="brand-link" id="brand-link" href="https://github.com/MarcoLeongDev/harness-launcher" title="Open Harness Launcher on GitHub" aria-label="Open Harness Launcher on GitHub">
+      <div class="logo"><img id="brand-logo" src="dsh-ui://localhost/brand/logo.png" alt="Harness Launcher logo" /></div>
+      <h1>Harness Launcher</h1>
+    </a>
     <div class="sub">The harness engine is stopped</div>
     <p>The DeepSeek Harness background engine is not running. Start it to open the harness UI, or open the Control Panel to manage versions, updates, port and logs.</p>
     <button id="btn-start">Start Engine</button>
@@ -81,6 +89,14 @@
   });
   document.getElementById('btn-settings').addEventListener('click', function () {
     run(function () { return invoke('open_settings', {}); });
+  });
+  // Brand header (logo, app name): opens the project GitHub page.
+  // preventDefault keeps the view on dsh-ui:// instead of navigating away.
+  document.getElementById('brand-link').addEventListener('click', function (e) {
+    e.preventDefault();
+    invoke('open_repo_page', {}).catch(function (err) {
+      hint.textContent = String(err && err.message || err);
+    });
   });
 })();
 </script>
