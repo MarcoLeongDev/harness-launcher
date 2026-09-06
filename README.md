@@ -1,7 +1,7 @@
-# DeepSeek Harness Launcher
+# Harness Launcher
 
 <p align="center">
-  <img src="logo/DSH Launcher.png" alt="DeepSeek Harness Launcher" width="180" />
+  <img src="logo/DSH Launcher.png" alt="Harness Launcher" width="180" />
 </p>
 
 <h3 align="center">
@@ -17,7 +17,7 @@
 
 ---
 
-**DeepSeek Harness Launcher** is a polished macOS menubar app that wraps the
+**Harness Launcher** is a polished macOS menubar app that wraps the
 DeepSeek Harness (`dsh`) engine in a self-contained Tauri shell. It
 encapsulates all the complexity of running an AI harness engine: install,
 update, switch versions, start, stop — everything a harness developer needs,
@@ -48,7 +48,7 @@ without ever touching a terminal or keeping a browser tab open.
 ## 🖼️ What it looks like
 
 <p align="center">
-  <img src="logo/Screenshot.png" alt="DeepSeek Harness Launcher Control Panel" width="420" />
+  <img src="logo/Screenshot.png" alt="Harness Launcher Control Panel" width="420" />
 </p>
 <p align="center">
   <sub>The Control Panel: engine card (version · host · port), update banner, the versions table (<b>Active</b> radio, open-directory, delete) with the install row last, and a live operation terminal below.</sub>
@@ -61,7 +61,27 @@ UI shows live status without leaving your chat; mutating actions live in the
 Control Panel (the harness page is untrusted, so its window is intentionally
 read-only).
 
-## 🚀 Quick start
+## 🚀 Install (recommended)
+
+```bash
+brew tap MarcoLeongDev/tap
+brew install --cask harness-launcher
+```
+
+China (中国大陆) users, if GitHub is slow:
+
+```bash
+brew tap MarcoLeongDev/tap https://gitee.com/MarcoLeongDev/homebrew-tap
+brew install --cask harness-launcher
+```
+
+Or download the `.dmg` from the **Releases** page (GitHub or Gitee) and drag
+`Harness Launcher.app` into `/Applications`.
+
+> Building from source is for contributors only — see
+> [Development](#-development) below.
+
+## 🧰 Build from source (contributors)
 
 ### From a release build
 
@@ -69,7 +89,7 @@ read-only).
 cd source
 npm install                # installs @tauri-apps/cli
 npm run assets             # icons + bundled Node sidecar + vendored npm (network once)
-npm run build              # universal tauri build → src-tauri/target/universal-apple-darwin/release/bundle/macos/DeepSeek Harness Launcher.app
+npm run build              # universal tauri build → src-tauri/target/universal-apple-darwin/release/bundle/macos/Harness Launcher.app
 ```
 
 ### Manual deploy to /Applications
@@ -81,7 +101,7 @@ npm run deploy:relaunch    # build, install, then restart the running instance
 
 ### Day-to-day use
 
-1. Launch **DeepSeek Harness Launcher** — it's a menubar app (no Dock icon).
+1. Launch **Harness Launcher** — it's a menubar app (no Dock icon).
 2. On first launch it installs the latest engine version in the background
    (**network required**: the engine is fetched from the npm registry into
    the app data dir — the download bundle ships the Node runtime, not the
@@ -143,7 +163,7 @@ engine versions, settings or logs.
 cd source
 npm run assets         # icons + tray glyphs + Node sidecars (both arches) + vendored npm + web-dist stub
 npx tauri dev          # or: cargo run --manifest-path src-tauri/Cargo.toml
-npm run build          # universal release build → src-tauri/target/universal-apple-darwin/.../DeepSeek Harness Launcher.app
+npm run build          # universal release build → src-tauri/target/universal-apple-darwin/.../Harness Launcher.app
 npm run build:host     # faster single-arch build for local iteration
 npm run deploy         # universal build + install into /Applications
 npm run deploy:relaunch# build, install, then restart the running instance
