@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.1.78 — README quickstart + new screenshot
+- README reorganized around a quickstart flow (badges, screenshots,
+  install, features, source build); new Control Panel + harness screenshot.
+
 ## v0.1.77 — Brew trust + unsigned-build notes
 - Install docs now include `brew trust MarcoLeongDev/tap` (required for
   third-party taps) and explain the ad-hoc-signed (free Apple account)
