@@ -9,7 +9,7 @@
 </h3>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/platform-macOS%2011%2B%20(Apple%20Silicon)-333333?logo=apple&logoColor=white" alt="Platform: macOS 11+" />
+  <img src="https://img.shields.io/badge/platform-macOS%2011%2B%20(universal%3A%20Apple%20Silicon%20%2B%20Intel)-333333?logo=apple&logoColor=white" alt="Platform: macOS 11+ universal" />
   <a href="https://tauri.app"><img src="https://img.shields.io/badge/built%20with-Tauri%202-24c8db?logo=tauri&logoColor=white" alt="Built with Tauri 2" /></a>
   <img src="https://img.shields.io/badge/productivity-menubar%20app-22c55e" alt="Menubar app" />
   <img src="https://img.shields.io/badge/license-MIT-3b82f6" alt="License: MIT" />
@@ -27,6 +27,10 @@ without ever touching a terminal or keeping a browser tab open.
 > harness inside the app (bundled Node runtime + vendored npm), serves the
 > harness WebUI on `http://127.0.0.1:<port>`, and gives you a native menubar
 > presence for the full lifecycle. Close the window — the engine keeps serving.
+
+> **Unofficial community project** — not affiliated with or endorsed by
+> DeepSeek. The harness engine (`@deepseek-ai/dsh`) is a separate
+> MIT-licensed project; this launcher just manages it.
 
 ## ✨ Features
 
@@ -65,7 +69,7 @@ read-only).
 cd source
 npm install                # installs @tauri-apps/cli
 npm run assets             # icons + bundled Node sidecar + vendored npm (network once)
-npm run build              # tauri build → src-tauri/target/release/bundle/macos/DeepSeek Harness Launcher.app
+npm run build              # universal tauri build → src-tauri/target/universal-apple-darwin/release/bundle/macos/DeepSeek Harness Launcher.app
 ```
 
 ### Manual deploy to /Applications
@@ -78,7 +82,10 @@ npm run deploy:relaunch    # build, install, then restart the running instance
 ### Day-to-day use
 
 1. Launch **DeepSeek Harness Launcher** — it's a menubar app (no Dock icon).
-2. On first launch it installs the latest engine version in the background.
+2. On first launch it installs the latest engine version in the background
+   (**network required**: the engine is fetched from the npm registry into
+   the app data dir — the download bundle ships the Node runtime, not the
+   engine itself).
 3. The engine starts and the harness UI opens in its own window.
 4. Use the **Control Panel** to start/stop, switch versions, watch downloads
    and change the port (the floating **DSh panel** shows status and starts a
@@ -117,17 +124,32 @@ engine versions, settings or logs.
 
 ## 🧑‍💻 Development
 
+### Prerequisites
+
+- **macOS 11 or later**, Apple Silicon or Intel (release builds are universal
+  `x86_64 + arm64` binaries).
+- **Rust stable** (≥ 1.77) with both Apple targets for universal builds:
+  `rustup target add aarch64-apple-darwin x86_64-apple-darwin`.
+- **Xcode Command Line Tools** (C linker, `lipo`, and `/usr/bin/swift` for
+  rendering the tray glyphs).
+- **Node.js 20+ with npm** (build-time only — the app is fully
+  self-contained at runtime via its bundled Node sidecar + vendored npm).
+- **Network** for the one-time toolchain fetch (nodejs.org, npm registry)
+  and for engine installs at runtime.
+
+### Commands
+
 ```bash
 cd source
-npm run assets
-npx tauri dev              # or: cargo run --manifest-path src-tauri/Cargo.toml
-npm test                   # panel/feed integration checks (scripts/test-panel-feed.mjs)
+npm run assets         # icons + tray glyphs + Node sidecars (both arches) + vendored npm + web-dist stub
+npx tauri dev          # or: cargo run --manifest-path src-tauri/Cargo.toml
+npm run build          # universal release build → src-tauri/target/universal-apple-darwin/.../DeepSeek Harness Launcher.app
+npm run build:host     # faster single-arch build for local iteration
+npm run deploy         # universal build + install into /Applications
+npm run deploy:relaunch# build, install, then restart the running instance
+npm test               # panel/feed integration checks (scripts/test-panel-feed.mjs)
 cd src-tauri && cargo test # Rust unit tests
 ```
-
-Prerequisites: **macOS 11 or later (Apple Silicon)**, Rust stable, Xcode
-Command Line Tools, Node.js 20+ (build-time only — the app is fully
-self-contained at runtime).
 
 ## 🏗️ Architecture
 

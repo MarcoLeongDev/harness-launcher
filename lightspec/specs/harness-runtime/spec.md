@@ -11,15 +11,19 @@ The launcher SHALL install `@deepseek-ai/dsh` versions into isolated directories
 - **THEN** the command fails with an invalid-version error and no filesystem change occurs
 
 ### Requirement: Bundled Node and NPM
-The launcher SHALL bundle a Node.js runtime as a Tauri sidecar binary and a vendored copy of the npm CLI, and SHALL run install, update, rollback and execution of the harness exclusively with those bundled tools, never requiring system node, npm or npx. The build scripts SHALL pin exact Node and npm versions and SHALL verify the SHA256 checksum of every downloaded toolchain artifact before extracting or vendoring it, so releases are reproducible and tamper-evident.
+The launcher SHALL bundle a Node.js runtime as a Tauri sidecar binary and a vendored copy of the npm CLI, and SHALL run install, update, rollback and execution of the harness exclusively with those bundled tools, never requiring system node, npm or npx. On macOS the app SHALL ship as a universal binary (Apple Silicon + Intel): the build SHALL fetch, checksum-verify and bundle the Node sidecar for both architectures, and the default release build SHALL target `universal-apple-darwin`.
 
 #### Scenario: Fresh machine without system Node
 - **WHEN** the app runs on a machine that has no system Node
 - **THEN** harness install and launch still succeed using the bundled Node and vendored npm
 
-#### Scenario: Tampered toolchain download
-- **WHEN** a downloaded Node or npm artifact fails checksum verification
-- **THEN** the prepare step aborts before the artifact is used
+#### Scenario: Intel Mac
+- **WHEN** the app runs on an Intel Mac
+- **THEN** it launches and manages the engine natively via the x86_64 slices
+
+#### Scenario: npx-style invocations
+- **WHEN** the runtime needs npx semantics (running package binaries)
+- **THEN** the app invokes the vendored npm CLI via `node <npm-cli.js> exec ...`
 
 ### Requirement: Harness Version Management
 The launcher SHALL let the user list published versions of `@deepseek-ai/dsh` (from the npm registry), install any listed version, switch the active version, and roll back to any previously installed version. Installs SHALL reuse the shared npm cache and use cache-friendly flags (prefer-offline, no audit/fund) so repeated or neighbor-version installs are as fast as the registry allows, and SHALL report honest progress to the user (command, elapsed time, terminal lines, cancel).
