@@ -57,6 +57,12 @@
     border: 1px solid var(--hair2); background: #fff; }
   .logo img { width: 100%; height: 100%; display: block; object-fit: cover; }
   .header-title { font-size: 15px; font-weight: 650; letter-spacing: -0.2px; }
+  /* Brand link: the logo, app name and launcher version open the project
+     GitHub page. Unstyled — inherits the surrounding header look (no
+     underline, no color shift, no extra decoration); only clickable. */
+  a.brand-link { display: flex; align-items: center; gap: 10px;
+    text-decoration: none; color: inherit; cursor: pointer; border-radius: 9px; }
+  a.brand-link:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
   header .spacer { flex: 1; }
   /* Launcher version: bare, subtle text — no tag styling. The header stays
      minimal: no engine version tag beside the power button. */
@@ -350,9 +356,11 @@
 <body>
 
 <header>
-  <div class="logo"><img id="brand-logo" src="dsh-ui://localhost/brand/logo.png" alt="Harness Launcher" /></div>
-  <span class="header-title">Harness Launcher</span>
-  <span class="hdr-ver-subtle" id="app-ver"></span>
+  <a class="brand-link" id="brand-link" href="https://github.com/MarcoLeongDev/harness-launcher" title="Open Harness Launcher on GitHub" aria-label="Open Harness Launcher on GitHub">
+    <div class="logo"><img id="brand-logo" src="dsh-ui://localhost/brand/logo.png" alt="Harness Launcher" /></div>
+    <span class="header-title">Harness Launcher</span>
+    <span class="hdr-ver-subtle" id="app-ver"></span>
+  </a>
   <span class="spacer"></span>
   <button class="hdr-quit" id="btn-quit" title="Quit"><i class="ico sm bi" data-ico="power"></i></button>
 </header>
@@ -1071,6 +1079,9 @@
   });
 
   sel.browser.addEventListener('click', function () { invoke('open_in_browser', {}).catch(function (e) { setResult(String(e.message || e), true); }); });
+  // Brand header (logo, app name, version): opens the project GitHub page.
+  // preventDefault keeps the panel on dsh-ui:// instead of navigating away.
+  $('brand-link').addEventListener('click', function (e) { e.preventDefault(); invoke('open_repo_page', {}).catch(function (err) { setResult(String(err.message || err), true); }); });
   sel.quit.addEventListener('click', function () { invoke('quit_app', {}); });
 
   // events
