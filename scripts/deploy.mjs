@@ -11,11 +11,16 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 // Default builds are universal, so prefer that bundle dir; fall back to the
 // host-arch dir (e.g. after `npm run build:host`).
 const candidates = [
-  path.join(root, "src-tauri", "target", "universal-apple-darwin", "release", "bundle", "macos", "DeepSeek Harness Launcher.app"),
-  path.join(root, "src-tauri", "target", "release", "bundle", "macos", "DeepSeek Harness Launcher.app"),
+  path.join(root, "src-tauri", "target", "universal-apple-darwin", "release", "bundle", "macos", "Harness Launcher.app"),
+  path.join(root, "src-tauri", "target", "release", "bundle", "macos", "Harness Launcher.app"),
 ];
 const bundle = candidates.find((p) => existsSync(p));
-const dest = "/Applications/DeepSeek Harness Launcher.app";
+const dest = "/Applications/Harness Launcher.app";
+// One-time rebrand migration (v0.1.76): the app used to ship as
+// "DeepSeek Harness Launcher.app" — remove the old bundle so two copies
+// never sit side by side (same bundle id, shared data dir, so settings,
+// versions and logs carry over untouched).
+const legacyDest = "/Applications/DeepSeek Harness Launcher.app";
 const relaunch = process.argv.includes("--relaunch");
 
 if (!bundle) {
@@ -58,12 +63,22 @@ if (!existsSync(mainBin)) {
   process.exit(1);
 }
 const size = (statSync(mainBin).size / 1e6).toFixed(1);
-console.log(`Installed DeepSeek Harness Launcher.app (main binary ${size} MB, sidecar node + vendored npm bundled).`);
+console.log(`Installed Harness Launcher.app (main binary ${size} MB, sidecar node + vendored npm bundled).`);
+if (existsSync(legacyDest)) {
+  execFileSync("rm", ["-rf", legacyDest], { stdio: "inherit" });
+  console.log("  removed legacy bundle:", legacyDest);
+}
 
 if (relaunch) {
   console.log("Quitting the running instance…");
   try {
-    execFileSync("osascript", ["-e", 'tell application "DeepSeek Harness Launcher" to quit'], { stdio: "ignore" });
+    for (const name of ["Harness Launcher", "DeepSeek Harness Launcher"]) {
+      try {
+        execFileSync("osascript", ["-e", `tell application "${name}" to quit`], { stdio: "ignore" });
+      } catch {
+        /* not running under this name — fine */
+      }
+    }
   } catch {
     /* not running — fine */
   }
@@ -71,7 +86,7 @@ if (relaunch) {
   const delay = (ms) => new Promise((r) => setTimeout(r, ms));
   await delay(1500);
   console.log("Launching the new build…");
-  execFileSync("open", ["-a", "DeepSeek Harness Launcher"], { stdio: "inherit" });
+  execFileSync("open", ["-a", dest], { stdio: "inherit" });
 } else {
   console.log("A running instance (if any) keeps running; relaunch it later to pick up this build.");
 }

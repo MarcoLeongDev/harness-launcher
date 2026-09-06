@@ -1,4 +1,4 @@
-// DeepSeek Harness Launcher overlay — floating control panel, bottom-left of the harness WebUI.
+// Harness Launcher overlay — floating control panel, bottom-left of the harness WebUI.
 // Injected at documentStart by the Rust shell (initialization_script).
 (function () {
   'use strict';
