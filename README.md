@@ -61,7 +61,27 @@ UI shows live status without leaving your chat; mutating actions live in the
 Control Panel (the harness page is untrusted, so its window is intentionally
 read-only).
 
-## 🚀 Quick start
+## 🚀 Install (recommended)
+
+```bash
+brew tap MarcoLeongDev/tap
+brew install --cask deepseek-harness-launcher
+```
+
+China (中国大陆) users, if GitHub is slow:
+
+```bash
+brew tap MarcoLeongDev/tap https://gitee.com/MarcoLeongDev/homebrew-tap
+brew install --cask deepseek-harness-launcher
+```
+
+Or download the `.dmg` from the **Releases** page (GitHub or Gitee) and drag
+`DeepSeek Harness Launcher.app` into `/Applications`.
+
+> Building from source is for contributors only — see
+> [Development](#-development) below.
+
+## 🧰 Build from source (contributors)
 
 ### From a release build
 
