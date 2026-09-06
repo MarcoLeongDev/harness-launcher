@@ -1,4 +1,4 @@
-//! DeepSeek Harness Launcher \u2014 a Tauri macOS menubar app that installs,
+//! Harness Launcher \u2014 a Tauri macOS menubar app that installs,
 //! updates, versions and manages the DeepSeek Harness background engine.
 mod commands;
 mod port;
