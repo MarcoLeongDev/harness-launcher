@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.1.74 — Release-doc polish
+- README: unofficial-project trademark disclaimer, first-launch network
+  note, full prerequisites + commands, universal (Intel) support statement.
+- New slim CONTRIBUTING.md holding the vendored-muda patch sync burden.
+
+## v0.1.73 — Universal macOS binary
+- Default release build targets `universal-apple-darwin` (arm64 + x86_64,
+  verified with `lipo`); Node sidecars fetched + verified for both arches
+  and combined into one universal sidecar; `build:host` kept for fast
+  iteration; deploy script prefers the universal bundle.
+- Bundle category set to DeveloperTool.
+
 ## v0.1.72 — Release hygiene (SN13)
 - Added this CHANGELOG; README/SECURITY updated for the security-hardened
   behavior (read-only harness window, manual update checks, no force-restart).
