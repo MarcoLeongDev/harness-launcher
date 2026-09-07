@@ -61,6 +61,11 @@ function makeElement(doc, tag) {
     children: [], parentNode: null,
     _classes: new Set(), _qs: new Map(),
     hidden: true, disabled: false, textContent: "",
+    // Browser semantics: assigning innerHTML replaces (here: clears) children.
+    // Without this, re-filled selects/tables accumulate options/rows across
+    // refreshes and selection-preservation tests cannot be faithful.
+    set innerHTML(v) { el.children = []; },
+    get innerHTML() { return ""; },
     className: "",
     get classList() {
       const classes = el._classes;
@@ -434,6 +439,48 @@ console.log("9. versions table renders hostile version names as inert text");
     texts.join("|").slice(0, 200));
   check("no innerHTML sink interpolates a version variable",
     !/\.innerHTML\s*=[^;]*\+\s*v\b/.test(html));
+  h.restore();
+}
+
+// ---------- 11. version-list refresh button ----------
+console.log("11. install row refresh button refetches the list, keeps selection");
+{
+  check("refresh button in install row markup with refresh glyph",
+    html.includes('id="btn-refresh-versions"') && html.includes('data-ico="arrow-clockwise"'));
+  let glyphOk = false;
+  try { readFileSync(path.join(root, "src-tauri", "resources", "bootstrap-icons", "arrow-clockwise.svg")); glyphOk = true; } catch {}
+  check("refresh glyph bundled", glyphOk);
+  check("refresh button styled icon-only",
+    /\.ver-refresh-btn svg \{ width: 16px; height: 16px; \}/.test(html));
+  let refreshCalls = 0, extraVersion = false;
+  const h = boot({ invokeImpl: function (cmd) {
+    if (cmd === "refresh_versions") { refreshCalls++; extraVersion = true; return "version list refreshed (3 versions)"; }
+    if (cmd === "get_status") {
+      return { enginePhase: "stopped", running: false, launcherVersion: "0.1.80",
+        activeVersion: "0.1.1", previousVersion: null, port: 3081, actualPort: 3081, portChanged: false,
+        versions: extraVersion ? ["0.1.1", "0.1.2", "0.1.3"] : ["0.1.1", "0.1.2"],
+        installedVersions: ["0.1.1"], latestRemote: "0.1.2", updateAvailable: false,
+        includePrerelease: false, startOnLaunch: true, bootError: null,
+        currentOp: null, currentOps: [], console: [], webUrl: null };
+    }
+    if (cmd === "tail_logs") return "";
+    return {};
+  } });
+  check("no init-time crash with refresh button present", h.error === null, h.error && String(h.error));
+  await settle();
+  const rsel = h.doc.getElementById("sel-install-ver");
+  const rbtn = h.doc.getElementById("btn-refresh-versions");
+  check("dropdown lists published versions", rsel.children.length === 2);
+  check("refresh button wired",
+    !!(rbtn._handlers && rbtn._handlers.click && rbtn._handlers.click.length));
+  rsel.value = "0.1.1";
+  rbtn._handlers.click[0]();
+  check("button busy-disables while fetching", rbtn.disabled === true);
+  await settle();
+  check("refresh_versions invoked once", refreshCalls === 1);
+  check("dropdown picks up the new version", rsel.children.length === 3);
+  check("selection preserved across refresh", rsel.value === "0.1.1");
+  check("button re-enabled after refresh", rbtn.disabled === false);
   h.restore();
 }
 

@@ -884,6 +884,41 @@ mod repo_tests {
     }
 }
 
+/// Re-fetch the published harness version list from the npm registry right
+/// now, bypassing the `get_status` cache TTL (the install-row dropdown
+/// otherwise lags up to 60 s behind a fresh publish). Read-only: no engine
+/// touch, no settings change — but Control Panel only, like the other
+/// version commands, so untrusted harness-window content cannot trigger
+/// registry traffic.
+#[tauri::command]
+pub async fn refresh_versions(app: AppHandle, window: tauri::Window) -> Result<String, String> {
+    require_panel(&window)?;
+    // Async + spawn_blocking: the listing shells out to npm and must never
+    // block the main thread (same reason as get_status).
+    tauri::async_runtime::spawn_blocking(move || {
+        let settings = state::read_settings(&app);
+        let rd = state::runtime_dir(&app);
+        // Drop the cached list first so the fetch below cannot serve stale
+        // data even if listing falls back; then refresh through the same
+        // choke point get_status uses, so filtering/sorting stay identical.
+        invalidate_version_cache(&app);
+        match versions::list_versions(&app, &rd, settings.include_prerelease) {
+            Ok(v) => {
+                let n = v.len();
+                let st = app.state::<AppState>();
+                let mut vc = st.version_cache.lock().unwrap();
+                vc.versions = v;
+                vc.include_prerelease = settings.include_prerelease;
+                vc.fetched_at = Some(std::time::Instant::now());
+                Ok(format!("version list refreshed ({n} versions)"))
+            }
+            Err(e) => Err(format!("version refresh failed: {e}")),
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[tauri::command]
 pub fn quit_app(app: AppHandle, window: tauri::Window) -> Result<(), String> {
     require_panel(&window)?;
