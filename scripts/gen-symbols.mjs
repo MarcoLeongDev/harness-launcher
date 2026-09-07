@@ -20,9 +20,7 @@ const SYMBOLS = [
   ["start", "play"],
   ["stop", "stop"],
   ["restart", "arrow.counterclockwise"],
-  ["browser", "arrow.up.right.square"],
-  ["fullscreen-harness", "arrow.up.left.and.arrow.down.right"],
-  ["fullscreen-settings", "arrow.up.left.and.arrow.down.right"],
+  ["browser", "link"],
   ["quit", "power"],
 ];
 

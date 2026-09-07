@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.1.87 — Tray browser glyph is the SF link symbol
+- "Open in Browser" carries SF `link` instead of `arrow.up.right.square`,
+  matching the Control Panel engine-cell link button.
+
+## v0.1.86 — Engine-cell open button uses the link glyph
+- The Control Panel engine-cell open-in-browser button renders the
+  chain-link glyph instead of the box-arrow (tooltip, label and tint
+  unchanged; retired the unused box-arrow asset).
+
+## v0.1.85 — Tray fullscreen items removed
+- Dropped "Harness Full Screen" / "Control Panel Full Screen" from the
+  tray menu (glyphs, handlers, labels): the green traffic-light button
+  owns fullscreen since v0.1.84. Tray keeps Open, Control Panel, engine
+  controls, browser and quit.
+
 ## v0.1.84 — Green button enters native fullscreen
 - Harness + Control Panel windows are fullscreen-primary: the green
   traffic-light button enters native macOS fullscreen instead of zooming
