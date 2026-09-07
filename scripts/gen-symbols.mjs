@@ -20,7 +20,7 @@ const SYMBOLS = [
   ["start", "play"],
   ["stop", "stop"],
   ["restart", "arrow.counterclockwise"],
-  ["browser", "arrow.up.right.square"],
+  ["browser", "link"],
   ["quit", "power"],
 ];
 
