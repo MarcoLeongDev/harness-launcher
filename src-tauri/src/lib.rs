@@ -87,6 +87,7 @@ pub fn run() {
             commands::rollback,
             commands::set_port,
             commands::set_prerelease,
+            commands::set_language,
             commands::check_updates,
             commands::refresh_versions,
             commands::tail_logs,

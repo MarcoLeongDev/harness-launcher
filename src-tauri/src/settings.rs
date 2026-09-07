@@ -5,6 +5,22 @@ use std::path::PathBuf;
 
 pub const DEFAULT_PORT: u16 = 3080;
 
+/// UI language codes offered by the Control Panel switcher and the tray
+/// menu. Codes double as locale keys in the panel script.
+pub const LANGUAGES: [&str; 5] = ["en", "zh-Hant", "zh-Hans", "ja", "es"];
+pub const DEFAULT_LANGUAGE: &str = "en";
+
+/// Allowlist a caller-supplied language code: unknown values (hand-edited
+/// settings files, stale payloads) fall back to English.
+pub fn normalize_language(lang: &str) -> String {
+    let trimmed = lang.trim();
+    if LANGUAGES.contains(&trimmed) {
+        trimmed.to_string()
+    } else {
+        DEFAULT_LANGUAGE.to_string()
+    }
+}
+
 /// launcher.log rotates at 1 MB (SN10): it previously grew without bound.
 pub const LAUNCHER_LOG_MAX_BYTES: u64 = 1024 * 1024;
 
@@ -19,6 +35,10 @@ pub struct Settings {
     pub open_on_launch: bool,
     /// Whether the harness engine should be started automatically on app launch.
     pub start_on_launch: bool,
+    /// UI language for the Control Panel + tray menu ("en" | "zh-Hant" |
+    /// "zh-Hans" | "ja" | "es"). Missing in old files (serde default) and
+    /// normalized on load, so pre-language installs open in English.
+    pub language: String,
 }
 
 impl Default for Settings {
@@ -31,6 +51,7 @@ impl Default for Settings {
             previous_version: None,
             open_on_launch: true,
             start_on_launch: true,
+            language: DEFAULT_LANGUAGE.into(),
         }
     }
 }
@@ -41,10 +62,14 @@ pub fn settings_path(data_dir: &PathBuf) -> PathBuf {
 
 pub fn load(data_dir: &PathBuf) -> Settings {
     match fs::read_to_string(settings_path(data_dir)) {
-        Ok(text) => serde_json::from_str(&text).unwrap_or_else(|e| {
-            log(data_dir, &format!("settings.json corrupt, using defaults: {e}"));
-            Settings::default()
-        }),
+        Ok(text) => {
+            let mut s: Settings = serde_json::from_str(&text).unwrap_or_else(|e| {
+                log(data_dir, &format!("settings.json corrupt, using defaults: {e}"));
+                Settings::default()
+            });
+            s.language = normalize_language(&s.language);
+            s
+        }
         Err(_) => Settings::default(),
     }
 }
@@ -92,6 +117,32 @@ mod tests {
         assert!(s.start_on_launch);
         assert!(!s.include_prerelease);
         assert!(s.current_version.is_none());
+        assert_eq!(s.language, "en");
+    }
+
+    #[test]
+    fn normalize_language_allowlists() {
+        assert_eq!(normalize_language("ja"), "ja");
+        assert_eq!(normalize_language(" zh-Hant "), "zh-Hant");
+        assert_eq!(normalize_language("fr"), "en");
+        assert_eq!(normalize_language(""), "en");
+    }
+
+    #[test]
+    fn language_roundtrips_and_old_files_default_to_english() {
+        let dir = std::env::temp_dir().join(format!("dsh-settings-lang-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let mut s = Settings::default();
+        s.language = "ja".into();
+        save(&dir, &s).unwrap();
+        assert_eq!(load(&dir).language, "ja");
+        // Pre-language file (no `language` key): serde default + normalize.
+        let _ = std::fs::write(settings_path(&dir), r#"{"port": 3080}"#).unwrap();
+        assert_eq!(load(&dir).language, "en");
+        // Hand-edited bogus value falls back to English.
+        let _ = std::fs::write(settings_path(&dir), r#"{"language": "xx"}"#).unwrap();
+        assert_eq!(load(&dir).language, "en");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
