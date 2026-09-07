@@ -308,8 +308,18 @@
      published-version dropdown sits in the Version column and the
      cloud-download install button in the Actions column; the Active and
      Directory cells stay empty. */
-  .vc-ver-install { display: flex; }
+  .vc-ver-install { display: flex; align-items: center; gap: 6px; }
   .vc-ver-install select { width: 100%; max-width: 240px; }
+  /* Version-list refresh: borderless circular icon-only button (same
+     treatment as the engine-card open-in-browser button) sitting right of
+     the install-row dropdown. */
+  .ver-refresh-btn { width: 28px; height: 28px; border-radius: 50%; border: none;
+    background: transparent; color: var(--dim); cursor: pointer; display: inline-flex;
+    align-items: center; justify-content: center; padding: 0; flex: none; }
+  .ver-refresh-btn:hover { background: var(--cell-hover); color: var(--accent2); }
+  .ver-refresh-btn:disabled { opacity: 0.4; cursor: default; }
+  .ver-refresh-btn:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
+  .ver-refresh-btn svg { width: 16px; height: 16px; }
   /* Install action: white cloud-download glyph (same treatment as the delete
      button) — dim backing disc in light mode so white stays readable, accent
      disc on hover. */
@@ -426,6 +436,7 @@
           <span class="vc-def" aria-hidden="true"></span>
           <span class="vc-ver vc-ver-install">
             <select id="sel-install-ver" aria-label="Version to install"></select>
+            <button class="ver-refresh-btn" id="btn-refresh-versions" title="Refresh version list" aria-label="Refresh version list"><i class="ico sm bi" data-ico="arrow-clockwise"></i></button>
           </span>
           <span class="vc-dir" aria-hidden="true"></span>
           <span class="vc-acts">
@@ -524,7 +535,7 @@
     host: $('host-text'), hostWrap: $('host-wrap'),
     port: $('inp-port'),
     
-    installSel: $('sel-install-ver'), btnInstall: $('btn-install'),
+    installSel: $('sel-install-ver'), btnInstall: $('btn-install'), btnRefreshVer: $('btn-refresh-versions'),
     verTbody: $('ver-tbody'),
     feedsBox: $('op-feeds'),
     logFollow: $('btn-log-follow'), logTail: $('log-tail'),
@@ -1055,6 +1066,19 @@
     withCmd(function () { return invoke('download_version', { version: v }); }, 'Downloaded');
   });
   sel.installSel.addEventListener('change', function () { closePopovers(); });
+  // Manual version-list refresh: bypass the status-poll cache and re-fetch
+  // the published list now. The button busy-disables while npm answers;
+  // the repaint keeps the user's selection via fillVersionSelects.
+  sel.btnRefreshVer.addEventListener('click', function () {
+    sel.btnRefreshVer.disabled = true;
+    invoke('refresh_versions', {}).then(function (res) {
+      setResult(res || 'Version list refreshed', false);
+      return refresh();
+    }).catch(function (e) {
+      setResult(String(e.message || e), true);
+      return refresh();
+    }).then(function () { sel.btnRefreshVer.disabled = false; });
+  });
   sel.bannerBtn.addEventListener('click', function () { withCmd(function () { return invoke('update_to_latest', {}); }, 'Updated'); });
 
 

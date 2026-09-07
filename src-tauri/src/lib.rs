@@ -88,6 +88,7 @@ pub fn run() {
             commands::set_port,
             commands::set_prerelease,
             commands::check_updates,
+            commands::refresh_versions,
             commands::tail_logs,
             commands::open_in_browser,
             commands::open_repo_page,
