@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.1.81 — Manual version-list refresh button
+- The install-row version dropdown gains an icon-only refresh button
+  (refresh glyph, no text) that re-fetches the published list from the
+  registry immediately instead of waiting for the 60 s status-poll cache
+  to expire. New panel-only `refresh_versions` command; selection is
+  preserved and the button busy-disables while fetching.
+
+## v0.1.80 — Tray fullscreen toggles
+- New "Harness Full Screen" and "Control Panel Full Screen" tray menu
+  items toggle native macOS fullscreen on their window (green-button zoom
+  unchanged). Fullscreen SF Symbol glyphs; items disable while their
+  window does not exist.
+
 ## v0.1.79 — Brand header opens the GitHub project page
 - The logo, app name and launcher version now open the project GitHub page in the default browser (Control Panel header, engine-stopped page, harness-window overlay brand line). Visual style unchanged: no underline, color shift or extra decoration. New benign read-only `open_repo_page` command (allowlisted URL, callable from any window).
 
