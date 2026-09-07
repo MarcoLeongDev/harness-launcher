@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.1.85 — Tray fullscreen items removed
+- Dropped "Harness Full Screen" / "Control Panel Full Screen" from the
+  tray menu (glyphs, handlers, labels): the green traffic-light button
+  owns fullscreen since v0.1.84. Tray keeps Open, Control Panel, engine
+  controls, browser and quit.
+
 ## v0.1.84 — Green button enters native fullscreen
 - Harness + Control Panel windows are fullscreen-primary: the green
   traffic-light button enters native macOS fullscreen instead of zooming

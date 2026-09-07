@@ -22,8 +22,6 @@ pub struct TrayState {
     pub stop: IconMenuItem<tauri::Wry>,
     pub restart: IconMenuItem<tauri::Wry>,
     pub browser: IconMenuItem<tauri::Wry>,
-    pub fullscreen_harness: IconMenuItem<tauri::Wry>,
-    pub fullscreen_settings: IconMenuItem<tauri::Wry>,
     pub quit: IconMenuItem<tauri::Wry>,
 }
 
@@ -36,8 +34,6 @@ struct TrayLabels {
     stop: &'static str,
     restart: &'static str,
     browser: &'static str,
-    fullscreen_harness: &'static str,
-    fullscreen_settings: &'static str,
     quit: &'static str,
 }
 
@@ -50,8 +46,6 @@ fn labels_for(lang: &str) -> TrayLabels {
             stop: "停止 Harness",
             restart: "重新啟動 Harness",
             browser: "在瀏覽器中開啟",
-            fullscreen_harness: "Harness 全螢幕",
-            fullscreen_settings: "控制面板全螢幕",
             quit: "結束 Harness Launcher",
         },
         "zh-Hans" => TrayLabels {
@@ -61,8 +55,6 @@ fn labels_for(lang: &str) -> TrayLabels {
             stop: "停止 Harness",
             restart: "重新启动 Harness",
             browser: "在浏览器中打开",
-            fullscreen_harness: "Harness 全屏",
-            fullscreen_settings: "控制面板全屏",
             quit: "退出 Harness Launcher",
         },
         "ja" => TrayLabels {
@@ -72,8 +64,6 @@ fn labels_for(lang: &str) -> TrayLabels {
             stop: "Harness を停止",
             restart: "Harness を再起動",
             browser: "ブラウザで開く",
-            fullscreen_harness: "Harness を全画面表示",
-            fullscreen_settings: "コントロールパネルを全画面表示",
             quit: "Harness Launcher を終了",
         },
         "es" => TrayLabels {
@@ -83,8 +73,6 @@ fn labels_for(lang: &str) -> TrayLabels {
             stop: "Detener Harness",
             restart: "Reiniciar Harness",
             browser: "Abrir en el navegador",
-            fullscreen_harness: "Harness en pantalla completa",
-            fullscreen_settings: "Panel en pantalla completa",
             quit: "Salir de Harness Launcher",
         },
         _ => TrayLabels {
@@ -94,8 +82,6 @@ fn labels_for(lang: &str) -> TrayLabels {
             stop: "Stop Harness",
             restart: "Restart Harness",
             browser: "Open in Browser",
-            fullscreen_harness: "Harness Full Screen",
-            fullscreen_settings: "Control Panel Full Screen",
             quit: "Quit Harness Launcher",
         },
     }
@@ -115,8 +101,6 @@ pub fn apply_language(app: &AppHandle, lang: &str) {
     let _ = items.stop.set_text(l.stop);
     let _ = items.restart.set_text(l.restart);
     let _ = items.browser.set_text(l.browser);
-    let _ = items.fullscreen_harness.set_text(l.fullscreen_harness);
-    let _ = items.fullscreen_settings.set_text(l.fullscreen_settings);
     let _ = items.quit.set_text(l.quit);
 }
 
@@ -135,8 +119,6 @@ mod language_tests {
                 l.stop,
                 l.restart,
                 l.browser,
-                l.fullscreen_harness,
-                l.fullscreen_settings,
                 l.quit,
             ] {
                 assert!(!label.is_empty(), "{lang} has an empty tray label");
@@ -160,15 +142,6 @@ pub fn refresh(app: &AppHandle) {
     let _ = items.start.set_enabled(!running);
     let _ = items.stop.set_enabled(running);
     let _ = items.restart.set_enabled(running);
-    // Fullscreen toggles act on live windows only: disable while the window
-    // does not exist (the main window is created at boot when configured to
-    // open on launch; the panel is created on demand).
-    let _ = items
-        .fullscreen_harness
-        .set_enabled(app.get_webview_window(crate::window::LABEL).is_some());
-    let _ = items
-        .fullscreen_settings
-        .set_enabled(app.get_webview_window(crate::window::SETTINGS_LABEL).is_some());
 }
 
 /// SF Symbol glyphs for the tray menu items, generated at prep time by
@@ -182,8 +155,6 @@ const SYM_START: &[u8] = include_bytes!("../resources/tray/symbol/start.png");
 const SYM_STOP: &[u8] = include_bytes!("../resources/tray/symbol/stop.png");
 const SYM_RESTART: &[u8] = include_bytes!("../resources/tray/symbol/restart.png");
 const SYM_BROWSER: &[u8] = include_bytes!("../resources/tray/symbol/browser.png");
-const SYM_FULLSCREEN_HARNESS: &[u8] = include_bytes!("../resources/tray/symbol/fullscreen-harness.png");
-const SYM_FULLSCREEN_SETTINGS: &[u8] = include_bytes!("../resources/tray/symbol/fullscreen-settings.png");
 const SYM_QUIT: &[u8] = include_bytes!("../resources/tray/symbol/quit.png");
 
 /// Menu item carrying the given SF Symbol glyph.
@@ -205,19 +176,9 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
     let stop = symbol_item(app, "stop", "Stop Harness", false, SYM_STOP)?;
     let restart = symbol_item(app, "restart", "Restart Harness", false, SYM_RESTART)?;
     let browser = symbol_item(app, "browser", "Open in Browser", true, SYM_BROWSER)?;
-    let fullscreen_harness =
-        symbol_item(app, "fullscreen-harness", "Harness Full Screen", false, SYM_FULLSCREEN_HARNESS)?;
-    let fullscreen_settings = symbol_item(
-        app,
-        "fullscreen-settings",
-        "Control Panel Full Screen",
-        false,
-        SYM_FULLSCREEN_SETTINGS,
-    )?;
     let quit = symbol_item(app, "quit", "Quit Harness Launcher", true, SYM_QUIT)?;
     let sep = PredefinedMenuItem::separator(app)?;
-    let sep2 = PredefinedMenuItem::separator(app)?;
-    let items: &[&dyn IsMenuItem<tauri::Wry>] = &[&open, &settings, &sep, &start, &stop, &restart, &sep, &browser, &fullscreen_harness, &fullscreen_settings, &sep2, &quit];
+    let items: &[&dyn IsMenuItem<tauri::Wry>] = &[&open, &settings, &sep, &start, &stop, &restart, &sep, &browser, &sep, &quit];
     let menu = Menu::with_items(app, items)?;
 
     *app.state::<AppState>().tray_state.lock().unwrap() = Some(TrayState {
@@ -227,8 +188,6 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
         stop,
         restart,
         browser,
-        fullscreen_harness,
-        fullscreen_settings,
         quit,
     });
     // Label the menu in the saved UI language (pre-language installs read
@@ -275,12 +234,6 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
             "browser" => {
                 let _ = crate::commands::open_in_browser(app.clone());
             }
-            "fullscreen-harness" => {
-                toggle_fullscreen(app, crate::window::LABEL);
-            }
-            "fullscreen-settings" => {
-                toggle_fullscreen(app, crate::window::SETTINGS_LABEL);
-            }
             "quit" => {
                 crate::commands::quit_app_now(app);
             }
@@ -299,19 +252,6 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
         })
         .build(app)?;
     Ok(())
-}
-
-/// Toggle native macOS fullscreen on a launcher window and focus it. A
-/// missing window is a no-op — its tray item is disabled while it does not
-/// exist (see refresh()), so this only fires for live windows.
-fn toggle_fullscreen(app: &AppHandle, label: &str) {
-    let Some(window) = app.get_webview_window(label) else {
-        return;
-    };
-    if let Ok(fullscreen) = window.is_fullscreen() {
-        let _ = window.set_fullscreen(!fullscreen);
-        let _ = window.set_focus();
-    }
 }
 
 pub fn show_main_window(app: &AppHandle) -> Result<(), String> {
