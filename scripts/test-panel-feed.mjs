@@ -294,7 +294,7 @@ console.log("5. install dropdown defaults to the newest published version");
 console.log("6. install row merged into the versions table; log toggle bottom-right");
 {
   check("header column renamed to Directory",
-    /<span class="vc-dir" title="Open the version directory">Directory<\/span>/.test(html));
+    /<span class="vc-dir" title="Open the version directory" data-i18n="directory" data-i18n-title="directoryTitle">Directory<\/span>/.test(html));
   check("no Folder header label remains", !/>Folder</.test(html));
   check("row labels say directory, not folder", !/Open the folder/.test(html));
   check("standalone Install version group removed", !/Install version<\/span>/.test(html));
@@ -371,6 +371,9 @@ console.log("9. minimal terminal: header for download phases only, no stop contr
   // Real npm install: header + elapsed.
   h.emit("launcher://progress", { op: "update", version: "0.1.2-rc.1", phase: "installing", message: "Installing DeepSeek Harness version@0.1.2-rc.1", percent: 40 });
   check("npm install shows the header", feedEl._qs.get(".op-feed-head").hidden === false);
+  check("terminal header is action-neutral",
+    feedEl._qs.get(".op-feed-cmd").textContent === "Harness Launcher #",
+    JSON.stringify(feedEl._qs.get(".op-feed-cmd").textContent));
   // Launcher-level notice (no op key): pure message, no header.
   h.emit("launcher://console", { stream: "info", text: "Removed installed version 0.1.1-rc.1" });
   const noticeEl = feedsBox.children[feedsBox.children.length - 1];
@@ -482,6 +485,80 @@ console.log("11. install row refresh button refetches the list, keeps selection"
   check("selection preserved across refresh", rsel.value === "0.1.1");
   check("button re-enabled after refresh", rbtn.disabled === false);
   h.restore();
+}
+
+// ---------- 12. neutral terminal header ----------
+console.log("12. operation terminals head with Harness Launcher #");
+{
+  check("panel feed default header is neutral",
+    html.includes('<span class="op-feed-cmd">Harness Launcher #</span>'));
+  check("no install-claim header remains in the panel",
+    !html.includes("Installing DeepSeek Harness version"));
+  const overlaySrc = readFileSync(path.join(root, "src-tauri", "resources", "overlay.js"), "utf8");
+  check("overlay terminal title is neutral",
+    overlaySrc.includes(">Harness Launcher #</span>") && !overlaySrc.includes("Installing DeepSeek Harness version@"));
+}
+
+// ---------- 13. language switcher ----------
+console.log("13. header language switcher persists and repaints");
+{
+  const segCodes = ["en", "zh-Hant", "zh-Hans", "ja", "es"];
+  const segLabels = [">En<", ">繁<", ">簡<", ">日<", ">Es<"];
+  check("five language segments with the specified labels",
+    segCodes.every(function (c) { return html.includes('data-lang="' + c + '"'); }) &&
+    segLabels.every(function (s) { return html.includes(s); }));
+  // Locale table spot-checks (the fake DOM carries no markup attributes, so
+  // table content is asserted on the script source instead).
+  const scriptSrc = html.match(/<script>([\s\S]*?)<\/script>/)[1];
+  function localeVal(lang, key) {
+    const bare = lang === "en" || lang === "ja" || lang === "es";
+    const open = "    " + (bare ? lang : '"' + lang + '"') + ": {";
+    const blk = scriptSrc.slice(scriptSrc.indexOf(open)).split("\n    },")[0];
+    const m = blk.match(new RegExp(key + ':\\s*"([^\"]+)"'));
+    return m && m[1];
+  }
+  check("ja quit translated", localeVal("ja", "quit") === "終了", String(localeVal("ja", "quit")));
+  check("zh-Hant refresh translated", localeVal("zh-Hant", "refreshList") === "重新整理版本清單");
+  check("zh-Hans start translated", localeVal("zh-Hans", "start") === "启动");
+  check("es cancel translated", localeVal("es", "cancel") === "Cancelar");
+  check("unknown code falls back to En", /if \(!LOCALES\[l\]\) l = "en"/.test(scriptSrc));
+  check("missing key falls back to English", /\|\| LOCALES\.en\[key\]/.test(scriptSrc));
+  check("status payload drives the panel language", /if \(s\.language\) applyLanguage\(s\.language\)/.test(scriptSrc));
+  const langStatus = function (lang) {
+    return { enginePhase: "stopped", running: false, launcherVersion: "0.1.80",
+      activeVersion: "0.1.1", previousVersion: null, port: 3081, actualPort: 3081, portChanged: false,
+      versions: ["0.1.1"], installedVersions: ["0.1.1"], latestRemote: null, updateAvailable: false,
+      includePrerelease: false, startOnLaunch: true, bootError: null, language: lang,
+      currentOp: null, currentOps: [], console: [], webUrl: null };
+  };
+  // Saved Japanese: the panel converges on it at boot.
+  let hj = boot({ invokeImpl: function (cmd) {
+    if (cmd === "get_status") return langStatus("ja");
+    if (cmd === "tail_logs") return "";
+    return {};
+  } });
+  await settle();
+  check("no init-time crash with saved language", hj.error === null, hj.error && String(hj.error));
+  check("document lang follows the saved language", hj.doc.documentElement.lang === "ja");
+  // Click the Es segment: set_language persists, repaint follows the payload.
+  const seg = hj.doc.getElementById("lang-seg");
+  seg._handlers.click[0]({ target: { closest: function () { return { getAttribute: function () { return "es"; } }; } } });
+  await settle();
+  const persisted = hj.invoked.filter(function (p) { return p[0] === "set_language"; });
+  check("set_language invoked once with the picked code",
+    persisted.length === 1 && persisted[0][1] && persisted[0][1].language === "es",
+    JSON.stringify(persisted));
+  hj.restore();
+  // Unknown saved code falls back to English.
+  let hx = boot({ invokeImpl: function (cmd) {
+    if (cmd === "get_status") return langStatus("xx");
+    if (cmd === "tail_logs") return "";
+    return {};
+  } });
+  await settle();
+  check("unknown saved language resets document lang to en",
+    hx.doc.documentElement.lang === "en");
+  hx.restore();
 }
 
 console.log("");

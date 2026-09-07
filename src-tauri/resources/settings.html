@@ -64,6 +64,17 @@
     text-decoration: none; color: inherit; cursor: pointer; border-radius: 9px; }
   a.brand-link:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
   header .spacer { flex: 1; }
+  /* Language switcher: borderless segmented control (En | 繁 | 簡 | 日 | Es)
+     next to the quit button. The active segment reads as highlighted text;
+     inactive segments are dim. No background pill — header stays minimal. */
+  .lang-seg { display: flex; align-items: center; gap: 2px; flex: none; }
+  .lang-seg button { border: none; background: transparent; color: var(--faint);
+    font-size: 11.5px; font-weight: 600; letter-spacing: 0.2px; cursor: pointer;
+    padding: 4px 6px; border-radius: 6px; }
+  .lang-seg button:hover { color: var(--dim); background: var(--cell-hover); }
+  .lang-seg button[aria-pressed="true"] { color: var(--accent2); }
+  .lang-seg button:focus-visible { outline: 2px solid var(--accent2); outline-offset: 1px; }
+  .lang-seg button:disabled { opacity: 0.4; cursor: default; }
   /* Launcher version: bare, subtle text — no tag styling. The header stays
      minimal: no engine version tag beside the power button. */
   .hdr-ver-subtle { font-family: var(--mono); font-size: 10.5px; color: var(--faint);
@@ -366,13 +377,16 @@
 <body>
 
 <header>
-  <a class="brand-link" id="brand-link" href="https://github.com/MarcoLeongDev/harness-launcher" title="Open Harness Launcher on GitHub" aria-label="Open Harness Launcher on GitHub">
+  <a class="brand-link" id="brand-link" href="https://github.com/MarcoLeongDev/harness-launcher" title="Open Harness Launcher on GitHub" aria-label="Open Harness Launcher on GitHub" data-i18n-title="brandGithub" data-i18n-aria="brandGithub">
     <div class="logo"><img id="brand-logo" src="dsh-ui://localhost/brand/logo.png" alt="Harness Launcher" /></div>
     <span class="header-title">Harness Launcher</span>
     <span class="hdr-ver-subtle" id="app-ver"></span>
   </a>
   <span class="spacer"></span>
-  <button class="hdr-quit" id="btn-quit" title="Quit"><i class="ico sm bi" data-ico="power"></i></button>
+  <div class="lang-seg" id="lang-seg" role="group" aria-label="Language" data-i18n-aria="languageName">
+    <button type="button" data-lang="en" aria-pressed="true">En</button><button type="button" data-lang="zh-Hant" aria-pressed="false">繁</button><button type="button" data-lang="zh-Hans" aria-pressed="false">簡</button><button type="button" data-lang="ja" aria-pressed="false">日</button><button type="button" data-lang="es" aria-pressed="false">Es</button>
+  </div>
+  <button class="hdr-quit" id="btn-quit" title="Quit" aria-label="Quit" data-i18n-title="quit" data-i18n-aria="quit"><i class="ico sm bi" data-ico="power"></i></button>
 </header>
 
 <!-- Single merged view: Engine + Versions (no tab bar; the log lives in a
@@ -382,11 +396,11 @@
   <section class="tabpanel active" id="tab-main" role="tabpanel">
     <div class="group">
       <div class="ec-row">
-        <div class="ec-status-icon stopped" id="st-icon" aria-label="Engine status">
+        <div class="ec-status-icon stopped" id="st-icon" aria-label="Engine status" data-i18n-aria="engineStatus">
           <i class="ico bi" data-ico="moon"></i>
         </div>
         <div class="ec-select-wrap" id="ver-wrap">
-          <select id="sel-version" class="ec-select" aria-label="Engine version" disabled></select>
+          <select id="sel-version" class="ec-select" aria-label="Engine version" data-i18n-aria="engineVersion" disabled></select>
           <svg id="ver-chevron" style="display:none" viewBox="0 0 16 16" fill="currentColor"><path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg>
         </div>
         <span class="ec-sep">:</span>
@@ -394,11 +408,11 @@
           <span id="host-text" class="ec-ver">127.0.0.1</span>
         </div>
         <span class="ec-sep">:</span>
-        <input id="inp-port" class="ec-port" type="number" min="1" max="65535" aria-label="Port" disabled />
-        <button class="ec-open-btn" id="btn-open" title="Open in browser" aria-label="Open in browser"><i class="ico sm bi" data-ico="box-arrow-up-right"></i></button>
+        <input id="inp-port" class="ec-port" type="number" min="1" max="65535" aria-label="Port" data-i18n-aria="port" disabled />
+        <button class="ec-open-btn" id="btn-open" title="Open in browser" aria-label="Open in browser" data-i18n-title="openBrowser" data-i18n-aria="openBrowser"><i class="ico sm bi" data-ico="box-arrow-up-right"></i></button>
         <div class="ec-actions">
           <button class="ec-btn icon-start" id="btn-toggle" title="Start"><i class="ico bi" data-ico="play-fill"></i></button>
-          <button class="ec-btn icon-restart" id="btn-restart" disabled title="Restart"><i class="ico bi" data-ico="arrow-repeat"></i></button>
+          <button class="ec-btn icon-restart" id="btn-restart" disabled title="Restart" data-i18n-title="restart"><i class="ico bi" data-ico="arrow-repeat"></i></button>
         </div>
       </div>
     </div>
@@ -408,7 +422,7 @@
       <div class="cell">
         <i class="ico sm bi" style="color:var(--accent2)" data-ico="cloud-arrow-down-fill"></i>
         <span class="hint" id="update-banner-text" style="flex:1"></span>
-        <button class="btn primary" id="btn-banner-update">Update</button>
+        <button class="btn primary" id="btn-banner-update" data-i18n="updateBtn">Update</button>
       </div>
     </div>
 
@@ -422,10 +436,10 @@
     <div class="group">
       <div class="vtable">
         <div class="vrow vhead-row">
-          <span class="vc-def" title="Active version">Active</span>
-          <span class="vc-ver">Version</span>
-          <span class="vc-dir" title="Open the version directory">Directory</span>
-          <span class="vc-acts">Actions</span>
+          <span class="vc-def" title="Active version" data-i18n="active" data-i18n-title="activeTitle">Active</span>
+          <span class="vc-ver" data-i18n="versionCol">Version</span>
+          <span class="vc-dir" title="Open the version directory" data-i18n="directory" data-i18n-title="directoryTitle">Directory</span>
+          <span class="vc-acts" data-i18n="actions">Actions</span>
         </div>
         <div id="ver-tbody"></div>
         <!-- Install row: the persistent LAST row of the table. Empty
@@ -435,12 +449,12 @@
         <div class="vrow vinstall-row">
           <span class="vc-def" aria-hidden="true"></span>
           <span class="vc-ver vc-ver-install">
-            <select id="sel-install-ver" aria-label="Version to install"></select>
-            <button class="ver-refresh-btn" id="btn-refresh-versions" title="Refresh version list" aria-label="Refresh version list"><i class="ico sm bi" data-ico="arrow-clockwise"></i></button>
+            <select id="sel-install-ver" aria-label="Version to install" data-i18n-aria="installAria"></select>
+            <button class="ver-refresh-btn" id="btn-refresh-versions" title="Refresh version list" aria-label="Refresh version list" data-i18n-title="refreshList" data-i18n-aria="refreshList"><i class="ico sm bi" data-ico="arrow-clockwise"></i></button>
           </span>
           <span class="vc-dir" aria-hidden="true"></span>
           <span class="vc-acts">
-            <button class="btn icon install" id="btn-install" title="Download selected version" aria-label="Download selected version">
+            <button class="btn icon install" id="btn-install" title="Download selected version" aria-label="Download selected version" data-i18n-title="downloadVer" data-i18n-aria="downloadVer">
               <i class="ico sm bi" data-ico="cloud-arrow-down-fill"></i>
             </button>
           </span>
@@ -463,8 +477,8 @@
   <div class="log-drawer" id="log-drawer" hidden>
     <div class="log-group">
       <div class="log-wrap">
-        <pre class="log-view terminal" id="log-tail">No output yet</pre>
-        <button class="log-overlay bottom pressed" id="btn-log-follow" title="Go to last line" aria-pressed="true"><i class="ico sm bi" data-ico="arrow-down-circle-fill"></i></button>
+        <pre class="log-view terminal" id="log-tail" data-i18n="noOutput">No output yet</pre>
+        <button class="log-overlay bottom pressed" id="btn-log-follow" title="Go to last line" aria-label="Go to last line" aria-pressed="true" data-i18n-title="goLast" data-i18n-aria="goLast"><i class="ico sm bi" data-ico="arrow-down-circle-fill"></i></button>
       </div>
     </div>
   </div>
@@ -472,7 +486,7 @@
 
 <!-- Log visibility toggle: circular borderless button pinned bottom-right.
      Image only — no background or border except while hovered. -->
-<button class="log-toggle" id="btn-log-toggle" type="button" aria-pressed="false" aria-controls="log-drawer" title="Show log">
+<button class="log-toggle" id="btn-log-toggle" type="button" aria-pressed="false" aria-controls="log-drawer" aria-label="Show log" title="Show log" data-i18n-title="showLog" data-i18n-aria="showLog">
   <i class="ico sm bi" data-ico="journal-text"></i>
 </button>
 
@@ -528,6 +542,172 @@
     }
   }
 
+  // ---------- UI language (En | 繁 | 簡 | 日 | Es) ----------
+  // Locale table for the Control Panel chrome. Backend progress/notice
+  // lines and npm output stay English (operational output, like a terminal).
+  // Missing keys fall back to English; unknown codes fall back to En.
+  var LOCALES = {
+    en: {
+      brandGithub: "Open Harness Launcher on GitHub", languageName: "Language",
+      quit: "Quit", engineStatus: "Engine status", engineVersion: "Engine version",
+      port: "Port", openBrowser: "Open in browser",
+      start: "Start", stop: "Stop", restart: "Restart", updateBtn: "Update",
+      updateAvail: "Update available: v{active} → v{latest}",
+      active: "Active", activeTitle: "Active version", versionCol: "Version",
+      directory: "Directory", directoryTitle: "Open the version directory", actions: "Actions",
+      installAria: "Version to install", refreshList: "Refresh version list",
+      downloadVer: "Download selected version",
+      noOutput: "No output yet", noLogs: "(no logs yet)",
+      goLast: "Go to last line", showLog: "Show log", hideLog: "Hide log",
+      noVersions: "No versions installed — pick one below to install.",
+      activeIs: "This is the active version", makeActive: "Make v{ver} the active version",
+      openDir: "Open the directory for v{ver}",
+      delVer: "Delete this version", delAria: "Delete version v{ver}?",
+      delLead: "Delete ", delTail: "? This cannot be undone.",
+      cancel: "Cancel", delConfirm: "Delete",
+      validPort: "Enter a valid port (1–65535)", refreshed: "Version list refreshed",
+      stuckHint: "no progress for 60s — still working…", completed: "Completed",
+      doneSwitched: "Switched", doneVersionSet: "Version set", doneDownloaded: "Downloaded",
+      doneUpdated: "Updated", doneStarted: "Started", doneStopped: "Stopped",
+      doneRestarted: "Restarted", donePortSet: "Port set"
+    },
+    "zh-Hant": {
+      brandGithub: "在 GitHub 上開啟 Harness Launcher", languageName: "語言",
+      quit: "結束", engineStatus: "引擎狀態", engineVersion: "引擎版本",
+      port: "連接埠", openBrowser: "在瀏覽器中開啟",
+      start: "啟動", stop: "停止", restart: "重新啟動", updateBtn: "更新",
+      updateAvail: "有可用更新：v{active} → v{latest}",
+      active: "使用中", activeTitle: "使用中的版本", versionCol: "版本",
+      directory: "目錄", directoryTitle: "開啟版本目錄", actions: "操作",
+      installAria: "要安裝的版本", refreshList: "重新整理版本清單",
+      downloadVer: "下載所選版本",
+      noOutput: "尚無輸出", noLogs: "（尚無日誌）",
+      goLast: "跳到最後一行", showLog: "顯示日誌", hideLog: "隱藏日誌",
+      noVersions: "尚未安裝任何版本 — 請在下方挑選版本安裝。",
+      activeIs: "這是使用中的版本", makeActive: "將 v{ver} 設為使用中版本",
+      openDir: "開啟 v{ver} 的目錄",
+      delVer: "刪除此版本", delAria: "刪除版本 v{ver}？",
+      delLead: "刪除 ", delTail: "？此動作無法復原。",
+      cancel: "取消", delConfirm: "刪除",
+      validPort: "請輸入有效的連接埠（1–65535）", refreshed: "版本清單已重新整理",
+      stuckHint: "60 秒無進度 — 仍在處理…", completed: "完成",
+      doneSwitched: "已切換", doneVersionSet: "已設定版本", doneDownloaded: "已下載",
+      doneUpdated: "已更新", doneStarted: "已啟動", doneStopped: "已停止",
+      doneRestarted: "已重新啟動", donePortSet: "已設定連接埠"
+    },
+    "zh-Hans": {
+      brandGithub: "在 GitHub 上打开 Harness Launcher", languageName: "语言",
+      quit: "退出", engineStatus: "引擎状态", engineVersion: "引擎版本",
+      port: "端口", openBrowser: "在浏览器中打开",
+      start: "启动", stop: "停止", restart: "重新启动", updateBtn: "更新",
+      updateAvail: "有可用更新：v{active} → v{latest}",
+      active: "使用中", activeTitle: "使用中的版本", versionCol: "版本",
+      directory: "目录", directoryTitle: "打开版本目录", actions: "操作",
+      installAria: "要安装的版本", refreshList: "刷新版本列表",
+      downloadVer: "下载所选版本",
+      noOutput: "暂无输出", noLogs: "（暂无日志）",
+      goLast: "跳到最后一行", showLog: "显示日志", hideLog: "隐藏日志",
+      noVersions: "尚未安装任何版本 — 请在下方挑选版本安装。",
+      activeIs: "这是使用中的版本", makeActive: "将 v{ver} 设为使用中版本",
+      openDir: "打开 v{ver} 的目录",
+      delVer: "删除此版本", delAria: "删除版本 v{ver}？",
+      delLead: "删除 ", delTail: "？此操作无法撤销。",
+      cancel: "取消", delConfirm: "删除",
+      validPort: "请输入有效端口（1–65535）", refreshed: "版本列表已刷新",
+      stuckHint: "60 秒无进度 — 仍在处理…", completed: "完成",
+      doneSwitched: "已切换", doneVersionSet: "已设置版本", doneDownloaded: "已下载",
+      doneUpdated: "已更新", doneStarted: "已启动", doneStopped: "已停止",
+      doneRestarted: "已重新启动", donePortSet: "已设置端口"
+    },
+    ja: {
+      brandGithub: "GitHub で Harness Launcher を開く", languageName: "言語",
+      quit: "終了", engineStatus: "エンジンの状態", engineVersion: "エンジンのバージョン",
+      port: "ポート", openBrowser: "ブラウザで開く",
+      start: "起動", stop: "停止", restart: "再起動", updateBtn: "更新",
+      updateAvail: "更新があります：v{active} → v{latest}",
+      active: "使用中", activeTitle: "使用中のバージョン", versionCol: "バージョン",
+      directory: "ディレクトリ", directoryTitle: "バージョンディレクトリを開く", actions: "操作",
+      installAria: "インストールするバージョン", refreshList: "バージョン一覧を更新",
+      downloadVer: "選択したバージョンをダウンロード",
+      noOutput: "出力はまだありません", noLogs: "（ログはまだありません）",
+      goLast: "最終行へ移動", showLog: "ログを表示", hideLog: "ログを非表示",
+      noVersions: "バージョンがインストールされていません — 下から選んでインストールしてください。",
+      activeIs: "これが使用中のバージョンです", makeActive: "v{ver} を使用中のバージョンにする",
+      openDir: "v{ver} のディレクトリを開く",
+      delVer: "このバージョンを削除", delAria: "バージョン v{ver} を削除しますか？",
+      delLead: "削除 ", delTail: "？この操作は取り消せません。",
+      cancel: "キャンセル", delConfirm: "削除",
+      validPort: "有効なポートを入力してください（1–65535）", refreshed: "バージョン一覧を更新しました",
+      stuckHint: "60 秒間進捗なし — 処理中…", completed: "完了",
+      doneSwitched: "切替済み", doneVersionSet: "バージョンを設定済み", doneDownloaded: "ダウンロード済み",
+      doneUpdated: "更新済み", doneStarted: "起動済み", doneStopped: "停止済み",
+      doneRestarted: "再起動済み", donePortSet: "ポートを設定済み"
+    },
+    es: {
+      brandGithub: "Abrir Harness Launcher en GitHub", languageName: "Idioma",
+      quit: "Salir", engineStatus: "Estado del motor", engineVersion: "Versión del motor",
+      port: "Puerto", openBrowser: "Abrir en el navegador",
+      start: "Iniciar", stop: "Detener", restart: "Reiniciar", updateBtn: "Actualizar",
+      updateAvail: "Actualización disponible: v{active} → v{latest}",
+      active: "Activa", activeTitle: "Versión activa", versionCol: "Versión",
+      directory: "Directorio", directoryTitle: "Abrir el directorio de la versión", actions: "Acciones",
+      installAria: "Versión a instalar", refreshList: "Actualizar la lista de versiones",
+      downloadVer: "Descargar la versión seleccionada",
+      noOutput: "Sin salida todavía", noLogs: "(sin registros todavía)",
+      goLast: "Ir a la última línea", showLog: "Mostrar registro", hideLog: "Ocultar registro",
+      noVersions: "No hay versiones instaladas — elige una abajo para instalar.",
+      activeIs: "Esta es la versión activa", makeActive: "Convertir v{ver} en la versión activa",
+      openDir: "Abrir el directorio de v{ver}",
+      delVer: "Eliminar esta versión", delAria: "¿Eliminar la versión v{ver}?",
+      delLead: "Eliminar ", delTail: "? Esta acción no se puede deshacer.",
+      cancel: "Cancelar", delConfirm: "Eliminar",
+      validPort: "Introduce un puerto válido (1–65535)", refreshed: "Lista de versiones actualizada",
+      stuckHint: "sin progreso durante 60 s — trabajando…", completed: "Completado",
+      doneSwitched: "Cambiado", doneVersionSet: "Versión establecida", doneDownloaded: "Descargado",
+      doneUpdated: "Actualizado", doneStarted: "Iniciado", doneStopped: "Detenido",
+      doneRestarted: "Reiniciado", donePortSet: "Puerto establecido"
+    }
+  };
+
+  var lang = "en";
+  function t(key) { return (LOCALES[lang] && LOCALES[lang][key]) || LOCALES.en[key] || key; }
+  function fmt(key, params) {
+    var s = t(key);
+    for (var k in params) s = s.split("{" + k + "}").join(params[k]);
+    return s;
+  }
+  // Repaint every localizable string for language l and mark the matching
+  // segment pressed. renderStatus calls this on every poll, so the panel
+  // converges on the saved language even after a restart.
+  function applyLanguage(l) {
+    if (!LOCALES[l]) l = "en";
+    lang = l;
+    try { document.documentElement.lang = l; } catch (e) {}
+    var i, els;
+    els = document.querySelectorAll("[data-i18n]");
+    for (i = 0; i < els.length; i++) els[i].textContent = t(els[i].getAttribute("data-i18n"));
+    els = document.querySelectorAll("[data-i18n-title]");
+    for (i = 0; i < els.length; i++) els[i].title = t(els[i].getAttribute("data-i18n-title"));
+    els = document.querySelectorAll("[data-i18n-aria]");
+    for (i = 0; i < els.length; i++) els[i].setAttribute("aria-label", t(els[i].getAttribute("data-i18n-aria")));
+    var seg = $("lang-seg");
+    if (seg && seg.querySelectorAll) {
+      var btns = seg.querySelectorAll("button");
+      for (i = 0; i < btns.length; i++) {
+        var b = btns[i];
+        if (b.getAttribute && b.setAttribute)
+          b.setAttribute("aria-pressed", b.getAttribute("data-lang") === l ? "true" : "false");
+      }
+    }
+  }
+  // Persist the choice, then repaint from the canonical status payload.
+  function setLanguage(l) {
+    if (!LOCALES[l] || l === lang) return;
+    applyLanguage(l);
+    invoke("set_language", { language: l }).then(function () { return refresh(); })
+      .catch(function (e) { setResult(String(e.message || e), true); return refresh(); });
+  }
+
   var sel = {
     stIcon: $('st-icon'),
     toggle: $('btn-toggle'), restart: $('btn-restart'),
@@ -542,6 +722,7 @@
     logToggle: $('btn-log-toggle'), logDrawer: $('log-drawer'),
     banner: $('update-banner'), bannerText: $('update-banner-text'), bannerBtn: $('btn-banner-update'),
     appVer: $('app-ver'),
+    langSeg: $('lang-seg'),
     browser: $('btn-open'), quit: $('btn-quit')
   };
 
@@ -588,7 +769,7 @@
     el.innerHTML =
       '<div class="op-feed-head" hidden>' +
         '<i class="ico sm bi" style="color:var(--accent2)" data-ico="terminal-fill"></i>' +
-        '<span class="op-feed-cmd">Installing DeepSeek Harness version</span>' +
+        '<span class="op-feed-cmd">Harness Launcher #</span>' +
         '<span class="op-feed-elapsed">0:00</span>' +
       '</div>' +
       '<div class="op-feed-body">' +
@@ -640,7 +821,7 @@
       armStuck: function () {
         if (feed.stuckTimer) clearTimeout(feed.stuckTimer);
         feed.stuckTimer = setTimeout(function () {
-          if (feed.downloading) feed.append('info', 'no progress for 60s — still working…');
+          if (feed.downloading) feed.append('info', t('stuckHint'));
         }, 60000);
       },
       // Keep the terminal visible briefly after the operation settles, then
@@ -702,7 +883,7 @@
     if (downloading) {
       f.done = false;
       f.setDownloading(true);
-      f.setHeader('Installing DeepSeek Harness version@' + (p.version || ''));
+      f.setHeader('Harness Launcher #');
     }
     // Milestone messages (registry → installing → verifying, stopping →
     // starting → running) stream in as info lines so the terminal tells the
@@ -717,7 +898,7 @@
       closedOps[p.op || ''] = true;
       if (f.lastPhase !== p.phase) {
         f.lastPhase = p.phase;
-        f.append(p.phase === 'done' ? 'info' : 'err', p.message || (p.phase === 'done' ? 'Completed' : p.phase));
+        f.append(p.phase === 'done' ? 'info' : 'err', p.message || (p.phase === 'done' ? t('completed') : p.phase));
       }
       f.finishSoon(p.phase === 'done' ? 8000 : 10000);
       if (engineBusyOps[kind]) setTimeout(function () { busy(false); }, 2500);
@@ -739,7 +920,10 @@
     if (!list.length) {
       var empty = document.createElement('div');
       empty.className = 'vrow';
-      empty.innerHTML = '<span class="hint">No versions installed — pick one below to install.</span>';
+      var emptyTxt = document.createElement('span');
+      emptyTxt.className = 'hint';
+      emptyTxt.textContent = t('noVersions');
+      empty.appendChild(emptyTxt);
       sel.verTbody.appendChild(empty);
       return;
     }
@@ -757,10 +941,10 @@
       radio.className = 'vc-radio';
       radio.checked = isActive;
       radio.disabled = isActive || !!s.currentOp;
-      radio.title = isActive ? 'This is the active version' : 'Make v' + v + ' the active version';
+      radio.title = isActive ? t('activeIs') : fmt('makeActive', { ver: v });
       radio.addEventListener('change', function () {
         if (radio.checked && !isActive) {
-          withCmd(function () { return invoke('install_and_switch', { version: v }); }, 'Switched');
+          withCmd(function () { return invoke('install_and_switch', { version: v }); }, t('doneSwitched'));
         }
       });
       defCell.appendChild(radio);
@@ -773,8 +957,8 @@
       dirCell.className = 'vc-dir';
       var dirBtn = document.createElement('button');
       dirBtn.className = 'btn dir';
-      dirBtn.title = 'Open the directory for v' + v;
-      dirBtn.setAttribute('aria-label', 'Open the directory for v' + v);
+      dirBtn.title = fmt('openDir', { ver: v });
+      dirBtn.setAttribute('aria-label', fmt('openDir', { ver: v }));
       dirBtn.innerHTML = '<i class="ico sm bi" data-ico="folder2-open"></i>';
       dirBtn.addEventListener('click', function () {
         invoke('open_version_dir', { version: v }).catch(function (e) {
@@ -788,32 +972,32 @@
       acts.className = 'vc-acts';
       var del = document.createElement('button');
       del.className = 'btn del';
-      del.title = 'Delete this version';
+      del.title = t('delVer');
       del.disabled = isActive || !!s.currentOp;
       del.innerHTML = '<i class="ico sm bi" data-ico="trash-fill"></i>';
       var pop = document.createElement('div');
       pop.className = 'pop';
       pop.setAttribute('role', 'dialog');
-      pop.setAttribute('aria-label', 'Delete version v' + v + '?');
+      pop.setAttribute('aria-label', fmt('delAria', { ver: v }));
       // Built with DOM nodes (never innerHTML with the version string): `v`
       // comes from the registry version list and must render as inert text.
       var popTxt = document.createElement('div');
       popTxt.className = 'pop-txt';
-      popTxt.appendChild(document.createTextNode('Delete '));
+      popTxt.appendChild(document.createTextNode(t('delLead')));
       var popVer = document.createElement('b');
       popVer.textContent = 'v' + v;
       popTxt.appendChild(popVer);
-      popTxt.appendChild(document.createTextNode('? This cannot be undone.'));
+      popTxt.appendChild(document.createTextNode(t('delTail')));
       var popActs = document.createElement('div');
       popActs.className = 'pop-acts';
       var cancelBtn = document.createElement('button');
       cancelBtn.className = 'btn';
       cancelBtn.setAttribute('data-act', 'cancel');
-      cancelBtn.textContent = 'Cancel';
+      cancelBtn.textContent = t('cancel');
       var confirmBtn = document.createElement('button');
       confirmBtn.className = 'btn danger';
       confirmBtn.setAttribute('data-act', 'confirm');
-      confirmBtn.textContent = 'Delete';
+      confirmBtn.textContent = t('delConfirm');
       popActs.appendChild(cancelBtn);
       popActs.appendChild(confirmBtn);
       pop.appendChild(popTxt);
@@ -849,6 +1033,9 @@
   function renderStatus(s) {
     var running = !!s.running;
     sel.appVer.textContent = s.launcherVersion || '';
+    // Saved language wins: the panel converges here on every poll, so a
+    // restart or an external settings edit still lands on the right locale.
+    if (s.language) applyLanguage(s.language);
 
     var phase = s.enginePhase || (running ? 'running' : 'stopped');
     lastPhase = phase;
@@ -898,11 +1085,11 @@
     if (runningLike) {
       sel.toggle.className = 'ec-btn icon-stop';
       sel.toggle.innerHTML = '<i class="ico bi" data-ico="pause-fill"></i>';
-      sel.toggle.title = 'Stop';
+      sel.toggle.title = t('stop');
     } else {
       sel.toggle.className = 'ec-btn icon-start';
       sel.toggle.innerHTML = '<i class="ico bi" data-ico="play-fill"></i>';
-      sel.toggle.title = 'Start';
+      sel.toggle.title = t('start');
     }
     loadIconsIn(sel.toggle);
     sel.toggle.disabled = false;
@@ -924,7 +1111,7 @@
     
     if (s.updateAvailable && s.latestRemote) {
       sel.banner.style.display = '';
-      sel.bannerText.textContent = 'Update available: v' + (s.activeVersion || '?') + ' → v' + s.latestRemote;
+      sel.bannerText.textContent = fmt('updateAvail', { active: (s.activeVersion || '?'), latest: s.latestRemote });
     } else {
       sel.banner.style.display = 'none';
     }
@@ -1016,7 +1203,7 @@
       if (!pre.childElementCount) {
         var empty = document.createElement('span');
         empty.className = 'ln info';
-        empty.textContent = '(no logs yet)';
+        empty.textContent = t('noLogs');
         pre.appendChild(empty);
       }
       if (followOn || atBottom) pre.scrollTop = pre.scrollHeight;
@@ -1034,24 +1221,24 @@
     if (lastPhase !== 'stopped') {
       withCmd(function () { return invoke('install_and_switch', { version: v }); }, 'Switched');
     } else {
-      withCmd(function () { return invoke('set_version', { version: v }); }, 'Version set');
+      withCmd(function () { return invoke('set_version', { version: v }); }, t('doneVersionSet'));
     }
   });
   sel.toggle.addEventListener('click', function () {
     if (lastPhase === 'running') {
-      withCmd(function () { return invoke('engine_stop', {}); }, 'Stopped');
+      withCmd(function () { return invoke('engine_stop', {}); }, t('doneStopped'));
     } else {
-      withCmd(function () { return invoke('engine_start', {}); }, 'Started');
+      withCmd(function () { return invoke('engine_start', {}); }, t('doneStarted'));
     }
   });
-  sel.restart.addEventListener('click', function () { withCmd(function () { return invoke('engine_restart', {}); }, 'Restarted'); });
+  sel.restart.addEventListener('click', function () { withCmd(function () { return invoke('engine_restart', {}); }, t('doneRestarted')); });
 
   // port: save on blur (and Enter). When stopped this only persists the port;
   // it does NOT auto-start the engine (handled in set_port on the backend).
   function applyPort() {
     var p = parseInt(sel.port.value, 10);
-    if (!p || p < 1 || p > 65535) return setResult('Enter a valid port (1–65535)', true);
-    withCmd(function () { return invoke('set_port', { port: p }); }, 'Port set');
+    if (!p || p < 1 || p > 65535) return setResult(t('validPort'), true);
+    withCmd(function () { return invoke('set_port', { port: p }); }, t('donePortSet'));
   }
   sel.port.addEventListener('blur', applyPort);
   sel.port.addEventListener('keydown', function (e) { if (e.key === 'Enter') sel.port.blur(); });
@@ -1063,7 +1250,7 @@
     // Download only: never switches the active version and never touches a
     // running engine — downloading works while the engine runs. Switching is
     // the versions-table radio / engine-card dropdown.
-    withCmd(function () { return invoke('download_version', { version: v }); }, 'Downloaded');
+    withCmd(function () { return invoke('download_version', { version: v }); }, t('doneDownloaded'));
   });
   sel.installSel.addEventListener('change', function () { closePopovers(); });
   // Manual version-list refresh: bypass the status-poll cache and re-fetch
@@ -1072,14 +1259,14 @@
   sel.btnRefreshVer.addEventListener('click', function () {
     sel.btnRefreshVer.disabled = true;
     invoke('refresh_versions', {}).then(function (res) {
-      setResult(res || 'Version list refreshed', false);
+      setResult(res || t('refreshed'), false);
       return refresh();
     }).catch(function (e) {
       setResult(String(e.message || e), true);
       return refresh();
     }).then(function () { sel.btnRefreshVer.disabled = false; });
   });
-  sel.bannerBtn.addEventListener('click', function () { withCmd(function () { return invoke('update_to_latest', {}); }, 'Updated'); });
+  sel.bannerBtn.addEventListener('click', function () { withCmd(function () { return invoke('update_to_latest', {}); }, t('doneUpdated')); });
 
 
 
@@ -1091,7 +1278,8 @@
     sel.logDrawer.hidden = !open;
     sel.logDrawer.classList.toggle('open', open);
     sel.logToggle.setAttribute('aria-pressed', open ? 'true' : 'false');
-    sel.logToggle.title = open ? 'Hide log' : 'Show log';
+    sel.logToggle.title = open ? t('hideLog') : t('showLog');
+    sel.logToggle.setAttribute('aria-label', sel.logToggle.title);
     if (open) refreshLog();
   });
   // Go to last line: jump to the end of the log and keep following it.
@@ -1107,6 +1295,14 @@
   // preventDefault keeps the panel on dsh-ui:// instead of navigating away.
   $('brand-link').addEventListener('click', function (e) { e.preventDefault(); invoke('open_repo_page', {}).catch(function (err) { setResult(String(err.message || err), true); }); });
   sel.quit.addEventListener('click', function () { invoke('quit_app', {}); });
+  // Language segments: delegated so the five buttons share one listener.
+  // setLanguage persists via the backend; the next status poll repaints
+  // from the canonical saved value.
+  sel.langSeg.addEventListener('click', function (e) {
+    var el = e && e.target && e.target.closest ? e.target.closest('button[data-lang]') : null;
+    var l = el && el.getAttribute ? el.getAttribute('data-lang') : null;
+    if (l) setLanguage(l);
+  });
 
   // events
   listen('launcher://progress', function (p) { if (p) applyProgress(p); });

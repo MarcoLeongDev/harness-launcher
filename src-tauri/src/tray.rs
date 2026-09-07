@@ -16,11 +16,138 @@ use crate::state::AppState;
 /// commands can enable/disable them as the engine phase changes.
 #[derive(Clone)]
 pub struct TrayState {
+    pub open: IconMenuItem<tauri::Wry>,
+    pub settings: IconMenuItem<tauri::Wry>,
     pub start: IconMenuItem<tauri::Wry>,
     pub stop: IconMenuItem<tauri::Wry>,
     pub restart: IconMenuItem<tauri::Wry>,
+    pub browser: IconMenuItem<tauri::Wry>,
     pub fullscreen_harness: IconMenuItem<tauri::Wry>,
     pub fullscreen_settings: IconMenuItem<tauri::Wry>,
+    pub quit: IconMenuItem<tauri::Wry>,
+}
+
+/// Tray menu labels per UI language (same five codes as the Control Panel
+/// switcher; English is the fallback for unknown codes).
+struct TrayLabels {
+    open: &'static str,
+    settings: &'static str,
+    start: &'static str,
+    stop: &'static str,
+    restart: &'static str,
+    browser: &'static str,
+    fullscreen_harness: &'static str,
+    fullscreen_settings: &'static str,
+    quit: &'static str,
+}
+
+fn labels_for(lang: &str) -> TrayLabels {
+    match lang {
+        "zh-Hant" => TrayLabels {
+            open: "開啟 Harness",
+            settings: "控制面板…",
+            start: "啟動 Harness",
+            stop: "停止 Harness",
+            restart: "重新啟動 Harness",
+            browser: "在瀏覽器中開啟",
+            fullscreen_harness: "Harness 全螢幕",
+            fullscreen_settings: "控制面板全螢幕",
+            quit: "結束 Harness Launcher",
+        },
+        "zh-Hans" => TrayLabels {
+            open: "打开 Harness",
+            settings: "控制面板…",
+            start: "启动 Harness",
+            stop: "停止 Harness",
+            restart: "重新启动 Harness",
+            browser: "在浏览器中打开",
+            fullscreen_harness: "Harness 全屏",
+            fullscreen_settings: "控制面板全屏",
+            quit: "退出 Harness Launcher",
+        },
+        "ja" => TrayLabels {
+            open: "Harness を開く",
+            settings: "コントロールパネル…",
+            start: "Harness を起動",
+            stop: "Harness を停止",
+            restart: "Harness を再起動",
+            browser: "ブラウザで開く",
+            fullscreen_harness: "Harness を全画面表示",
+            fullscreen_settings: "コントロールパネルを全画面表示",
+            quit: "Harness Launcher を終了",
+        },
+        "es" => TrayLabels {
+            open: "Abrir Harness",
+            settings: "Panel de control…",
+            start: "Iniciar Harness",
+            stop: "Detener Harness",
+            restart: "Reiniciar Harness",
+            browser: "Abrir en el navegador",
+            fullscreen_harness: "Harness en pantalla completa",
+            fullscreen_settings: "Panel en pantalla completa",
+            quit: "Salir de Harness Launcher",
+        },
+        _ => TrayLabels {
+            open: "Open Harness",
+            settings: "Control Panel…",
+            start: "Start Harness",
+            stop: "Stop Harness",
+            restart: "Restart Harness",
+            browser: "Open in Browser",
+            fullscreen_harness: "Harness Full Screen",
+            fullscreen_settings: "Control Panel Full Screen",
+            quit: "Quit Harness Launcher",
+        },
+    }
+}
+
+/// Re-label every tray menu item for `lang`. Called at setup (saved
+/// language) and whenever the Control Panel changes the language.
+pub fn apply_language(app: &AppHandle, lang: &str) {
+    let st = app.state::<AppState>();
+    let Some(items) = st.tray_state.lock().unwrap().clone() else {
+        return;
+    };
+    let l = labels_for(lang);
+    let _ = items.open.set_text(l.open);
+    let _ = items.settings.set_text(l.settings);
+    let _ = items.start.set_text(l.start);
+    let _ = items.stop.set_text(l.stop);
+    let _ = items.restart.set_text(l.restart);
+    let _ = items.browser.set_text(l.browser);
+    let _ = items.fullscreen_harness.set_text(l.fullscreen_harness);
+    let _ = items.fullscreen_settings.set_text(l.fullscreen_settings);
+    let _ = items.quit.set_text(l.quit);
+}
+
+#[cfg(test)]
+mod language_tests {
+    use super::labels_for;
+
+    #[test]
+    fn every_language_labels_every_item() {
+        for lang in ["en", "zh-Hant", "zh-Hans", "ja", "es"] {
+            let l = labels_for(lang);
+            for label in [
+                l.open,
+                l.settings,
+                l.start,
+                l.stop,
+                l.restart,
+                l.browser,
+                l.fullscreen_harness,
+                l.fullscreen_settings,
+                l.quit,
+            ] {
+                assert!(!label.is_empty(), "{lang} has an empty tray label");
+            }
+        }
+    }
+
+    #[test]
+    fn unknown_language_falls_back_to_english() {
+        assert_eq!(labels_for("fr").quit, "Quit Harness Launcher");
+    }
 }
 
 /// Update tray item enablement from the current engine phase.
@@ -94,12 +221,19 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
     let menu = Menu::with_items(app, items)?;
 
     *app.state::<AppState>().tray_state.lock().unwrap() = Some(TrayState {
+        open,
+        settings,
         start,
         stop,
         restart,
+        browser,
         fullscreen_harness,
         fullscreen_settings,
+        quit,
     });
+    // Label the menu in the saved UI language (pre-language installs read
+    // back English, so this is a no-op for them).
+    apply_language(app, &crate::state::read_settings(app).language);
 
     // Logo-derived black glyphs render crisply in the macOS menu bar as a
     // template image (generated by scripts/gen-icons.mjs at prep time).
