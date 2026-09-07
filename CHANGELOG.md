@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.1.84 — Green button enters native fullscreen
+- Harness + Control Panel windows are fullscreen-primary: the green
+  traffic-light button enters native macOS fullscreen instead of zooming
+  (Option-click / long-press still zoom; tray toggles unchanged).
+
 ## v0.1.83 — Control Panel + tray language switcher (En|繁|簡|日|Es)
 - Segmented language control next to the header quit button; choice
   persists in settings.json and translates the Control Panel chrome and
