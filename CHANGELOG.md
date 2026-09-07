@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.1.82 — Neutral operation terminal header
+- Operation terminal headers read "Harness Launcher #" for every action
+  (install, switch, update, rollback, engine ops) instead of claiming an
+  install is running. Applies to Control Panel feeds and overlay terminal.
+
 ## v0.1.81 — Manual version-list refresh button
 - The install-row version dropdown gains an icon-only refresh button
   (refresh glyph, no text) that re-fetches the published list from the

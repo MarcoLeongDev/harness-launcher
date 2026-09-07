@@ -371,6 +371,9 @@ console.log("9. minimal terminal: header for download phases only, no stop contr
   // Real npm install: header + elapsed.
   h.emit("launcher://progress", { op: "update", version: "0.1.2-rc.1", phase: "installing", message: "Installing DeepSeek Harness version@0.1.2-rc.1", percent: 40 });
   check("npm install shows the header", feedEl._qs.get(".op-feed-head").hidden === false);
+  check("terminal header is action-neutral",
+    feedEl._qs.get(".op-feed-cmd").textContent === "Harness Launcher #",
+    JSON.stringify(feedEl._qs.get(".op-feed-cmd").textContent));
   // Launcher-level notice (no op key): pure message, no header.
   h.emit("launcher://console", { stream: "info", text: "Removed installed version 0.1.1-rc.1" });
   const noticeEl = feedsBox.children[feedsBox.children.length - 1];
@@ -482,6 +485,18 @@ console.log("11. install row refresh button refetches the list, keeps selection"
   check("selection preserved across refresh", rsel.value === "0.1.1");
   check("button re-enabled after refresh", rbtn.disabled === false);
   h.restore();
+}
+
+// ---------- 12. neutral terminal header ----------
+console.log("12. operation terminals head with Harness Launcher #");
+{
+  check("panel feed default header is neutral",
+    html.includes('<span class="op-feed-cmd">Harness Launcher #</span>'));
+  check("no install-claim header remains in the panel",
+    !html.includes("Installing DeepSeek Harness version"));
+  const overlaySrc = readFileSync(path.join(root, "src-tauri", "resources", "overlay.js"), "utf8");
+  check("overlay terminal title is neutral",
+    overlaySrc.includes(">Harness Launcher #</span>") && !overlaySrc.includes("Installing DeepSeek Harness version@"));
 }
 
 console.log("");

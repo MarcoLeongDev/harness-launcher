@@ -588,7 +588,7 @@
     el.innerHTML =
       '<div class="op-feed-head" hidden>' +
         '<i class="ico sm bi" style="color:var(--accent2)" data-ico="terminal-fill"></i>' +
-        '<span class="op-feed-cmd">Installing DeepSeek Harness version</span>' +
+        '<span class="op-feed-cmd">Harness Launcher #</span>' +
         '<span class="op-feed-elapsed">0:00</span>' +
       '</div>' +
       '<div class="op-feed-body">' +
@@ -702,7 +702,7 @@
     if (downloading) {
       f.done = false;
       f.setDownloading(true);
-      f.setHeader('Installing DeepSeek Harness version@' + (p.version || ''));
+      f.setHeader('Harness Launcher #');
     }
     // Milestone messages (registry → installing → verifying, stopping →
     // starting → running) stream in as info lines so the terminal tells the
