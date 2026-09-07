@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.1.86 — Engine-cell open button uses the link glyph
+- The Control Panel engine-cell open-in-browser button renders the
+  chain-link glyph instead of the box-arrow (tooltip, label and tint
+  unchanged; retired the unused box-arrow asset).
+
 ## v0.1.85 — Tray fullscreen items removed
 - Dropped "Harness Full Screen" / "Control Panel Full Screen" from the
   tray menu (glyphs, handlers, labels): the green traffic-light button

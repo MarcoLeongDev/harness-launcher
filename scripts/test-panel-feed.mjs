@@ -404,6 +404,13 @@ console.log("8. structure: no stop control; white install button glyph");
     /\.btn\.install \{ color: #fff; \}/.test(html));
   check("install button gets a light-mode backing disc",
     /\(prefers-color-scheme: light\)\s*\{\s*\.btn\.install \{ background: rgba\(29, 36, 48, 0\.32\); \}/.test(html));
+  check("engine-cell open button uses the link glyph",
+    html.includes("id=\"btn-open\"") && html.includes("data-ico=\"link-45deg\""));
+  check("link glyph bundled as a raw file",
+    fs.existsSync(path.join(root, "src-tauri", "resources", "bootstrap-icons", "link-45deg.svg")));
+  check("box-arrow glyph fully retired",
+    !html.includes("box-arrow-up-right") &&
+    !fs.existsSync(path.join(root, "src-tauri", "resources", "bootstrap-icons", "box-arrow-up-right.svg")));
 }
 
 console.log("10. tray has no fullscreen items; green button owns fullscreen");
