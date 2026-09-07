@@ -107,6 +107,16 @@ impl HarnessRuntime {
         self.web_url.lock().unwrap().clone()
     }
 
+    /// The most recent `max_lines` of captured engine output as one block.
+    /// Used to classify boot failures (e.g. missing native bindings) so the
+    /// error names the cause instead of reporting a generic timeout.
+    pub fn tail_text(&self, max_lines: usize) -> String {
+        let tail = self.log_tail.lock().unwrap();
+        let lines: Vec<&str> = tail.iter().map(|s| s.as_str()).collect();
+        let start = lines.len().saturating_sub(max_lines.max(1));
+        lines[start..].join("\n")
+    }
+
     /// Wait up to `timeout` for the harness to print its authenticated URL
     /// (it is emitted right after the web server binds). Returns the captured
     /// URL or None on timeout.
@@ -399,6 +409,18 @@ pub fn start(
 mod tests {
     use super::parse_web_url_line;
     use super::redact_token;
+    use super::HarnessRuntime;
+
+    #[test]
+    fn tail_text_returns_the_most_recent_lines() {
+        let rt = HarnessRuntime::new();
+        for i in 0..5 {
+            rt.log_tail.lock().unwrap().push_back(format!("line{i}"));
+        }
+        assert_eq!(rt.tail_text(2), "line3\nline4");
+        assert_eq!(rt.tail_text(99).lines().count(), 5);
+        assert!(HarnessRuntime::new().tail_text(40).is_empty());
+    }
 
     #[test]
     fn parses_token_url_line() {

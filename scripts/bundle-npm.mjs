@@ -13,7 +13,7 @@
 // DSH_NPM_VERSION override is verified against that version's packument
 // instead (transport trust only — prefer pinning).
 import { createWriteStream } from "node:fs";
-import { mkdir, readFile, writeFile, rm, access, chmod, readdir } from "node:fs/promises";
+import { mkdir, readFile, writeFile, rm, access, chmod, readdir, stat } from "node:fs/promises";
 import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
 import { createHash } from "node:crypto";
@@ -75,7 +75,17 @@ async function copyTree(src, dest, rel) {
       await copyTree(s, d, rel2);
     } else {
       await writeFile(d, await readFile(s));
-      if (rel2.startsWith("bin/")) await chmod(d, 0o755);
+      // Preserve executable bits from the materialized tree: writeFile
+      // creates 0644, which silently strips +x from helpers npm executes at
+      // install time (node-gyp-bin/node-gyp). A stripped helper fails every
+      // native build with `Permission denied` (exit 126) — this is what left
+      // harness 0.1.3-alpha.2's fs-ext uncompiled even with scripts allowed.
+      const mode = (await stat(s)).mode & 0o777;
+      if (mode & 0o111) {
+        await chmod(d, mode);
+      } else if (rel2.startsWith("bin/")) {
+        await chmod(d, 0o755);
+      }
     }
   }
 }
@@ -128,6 +138,24 @@ async function vendoring(version) {
   await rm(stage, { recursive: true, force: true });
   await writeFile(marker, version + "\n").catch((e) => console.warn("[bundle-npm] marker write skipped:", e.code));
   console.log("[bundle-npm] vendored npm " + version + " -> " + destDir);
+
+  // Fail closed when lifecycle helpers lost their executable bit: without
+  // +x on node-gyp, every harness install with scripts allowed fails native
+  // builds with `Permission denied` (exit 126) — the silent second half of
+  // the 0.1.3-alpha.2 fs-ext outage.
+  if (process.platform !== "win32") {
+    const helpers = [
+      "node_modules/@npmcli/run-script/lib/node-gyp-bin/node-gyp",
+    ];
+    for (const h of helpers) {
+      const p = path.join(destDir, h);
+      const mode = (await stat(p)).mode & 0o777;
+      if ((mode & 0o111) === 0) {
+        throw new Error(`[bundle-npm] ${h} is not executable (mode ${mode.toString(8)}); fix copyTree mode preservation`);
+      }
+      console.log(`[bundle-npm] exec check OK: ${h} (${mode.toString(8)})`);
+    }
+  }
 
   const nodeSidecars = ["node-aarch64-apple-darwin", "node-x86_64-apple-darwin"]
     .map((n) => path.join(root, "src-tauri", "binaries", n));

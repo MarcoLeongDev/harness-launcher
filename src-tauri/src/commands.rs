@@ -115,6 +115,43 @@ fn invalidate_version_cache(app: &AppHandle) {
     vc.fetched_at = None;
 }
 
+/// Failure message for an engine that did not serve after (re)start.
+/// Native-binding failures (missing/unloadable `.node`, e.g. the fs-ext
+/// shape from harness 0.1.3-alpha) get the actionable repair/rollback
+/// message; anything else keeps the port/holder diagnosis.
+fn serve_failure_message(app: &AppHandle, version: &str, port: u16) -> String {
+    let tail = app.state::<AppState>().runtime.tail_text(40);
+    if versions::is_native_binding_failure(&tail) {
+        versions::native_binding_error(version, &tail)
+    } else {
+        format!(
+            "harness did not answer on 127.0.0.1:{port} within 30s{}",
+            port::holder_hint(port).map(|h| format!(" ({h})")).unwrap_or_default()
+        )
+    }
+}
+
+/// One in-place native rebuild + restart for a version that failed with a
+/// native-binding signature. Only the broken version's own directory is
+/// rewritten; `~/.dsh` and sibling versions are untouched. Returns the
+/// serving port when the retry succeeds.
+fn repair_and_restart(app: &AppHandle, op: &str, version: &str, port: u16) -> Result<u16, String> {
+    let st = app.state::<AppState>();
+    let rd = state::runtime_dir(app);
+    progress::emit(app, op, Some(version), "repairing", "Engine is missing a native module — rebuilding it…", None);
+    versions::repair_native_bindings(app, &rd, version, op)?;
+    runtime::start(app, &st.runtime, &rd, version, port)?;
+    if port::wait_until_serving(port, Duration::from_secs(30)) {
+        st.runtime.mark_phase(runtime::PHASE_RUNNING);
+        progress::emit(app, op, Some(version), "running", "Engine running", Some(100));
+        crate::tray::refresh(app);
+        Ok(port)
+    } else {
+        runtime::stop(&st.runtime, &rd);
+        Err(serve_failure_message(app, version, port))
+    }
+}
+
 /// Start the engine if it is not already running and wait until it serves.
 /// Emits progress under `op` and refreshes tray state. Returns the port.
 fn start_engine(app: &AppHandle, op: &str) -> Result<u16, String> {
@@ -138,10 +175,19 @@ fn start_engine(app: &AppHandle, op: &str) -> Result<u16, String> {
     let served = port::wait_until_serving(actual, Duration::from_secs(30));
     if !served {
         runtime::stop(&st.runtime, &rd);
-        let msg = format!(
-            "harness did not answer on 127.0.0.1:{actual} within 30s{}",
-            port::holder_hint(actual).map(|h| format!(" ({h})")).unwrap_or_default()
-        );
+        // A fresh install is verified before settings point at it, but a
+        // pre-existing tree (or a toolchain hiccup) can still fail native
+        // loading: attempt one in-place repair before giving up.
+        if versions::is_native_binding_failure(&st.runtime.tail_text(40)) {
+            match repair_and_restart(app, op, &version, actual) {
+                Ok(port) => return Ok(port),
+                Err(e) => {
+                    progress::emit(app, op, Some(&version), "failed", &e, Some(0));
+                    return Err(e);
+                }
+            }
+        }
+        let msg = serve_failure_message(app, &version, actual);
         progress::emit(app, op, Some(&version), "failed", &msg, Some(0));
         return Err(msg);
     }
@@ -178,10 +224,19 @@ fn restart_engine(app: &AppHandle, op: &str, version: Option<&str>) -> Result<u1
     let served = port::wait_until_serving(actual, Duration::from_secs(30));
     if !served {
         runtime::stop(&st.runtime, &rd);
-        let msg = format!(
-            "harness did not answer on 127.0.0.1:{actual} within 30s{}",
-            port::holder_hint(actual).map(|h| format!(" ({h})")).unwrap_or_default()
-        );
+        // Same one-shot repair as start_engine: a pre-existing broken tree
+        // deserves a rebuild attempt before the caller (switch/port/boot)
+        // decides on rollback or failure.
+        if versions::is_native_binding_failure(&st.runtime.tail_text(40)) {
+            match repair_and_restart(app, op, &version, actual) {
+                Ok(port) => return Ok(port),
+                Err(e) => {
+                    progress::emit(app, op, Some(&version), "failed", &e, Some(0));
+                    return Err(e);
+                }
+            }
+        }
+        let msg = serve_failure_message(app, &version, actual);
         progress::emit(app, op, Some(&version), "failed", &msg, Some(0));
         return Err(msg);
     }
@@ -244,6 +299,9 @@ fn switch_version_inner(app: &AppHandle, version: &str, op: &str) -> Result<Stri
 
     let settings = state::read_settings(app);
     let already_active = settings.current_version.as_deref() == Some(version);
+    // Captured BEFORE the switch so a failed running switch can restore the
+    // engine that was serving moments ago.
+    let previous_before = settings.current_version.clone();
     if !already_active {
         let previous = settings.current_version.clone();
         state::update_settings(app, |s| {
@@ -254,11 +312,52 @@ fn switch_version_inner(app: &AppHandle, version: &str, op: &str) -> Result<Stri
     }
 
     if was_running {
-        let actual = restart_engine(app, op, Some(version))?;
-        let _ = window::navigate(app, &harness_web_url(app, actual, Some(Duration::from_secs(10))));
-        let msg = switch_running_feedback(version, actual);
-        progress::finish(app, op, Some(version), &msg);
-        return Ok(msg);
+        match restart_engine(app, op, Some(version)) {
+            Ok(actual) => {
+                let _ = window::navigate(app, &harness_web_url(app, actual, Some(Duration::from_secs(10))));
+                let msg = switch_running_feedback(version, actual);
+                progress::finish(app, op, Some(version), &msg);
+                return Ok(msg);
+            }
+            Err(e) => {
+                // The previous engine was serving before we stopped it: never
+                // strand settings + engine on the broken version. Best-effort
+                // restore the previous working version and restart it; user
+                // data (~/.dsh) is untouched throughout — only the recorded
+                // default changes back.
+                if let Some(prev) = previous_before {
+                    if prev.as_str() != version {
+                        let rd = state::runtime_dir(app);
+                        if versions::is_installed(&rd, &prev) {
+                            let current_broken = Some(version.to_string());
+                            state::update_settings(app, |s| {
+                                s.previous_version = current_broken;
+                                s.current_version = Some(prev.clone());
+                            });
+                            crate::tray::refresh(app);
+                            match restart_engine(app, op, Some(&prev)) {
+                                Ok(actual2) => {
+                                    let _ = window::navigate(app, &harness_web_url(app, actual2, Some(Duration::from_secs(10))));
+                                    let msg = format!(
+                                        "v{version} failed to start ({e}); rolled back to v{prev} on port {actual2}"
+                                    );
+                                    progress::emit(app, op, Some(&prev), "failed", &msg, Some(0));
+                                    return Err(msg);
+                                }
+                                Err(e2) => {
+                                    let msg = format!(
+                                        "v{version} failed to start ({e}); rollback to v{prev} also failed ({e2})"
+                                    );
+                                    progress::emit(app, op, Some(&prev), "failed", &msg, Some(0));
+                                    return Err(msg);
+                                }
+                            }
+                        }
+                    }
+                }
+                return Err(e);
+            }
+        }
     }
 
     let msg = switch_feedback(version, was_installed, already_active);

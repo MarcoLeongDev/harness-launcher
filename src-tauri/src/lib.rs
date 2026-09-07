@@ -210,6 +210,22 @@ fn boot_inner(app: &AppHandle) -> Result<u16, String> {
     runtime::start(app, &st.runtime, &rd, &version, actual)?;
     let served = port::wait_until_serving(actual, Duration::from_secs(30));
     if !served {
+        runtime::stop(&st.runtime, &state::runtime_dir(app));
+        // A pre-existing tree can predate the install-script fix (e.g. a
+        // 0.1.3-alpha.2 installed while scripts were blocked): one in-place
+        // rebuild before failing. Only that version's directory is written;
+        // ~/.dsh and sibling versions are untouched.
+        if versions::is_native_binding_failure(&st.runtime.tail_text(40)) {
+            versions::repair_native_bindings(app, &rd, &version, "boot")?;
+            runtime::start(app, &st.runtime, &rd, &version, actual)?;
+            if port::wait_until_serving(actual, Duration::from_secs(30)) {
+                st.runtime.mark_phase(runtime::PHASE_RUNNING);
+                settings::log(&state::data_dir(app), &format!("harness {version} repaired + serving on 127.0.0.1:{actual}"));
+                return Ok(actual);
+            }
+            runtime::stop(&st.runtime, &state::runtime_dir(app));
+            return Err(versions::native_binding_error(&version, &st.runtime.tail_text(40)));
+        }
         return Err(format!("harness {version} did not answer on 127.0.0.1:{actual} within 30s"));
     }
     st.runtime.mark_phase(runtime::PHASE_RUNNING);

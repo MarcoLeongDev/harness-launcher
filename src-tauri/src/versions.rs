@@ -11,6 +11,17 @@ use tauri_plugin_shell::ShellExt;
 
 pub const PACKAGE: &str = "@deepseek-ai/dsh";
 
+/// npm 12 blocks install-time lifecycle scripts by default (the `allowScripts`
+/// policy): a package whose install script compiles a native binding (e.g.
+/// `fs-ext@2.1.1`'s `install: node-gyp configure build`, pulled in by
+/// `@deepseek-ai/dsh-session-persistence-jsonl` since harness 0.1.3-alpha)
+/// would otherwise install WITHOUT its `.node` binary and the engine would
+/// crash at boot with `Cannot find module './build/Release/fs_ext.node'`.
+/// The harness tree is a pinned, first-party, isolated prefix, so every
+/// harness install/rebuild explicitly opts back into scripts. The flag is
+/// logged to the operation console at each use so the allowance is visible.
+pub const ALLOW_SCRIPTS_FLAG: &str = "--dangerously-allow-all-scripts";
+
 pub fn npm_cli_path(app: &AppHandle) -> Result<PathBuf, String> {
     let res = app
         .path()
@@ -37,18 +48,49 @@ pub fn run_npm(
     let cache = runtime_dir.join("npm-cache");
     let _ = std::fs::create_dir_all(&cache);
 
+    // Native bindings (node-gyp) spawned as lifecycle scripts resolve `node`
+    // from PATH. Point PATH at a shim for the BUNDLED node first so builds
+    // target the engine's runtime ABI: a system node on PATH (or no node at
+    // all under a GUI launch) would otherwise compile for the wrong
+    // NODE_MODULE_VERSION or fail outright. Also best-effort restore the
+    // vendored node-gyp helper's executable bit (early vendored trees shipped
+    // it as 0644, which fails install scripts with `Permission denied` 126).
+    // Only needed when scripts actually run (install/rebuild); `view` calls
+    // stay on the plain environment.
+    let needs_scripts = matches!(npm_args.first(), Some(a) if *a == "install" || *a == "rebuild");
+    let mut extra_path: Option<String> = None;
+    if needs_scripts {
+        ensure_node_gyp_exec(&cli);
+        match node_shim_dir(app, runtime_dir) {
+            Ok(dir) => {
+                let prior = std::env::var("PATH").unwrap_or_default();
+                extra_path = Some(format!("{}:{prior}", dir.display()));
+            }
+            Err(e) => {
+                if let Some(s) = sink.as_mut() {
+                    s("err", &format!("node shim unavailable ({e}); lifecycle scripts may build for the wrong node"));
+                }
+            }
+        }
+    }
+
     let mut args: Vec<String> = vec![cli.to_string_lossy().into_owned()];
     args.extend(npm_args.iter().map(|s| s.to_string()));
-    let (mut rx_async, child) = app
+    let sidecar = app
         .shell()
         .sidecar("node")
-        .map_err(|e| format!("node sidecar unavailable: {e}"))?
-        .args(args)
+        .map_err(|e| format!("node sidecar unavailable: {e}"))?;
+    let mut cmd = sidecar.args(args);
+    cmd = cmd
         .current_dir(runtime_dir)
         .env("npm_config_cache", cache.to_string_lossy().into_owned())
         .env("npm_config_update_notifier", "false")
         .env("npm_config_fund", "false")
-        .env("npm_config_audit", "false")
+        .env("npm_config_audit", "false");
+    if let Some(path) = extra_path {
+        cmd = cmd.env("PATH", path);
+    }
+    let (mut rx_async, child) = cmd
         .spawn()
         .map_err(|e| format!("failed to spawn node: {e}"))?;
     let (tx, rx) = std::sync::mpsc::channel::<CommandEvent>();
@@ -351,6 +393,10 @@ pub fn install_version(
             "--no-fund",
             "--no-color",
             "--legacy-peer-deps",
+            // npm 12 blocks lifecycle scripts by default; without this the
+            // native bindings a harness version needs (e.g. fs-ext since
+            // 0.1.3-alpha) are silently skipped and the engine cannot boot.
+            ALLOW_SCRIPTS_FLAG,
             "--fetch-retries=2",
             "--fetch-timeout=120000",
             "--loglevel=http",
@@ -394,6 +440,11 @@ pub fn install_version(
             "install of {spec} did not produce a usable harness\n{hint}\nstdout: {out}\nstderr: {err}"
         ));
     }
+    // Bootability gate: a present package.json is not enough — a tree whose
+    // native bindings were skipped (blocked install scripts) or miscompiled
+    // must fail HERE, before settings point at it and before the engine
+    // spends 30s not serving.
+    verify_harness_tree(app, runtime_dir, version, op)?;
     Ok(())
 }
 /// Find @deepseek-ai/* packages referenced as peerDependencies somewhere in
@@ -483,6 +534,9 @@ pub fn ensure_peer_completion(
         "--no-fund".into(),
         "--no-color".into(),
         "--legacy-peer-deps".into(),
+        // Same script policy as the main install: peer completion must also
+        // compile native bindings, not just unpack them.
+        ALLOW_SCRIPTS_FLAG.into(),
         "--fetch-retries=2".into(),
         "--fetch-timeout=120000".into(),
         "--loglevel=http".into(),
@@ -508,5 +562,353 @@ pub fn ensure_peer_completion(
     }
     Ok(())
 }
+
+/// Best-effort restore of the vendored node-gyp helper's executable bit.
+/// Early vendored npm trees shipped
+/// `node_modules/@npmcli/run-script/lib/node-gyp-bin/node-gyp` as 0644, so
+/// any install with scripts allowed failed with `Permission denied` (exit
+/// 126) instead of compiling. Fixed at vendor time by bundle-npm.mjs; this
+/// covers app bundles already deployed. Failures are silent: the npm run
+/// will surface them if the bit is still missing.
+fn ensure_node_gyp_exec(npm_cli: &Path) {
+    #[cfg(unix)]
+    {
+        let helper = npm_cli
+            .parent()
+            .map(|bin| {
+                bin.join("../node_modules/@npmcli/run-script/lib/node-gyp-bin/node-gyp")
+            });
+        if let Some(path) = helper {
+            use std::os::unix::fs::PermissionsExt;
+            if let Ok(meta) = std::fs::metadata(&path) {
+                let mode = meta.permissions().mode();
+                if mode & 0o111 == 0 {
+                    let mut perms = meta.permissions();
+                    perms.set_mode(mode | 0o755);
+                    let _ = std::fs::set_permissions(&path, perms);
+                }
+            }
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = npm_cli;
+    }
+}
+
+/// Run the bundled node sidecar with `args` in `cwd` and capture
+/// (exit code, stdout, stderr). Used for install verification and shim
+/// resolution — never for the engine itself (see runtime::start).
+fn run_node_capture(
+    app: &AppHandle,
+    args: Vec<String>,
+    cwd: &Path,
+    timeout: Duration,
+) -> Result<(Option<i32>, String, String), String> {
+    let (mut rx_async, child) = app
+        .shell()
+        .sidecar("node")
+        .map_err(|e| format!("node sidecar unavailable: {e}"))?
+        .args(args)
+        .current_dir(cwd)
+        .env("npm_config_update_notifier", "false")
+        .spawn()
+        .map_err(|e| format!("failed to spawn node: {e}"))?;
+    let (tx, rx) = std::sync::mpsc::channel::<CommandEvent>();
+    tauri::async_runtime::spawn(async move {
+        while let Some(event) = rx_async.recv().await {
+            let term = matches!(&event, CommandEvent::Terminated(_));
+            if tx.send(event).is_err() {
+                break;
+            }
+            if term {
+                break;
+            }
+        }
+    });
+    let deadline = std::time::Instant::now() + timeout;
+    let mut stdout = String::new();
+    let mut stderr = String::new();
+    loop {
+        match rx.recv_timeout(Duration::from_millis(250)) {
+            Ok(CommandEvent::Stdout(line)) => {
+                stdout.push_str(&String::from_utf8_lossy(&line));
+            }
+            Ok(CommandEvent::Stderr(line)) => {
+                stderr.push_str(&String::from_utf8_lossy(&line));
+            }
+            Ok(CommandEvent::Error(e)) => {
+                stderr.push_str(&format!("[node error] {e}\n"));
+            }
+            Ok(CommandEvent::Terminated(p)) => {
+                return Ok((p.code, stdout, stderr));
+            }
+            Ok(_) => {}
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                if std::time::Instant::now() >= deadline {
+                    let _ = child.kill();
+                    return Err("node verification timed out".to_string());
+                }
+            }
+            Err(_) => break,
+        }
+    }
+    Err("node verification ended without an exit code".to_string())
+}
+
+/// Absolute path of the bundled node binary, resolved by asking the sidecar
+/// itself (`process.execPath`). Needed for the PATH shim below; resolving
+/// dynamically keeps dev (`src-tauri/binaries/…`) and prod
+/// (`…/Contents/MacOS/node`) layouts working without hardcoding either.
+fn bundled_node_path(app: &AppHandle) -> Result<PathBuf, String> {
+    let dir = std::env::temp_dir();
+    let (code, out, err) = run_node_capture(
+        app,
+        vec!["-p".to_string(), "process.execPath".to_string()],
+        &dir,
+        Duration::from_secs(15),
+    )?;
+    if code != Some(0) {
+        return Err(format!("node execPath check failed: {err}{out}"));
+    }
+    let path = PathBuf::from(out.trim());
+    if path.is_file() {
+        Ok(path)
+    } else {
+        Err(format!("node execPath is not a file: {}", path.display()))
+    }
+}
+
+/// Directory holding a `node` symlink to the bundled sidecar. Prepending it
+/// to PATH for npm install/rebuild makes lifecycle scripts (node-gyp)
+/// compile against the engine runtime's NODE_MODULE_VERSION instead of
+/// whatever system node happens to be on PATH (or none under GUI launch).
+fn node_shim_dir(app: &AppHandle, runtime_dir: &Path) -> Result<PathBuf, String> {
+    let target = bundled_node_path(app)?;
+    let dir = runtime_dir.join("node-bin");
+    std::fs::create_dir_all(&dir).map_err(|e| format!("mkdir {}: {e}", dir.display()))?;
+    let link = dir.join("node");
+    #[cfg(unix)]
+    {
+        let stale = std::fs::read_link(&link).ok().map(|p| p != target).unwrap_or(true);
+        // A regular file (not a symlink) at the link path is never touched.
+        let is_link = std::fs::symlink_metadata(&link)
+            .map(|m| m.file_type().is_symlink())
+            .unwrap_or(false);
+        if !is_link && link.exists() {
+            return Err(format!(
+                "{} exists and is not a symlink; refusing to replace it",
+                link.display()
+            ));
+        }
+        if stale {
+            let _ = std::fs::remove_file(&link);
+            std::os::unix::fs::symlink(&target, &link)
+                .map_err(|e| format!("symlink {}: {e}", link.display()))?;
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = (target, link);
+        return Err("node shim is macOS-only".to_string());
+    }
+    Ok(dir)
+}
+
+/// True when `text` (engine output, smoke-test output) shows the harness
+/// tree failed for a missing/unloadable native binding: the fs-ext shape
+/// from 0.1.3-alpha (`Cannot find module './build/Release/fs_ext.node'`),
+/// an ABI mismatch (`was compiled against a different Node.js version`),
+/// or the resulting plugin-tree load failure.
+pub fn is_native_binding_failure(text: &str) -> bool {
+    let lower = text.to_lowercase();
+    lower.contains("fs_ext.node")
+        || lower.contains("cannot find module")
+        || lower.contains("plugin tree failed to load")
+        || lower.contains("compiled against a different node")
+        || lower.contains("node_module_version")
+}
+
+/// Actionable error for a harness version whose native bindings are missing
+/// or unloadable. Points at repair (rebuild with scripts allowed) and at the
+/// safe fallback (roll back), and states the data guarantee explicitly.
+pub fn native_binding_error(version: &str, detail: &str) -> String {
+    let short: String = detail.trim().chars().take(300).collect();
+    format!(
+        "harness {version} cannot boot: a native module failed to load ({short}). \
+         This happens when npm skipped install scripts during download. \
+         Reinstall or repair v{version} with install scripts allowed, or roll back to the previous working version. \
+         Your sessions and settings in ~/.dsh are untouched."
+    )
+}
+
+/// Post-install bootability gate. A mere `package.json` presence check let
+/// the broken 0.1.3-alpha.2 tree report success; this instead:
+///  1. runs `node bin.js --version` with the bundled node (catches
+///     incomplete installs), and
+///  2. when `fs-ext` is in the tree, requires its native binding to exist
+///     AND load under the bundled node (catches blocked scripts as well as
+///     ABI mismatches from building with a system node).
+/// Writes only to the operation console; never touches `~/.dsh`.
+pub fn verify_harness_tree(
+    app: &AppHandle,
+    runtime_dir: &Path,
+    version: &str,
+    op: &str,
+) -> Result<(), String> {
+    let entry = harness_entry(runtime_dir, version)
+        .ok_or_else(|| format!("harness {version} is not installed (missing bin.js)"))?;
+    let (code, out, err) = run_node_capture(
+        app,
+        vec![entry.to_string_lossy().into_owned(), "--version".to_string()],
+        runtime_dir,
+        Duration::from_secs(20),
+    )?;
+    if code != Some(0) {
+        let detail = format!("{out}{err}");
+        if is_native_binding_failure(&detail) {
+            return Err(native_binding_error(version, &detail));
+        }
+        return Err(format!(
+            "harness {version} failed its post-install check (bin.js --version exited {:?}): {}",
+            code,
+            detail.trim().chars().take(300).collect::<String>()
+        ));
+    }
+    let fs_ext_dir = version_dir(runtime_dir, version).join("node_modules").join("fs-ext");
+    if fs_ext_dir.is_dir() {
+        let binding = fs_ext_dir.join("build").join("Release").join("fs_ext.node");
+        if !binding.is_file() {
+            return Err(native_binding_error(
+                version,
+                &format!(
+                    "Cannot find module './build/Release/fs_ext.node' ({} is missing)",
+                    binding.display()
+                ),
+            ));
+        }
+        let (bcode, bout, berr) = run_node_capture(
+            app,
+            vec![
+                "-e".to_string(),
+                "require(process.argv[1])".to_string(),
+                binding.to_string_lossy().into_owned(),
+            ],
+            runtime_dir,
+            Duration::from_secs(20),
+        )?;
+        if bcode != Some(0) {
+            let detail = format!("{bout}{berr}");
+            return Err(native_binding_error(version, &detail));
+        }
+    }
+    crate::progress::push_console(
+        app,
+        op,
+        "info",
+        &format!("Verified harness {version} boots (bin.js --version: {})", out.trim()),
+    );
+    Ok(())
+}
+
+/// Rebuild the native bindings of an ALREADY-INSTALLED version in place
+/// (`npm rebuild` with install scripts allowed, building against the bundled
+/// node via the PATH shim), then re-run the bootability gate. Only that
+/// version's own `runtime/versions/<version>/` tree is written; `~/.dsh`
+/// and sibling versions are never touched.
+pub fn repair_native_bindings(
+    app: &AppHandle,
+    runtime_dir: &Path,
+    version: &str,
+    op: &str,
+) -> Result<(), String> {
+    if !is_valid_version_name(version) {
+        return Err(format!("invalid version name: {version}"));
+    }
+    if !is_installed(runtime_dir, version) {
+        return Err(format!("version {version} is not installed"));
+    }
+    let dir = version_dir(runtime_dir, version);
+    crate::progress::push_console(
+        app,
+        op,
+        "info",
+        &format!("$ npm rebuild (with install scripts allowed) in {version}"),
+    );
+    crate::progress::emit(
+        app,
+        op,
+        Some(version),
+        "repairing",
+        "Rebuilding native modules…",
+        None,
+    );
+    let mut sink = |stream: &str, line: &str| {
+        let line = line.trim();
+        if !line.is_empty() {
+            crate::progress::push_console(app, op, stream, &line.chars().take(600).collect::<String>());
+        }
+    };
+    run_npm(
+        app,
+        runtime_dir,
+        &[
+            "rebuild",
+            "--prefix",
+            dir.to_string_lossy().as_ref(),
+            ALLOW_SCRIPTS_FLAG,
+            "--no-color",
+            "--loglevel=http",
+            "--progress=false",
+        ],
+        Duration::from_secs(240),
+        Some(&mut sink),
+    )?;
+    verify_harness_tree(app, runtime_dir, version, op)
+}
+
+#[cfg(test)]
+mod native_tests {
+    use super::{is_native_binding_failure, native_binding_error, ALLOW_SCRIPTS_FLAG};
+
+    #[test]
+    fn scripts_flag_is_the_documented_opt_in() {
+        assert_eq!(ALLOW_SCRIPTS_FLAG, "--dangerously-allow-all-scripts");
+    }
+
+    #[test]
+    fn classifier_spots_the_alpha2_fs_ext_shape() {
+        assert!(is_native_binding_failure(
+            "Error: Cannot find module './build/Release/fs_ext.node'\nRequire stack:\n- fs-ext/fs-ext.js"
+        ));
+        assert!(is_native_binding_failure(
+            "dsh: plugin tree failed to load: failed to import loader entry session-persistence-jsonl"
+        ));
+        assert!(is_native_binding_failure(
+            "was compiled against a different Node.js version using NODE_MODULE_VERSION 147"
+        ));
+        assert!(is_native_binding_failure("ERR_DLOPEN_FAILED NODE_MODULE_VERSION mismatch"));
+    }
+
+    #[test]
+    fn classifier_ignores_healthy_boot_lines() {
+        assert!(!is_native_binding_failure(
+            "dsh web: http://127.0.0.1:3081/?token=[CENSORED]"
+        ));
+        assert!(!is_native_binding_failure("[launcher] starting harness 0.1.2-rc.1 on 127.0.0.1:3081"));
+        assert!(!is_native_binding_failure("Engine running"));
+        assert!(!is_native_binding_failure(""));
+    }
+
+    #[test]
+    fn error_names_repair_and_data_safety() {
+        let msg = native_binding_error("0.1.3-alpha.2", "Cannot find module './build/Release/fs_ext.node'");
+        assert!(msg.contains("0.1.3-alpha.2"), "{msg}");
+        assert!(msg.contains("fs_ext.node"), "{msg}");
+        assert!(msg.contains("roll back"), "{msg}");
+        assert!(msg.contains("~/.dsh"), "{msg}");
+    }
+}
+
 
 

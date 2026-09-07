@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.1.88 — v0.1.3-alpha.2 boot failure fixed (fs-ext native binding)
+- Root cause: vendored npm 12 blocks install scripts by default, so
+  `fs-ext` (new via `dsh-session-persistence-jsonl`) never compiled and
+  the engine crashed with `Cannot find module './build/Release/fs_ext.node'`
+  (v0.1.2-rc.1 has no fs-ext dep, so it kept working).
+- Harness installs/rebuilds now allow install scripts, build against the
+  bundled node (PATH shim, correct NODE_MODULE_VERSION), and fail fast
+  with an actionable error when a tree is unbootable — no more silent
+  success followed by a 30 s "did not answer" mystery.
+- Boot/start/switch detect native-binding failures, attempt one in-place
+  rebuild, and a failed running switch rolls back to the previous working
+  version instead of stranding the engine. `~/.dsh` sessions and settings
+  are never touched by install/repair/rollback.
+- Build fix: `bundle-npm.mjs` preserves executable bits when vendoring npm
+  (the shipped node-gyp helper lost +x and failed builds with
+  `Permission denied`), with a fail-closed exec check.
+
 ## v0.1.87 — Tray browser glyph is the SF link symbol
 - "Open in Browser" carries SF `link` instead of `arrow.up.right.square`,
   matching the Control Panel engine-cell link button.
