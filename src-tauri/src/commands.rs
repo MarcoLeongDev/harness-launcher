@@ -30,6 +30,7 @@ pub struct StatusPayload {
     pub latest_remote: Option<String>,
     pub update_available: bool,
     pub include_prerelease: bool,
+    pub language: String,
     pub start_on_launch: bool,
     pub boot_error: Option<String>,
     /// In-flight long-running operation, if any (legacy single slot for the
@@ -378,6 +379,7 @@ pub async fn get_status(app: AppHandle) -> Result<StatusPayload, String> {
         latest_remote: remote,
         update_available,
         include_prerelease: settings.include_prerelease,
+        language: settings.language.clone(),
         start_on_launch: settings.start_on_launch,
         boot_error,
         current_op,
@@ -572,6 +574,18 @@ pub async fn set_port(app: AppHandle, window: tauri::Window, port: u16) -> Resul
 pub async fn set_prerelease(app: AppHandle, include: bool) -> Result<String, String> {
     state::update_settings(&app, |s| s.include_prerelease = include);
     Ok(format!("pre-release versions {}", if include { "shown" } else { "hidden" }))
+}
+
+/// Persist the UI language (Control Panel + tray menu) and re-label the
+/// tray immediately. The code is allowlisted, so unknown values settle on
+/// English instead of persisting garbage. Control Panel only.
+#[tauri::command]
+pub async fn set_language(app: AppHandle, window: tauri::Window, language: String) -> Result<String, String> {
+    require_panel(&window)?;
+    let lang = crate::settings::normalize_language(&language);
+    state::update_settings(&app, |s| s.language = lang.clone());
+    crate::tray::apply_language(&app, &lang);
+    Ok(format!("language set to {lang}"))
 }
 
 #[tauri::command]
