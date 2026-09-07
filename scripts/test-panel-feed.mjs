@@ -404,20 +404,35 @@ console.log("8. structure: no stop control; white install button glyph");
     /\.btn\.install \{ color: #fff; \}/.test(html));
   check("install button gets a light-mode backing disc",
     /\(prefers-color-scheme: light\)\s*\{\s*\.btn\.install \{ background: rgba\(29, 36, 48, 0\.32\); \}/.test(html));
+  check("engine-cell open button uses the link glyph",
+    html.includes("id=\"btn-open\"") && html.includes("data-ico=\"link-45deg\""));
+  check("link glyph bundled as a raw file",
+    fs.existsSync(path.join(root, "src-tauri", "resources", "bootstrap-icons", "link-45deg.svg")));
+  check("box-arrow glyph fully retired",
+    !html.includes("box-arrow-up-right") &&
+    !fs.existsSync(path.join(root, "src-tauri", "resources", "bootstrap-icons", "box-arrow-up-right.svg")));
 }
 
-console.log("10. tray fullscreen toggles carry glyphs and handlers");
+console.log("10. tray has no fullscreen items; green button owns fullscreen");
 {
   const tray = readFileSync(path.join(root, "src-tauri", "src", "tray.rs"), "utf8");
   function assetExists(p) { try { readFileSync(p); return true; } catch { return false; } }
   for (const id of ["fullscreen-harness", "fullscreen-settings"]) {
-    check("tray symbol PNG exists for " + id,
-      assetExists(path.join(root, "src-tauri", "resources", "tray", "symbol", id + ".png")));
-    check("tray menu item registered for " + id,
-      tray.includes("\"" + id + "\""));
+    check("no tray symbol PNG for " + id,
+      !assetExists(path.join(root, "src-tauri", "resources", "tray", "symbol", id + ".png")));
+    check("no tray menu item for " + id,
+      !tray.includes("\"" + id + "\""));
   }
-  check("fullscreen toggle calls set_fullscreen", /set_fullscreen\(!fullscreen\)/.test(tray));
-  check("fullscreen items gated on window existence", /fullscreen_harness\s*\n?\s*\.set_enabled/.test(tray));
+  check("no fullscreen toggle handler remains", !/toggle_fullscreen/.test(tray));
+  check("no fullscreen label entries remain", !/fullscreen_harness|fullscreen_settings|Full Screen/.test(tray));
+  const symbols = readFileSync(path.join(root, "scripts", "gen-symbols.mjs"), "utf8");
+  check("tray browser item maps to the SF link symbol",
+    /\["browser",\s*"link"\]/.test(symbols));
+  check("arrow.up.right.square retired from the tray",
+    !symbols.includes("arrow.up.right.square"));
+  const win = readFileSync(path.join(root, "src-tauri", "src", "window.rs"), "utf8");
+  check("green-button fullscreen flag still applied at window creation",
+    /FullScreenPrimary/.test(win));
 }
 
 console.log("9. versions table renders hostile version names as inert text");
