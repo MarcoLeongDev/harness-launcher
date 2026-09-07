@@ -398,6 +398,20 @@ console.log("8. structure: no stop control; white install button glyph");
     /\(prefers-color-scheme: light\)\s*\{\s*\.btn\.install \{ background: rgba\(29, 36, 48, 0\.32\); \}/.test(html));
 }
 
+console.log("10. tray fullscreen toggles carry glyphs and handlers");
+{
+  const tray = readFileSync(path.join(root, "src-tauri", "src", "tray.rs"), "utf8");
+  function assetExists(p) { try { readFileSync(p); return true; } catch { return false; } }
+  for (const id of ["fullscreen-harness", "fullscreen-settings"]) {
+    check("tray symbol PNG exists for " + id,
+      assetExists(path.join(root, "src-tauri", "resources", "tray", "symbol", id + ".png")));
+    check("tray menu item registered for " + id,
+      tray.includes("\"" + id + "\""));
+  }
+  check("fullscreen toggle calls set_fullscreen", /set_fullscreen\(!fullscreen\)/.test(tray));
+  check("fullscreen items gated on window existence", /fullscreen_harness\s*\n?\s*\.set_enabled/.test(tray));
+}
+
 console.log("9. versions table renders hostile version names as inert text");
 {
   const EVIL = "<img src=x onerror=alert(1)>";

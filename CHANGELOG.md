@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.1.80 — Tray fullscreen toggles
+- New "Harness Full Screen" and "Control Panel Full Screen" tray menu
+  items toggle native macOS fullscreen on their window (green-button zoom
+  unchanged). Fullscreen SF Symbol glyphs; items disable while their
+  window does not exist.
+
 ## v0.1.79 — Brand header opens the GitHub project page
 - The logo, app name and launcher version now open the project GitHub page in the default browser (Control Panel header, engine-stopped page, harness-window overlay brand line). Visual style unchanged: no underline, color shift or extra decoration. New benign read-only `open_repo_page` command (allowlisted URL, callable from any window).
 
