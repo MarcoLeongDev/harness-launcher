@@ -7,6 +7,45 @@ use tauri::{AppHandle, Manager, WebviewUrl, WindowEvent};
 pub const LABEL: &str = "main";
 pub const SETTINGS_LABEL: &str = "settings";
 
+/// Green-button fullscreen (macOS): mark a freshly built window
+/// fullscreen-primary so a click on the green traffic light enters native
+/// fullscreen instead of zooming (Option-click / long-press still zoom).
+/// Must run on the main thread (AppKit); the applied behavior bits are
+/// logged so launcher.log proves the flag stuck.
+#[cfg(target_os = "macos")]
+fn apply_fullscreen_primary(app: &AppHandle, window: &tauri::WebviewWindow) {
+    use objc2_app_kit::{NSWindow, NSWindowCollectionBehavior};
+    let win = window.clone();
+    let handle = app.clone();
+    let _ = app.run_on_main_thread(move || {
+        let Ok(ptr) = win.ns_window() else { return };
+        // SAFETY: the pointer comes from Tauri for a live window and is used
+        // synchronously here while that window exists.
+        let ns_window: &NSWindow = unsafe { &*ptr.cast() };
+        ns_window.setCollectionBehavior(
+            ns_window.collectionBehavior() | NSWindowCollectionBehavior::FullScreenPrimary,
+        );
+        let actual = ns_window.collectionBehavior();
+        crate::settings::log(
+            &crate::state::data_dir(&handle),
+            &format!("fullscreen green button: collectionBehavior={actual:?}"),
+        );
+    });
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod fullscreen_tests {
+    // Guards the exact flag: Primary (green enters fullscreen) must not be
+    // confused with Auxiliary (helper window) or None (explicitly blocked).
+    #[test]
+    fn green_button_flag_is_primary() {
+        use objc2_app_kit::NSWindowCollectionBehavior as Behavior;
+        assert_eq!(Behavior::FullScreenPrimary.bits(), 1 << 7);
+        assert_ne!(Behavior::FullScreenPrimary, Behavior::FullScreenAuxiliary);
+        assert_ne!(Behavior::FullScreenPrimary, Behavior::FullScreenNone);
+    }
+}
+
 pub fn overlay_script() -> &'static str {
     include_str!("../resources/overlay.js")
 }
@@ -36,6 +75,8 @@ pub fn ensure_window(app: &AppHandle, url: &str) -> Result<(), String> {
         .initialization_script(overlay_script())
         .build()
         .map_err(|e| e.to_string())?;
+    #[cfg(target_os = "macos")]
+    apply_fullscreen_primary(app, &window);
 
     let win = window.clone();
     window.on_window_event(move |event| {
@@ -61,6 +102,8 @@ pub fn open_settings_window(app: &AppHandle) -> Result<(), String> {
         .min_inner_size(560.0, 640.0)
         .build()
         .map_err(|e| e.to_string())?;
+    #[cfg(target_os = "macos")]
+    apply_fullscreen_primary(app, &window);
 
     let win = window.clone();
     window.on_window_event(move |event| {
