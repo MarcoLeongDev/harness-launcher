@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.1.87 — Tray browser glyph is the SF link symbol
+- "Open in Browser" carries SF `link` instead of `arrow.up.right.square`,
+  matching the Control Panel engine-cell link button.
+
 ## v0.1.86 — Engine-cell open button uses the link glyph
 - The Control Panel engine-cell open-in-browser button renders the
   chain-link glyph instead of the box-arrow (tooltip, label and tint

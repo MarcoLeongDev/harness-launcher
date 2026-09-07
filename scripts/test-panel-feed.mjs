@@ -425,6 +425,11 @@ console.log("10. tray has no fullscreen items; green button owns fullscreen");
   }
   check("no fullscreen toggle handler remains", !/toggle_fullscreen/.test(tray));
   check("no fullscreen label entries remain", !/fullscreen_harness|fullscreen_settings|Full Screen/.test(tray));
+  const symbols = readFileSync(path.join(root, "scripts", "gen-symbols.mjs"), "utf8");
+  check("tray browser item maps to the SF link symbol",
+    /\["browser",\s*"link"\]/.test(symbols));
+  check("arrow.up.right.square retired from the tray",
+    !symbols.includes("arrow.up.right.square"));
   const win = readFileSync(path.join(root, "src-tauri", "src", "window.rs"), "utf8");
   check("green-button fullscreen flag still applied at window creation",
     /FullScreenPrimary/.test(win));
