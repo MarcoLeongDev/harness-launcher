@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.1.83 — Control Panel + tray language switcher (En|繁|簡|日|Es)
+- Segmented language control next to the header quit button; choice
+  persists in settings.json and translates the Control Panel chrome and
+  the tray menu immediately (default En, English fallback). New
+  panel-only `set_language` command; backend progress/notice lines stay
+  English (operational output).
+
 ## v0.1.82 — Neutral operation terminal header
 - Operation terminal headers read "Harness Launcher #" for every action
   (install, switch, update, rollback, engine ops) instead of claiming an
