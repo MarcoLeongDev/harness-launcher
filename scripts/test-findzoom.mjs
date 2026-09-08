@@ -54,6 +54,7 @@ function makeContext({ storage = {}, bodyText = "", withHighlight = false } = {}
   const byId = new Map();
   const store = new Map(Object.entries(storage));
   const listeners = { window: {}, doc: {} };
+  const hooks = { onFind: null };
   const findCalls = [];
   let selectionCleared = 0;
 
@@ -204,6 +205,7 @@ function makeContext({ storage = {}, bodyText = "", withHighlight = false } = {}
     },
     find(query) {
       findCalls.push(query);
+      if (hooks.onFind) hooks.onFind(query);
       return String(query).length > 0;
     },
     getSelection: () => ({
@@ -225,6 +227,8 @@ function makeContext({ storage = {}, bodyText = "", withHighlight = false } = {}
   vm.createContext(sandbox);
   vm.runInContext(JS, sandbox, { filename: "findzoom.js" });
 
+  // Simplified bubble propagation (target → document → window) honoring
+  // stopPropagation, so page-level listeners behave like in a browser.
   function keydown(event) {
     const e = {
       key: "",
@@ -235,17 +239,28 @@ function makeContext({ storage = {}, bodyText = "", withHighlight = false } = {}
       shiftKey: false,
       target: document.activeElement || body,
       defaultPrevented: false,
+      stopped: false,
       preventDefault() {
         this.defaultPrevented = true;
       },
-      stopPropagation() {},
+      stopPropagation() {
+        this.stopped = true;
+      },
       ...event,
     };
-    for (const fn of listeners.window.keydown || []) fn(e);
+    const phases = [
+      ...((e.target && e.target._listeners && e.target._listeners.keydown) || []),
+      ...(listeners.doc.keydown || []),
+      ...(listeners.window.keydown || []),
+    ];
+    for (const fn of phases) {
+      if (e.stopped) break;
+      fn(e);
+    }
     return e;
   }
 
-  return { document, window, body, byId, store, findCalls, keydown, sandbox,
+  return { document, window, body, byId, store, findCalls, keydown, sandbox, hooks,
     selectionCleared: () => selectionCleared };
 }
 
@@ -332,6 +347,49 @@ console.log("findzoom: find");
     ctx.keydown({ key: "f", ctrlKey: true });
     return bar().classList.contains("open");
   })());
+}
+
+// ---- 4. Focus survives hostile pages -----------------------------------------
+console.log("findzoom: keeps focus against page thieves");
+{
+  const ctx = makeContext({ bodyText: "hello world, hello again" });
+  const bar = () => ctx.document.getElementById("dsh-fz-bar");
+  const input = () => ctx.document.getElementById("dsh-fz-input");
+  // Chat-style page: a composer plus a document-level listener that steals
+  // focus on every plain keydown (the reported bug: field unfocused per key).
+  const composer = ctx.document.createElement("input");
+  composer.setAttribute("id", "composer");
+  ctx.body.appendChild(composer);
+  let thiefCalls = 0;
+  ctx.document.addEventListener("keydown", (e) => {
+    if (e.metaKey || e.ctrlKey) return;
+    thiefCalls++;
+    composer.focus();
+  });
+  // Plus a selection-triggered thief, as pages reacting to find selection.
+  ctx.hooks.onFind = () => composer.focus();
+
+  ctx.keydown({ key: "f", metaKey: true });
+  check("bar opened despite page listeners", bar().classList.contains("open"));
+  check("input focused on open", ctx.document.activeElement === input());
+
+  // A plain keystroke: the page must never see it, focus must not move, and
+  // the character itself must not be suppressed.
+  const k = ctx.keydown({ key: "h", target: input() });
+  check("page thief starved of keystrokes", thiefCalls === 0);
+  check("focus stays in the field per keystroke", ctx.document.activeElement === input());
+  check("character not suppressed", !k.defaultPrevented);
+
+  input().value = "hello";
+  input().dispatch("input");
+  await sleep(250); // debounce fires runSearch (nativeFind steals focus first)
+  check("search runs despite selection steal", ctx.document.getElementById("dsh-fz-count").textContent === "1 of 2");
+  check("focus restored to the field after search", ctx.document.activeElement === input());
+
+  // Zoom shortcut from inside the field still works.
+  ctx.keydown({ key: "=", metaKey: true, target: input() });
+  check("Cmd+= zooms from find field", ctx.document.documentElement.style.zoom === "110%");
+  check("field keeps focus after zoom", ctx.document.activeElement === input());
 }
 
 if (failures) {

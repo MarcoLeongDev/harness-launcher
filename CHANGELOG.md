@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.1.91 — Find field keeps focus while typing
+- Fixed: the find text field lost focus on every keystroke because page
+  keydown listeners (e.g. the harness composer refocus) received the field's
+  key events. Keystrokes in the find field no longer propagate to the page;
+  focus is also restored after search, and closing the bar never strands
+  focus on the hidden field. Zoom shortcuts work from inside the field.
+
 ## v0.1.89 — Webview find (Cmd/Ctrl+F) and zoom (Cmd/Ctrl +/−/0)
 - Both webviews (harness window + Control Panel) now have browser-style
   in-page find (floating bar, match count, Enter/Shift+Enter navigation,

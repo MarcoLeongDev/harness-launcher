@@ -248,6 +248,28 @@
     }
     searchedQuery = query;
     updateCount();
+    guardFocus();
+  }
+
+  // Pages that move focus on selection changes (or on timers) can pull focus
+  // out of the field mid-search: put it back while the bar is still open.
+  // Focus on our own buttons (prev/next/close) is left alone.
+  function guardFocus() {
+    var bar = uiRoot();
+    if (!bar || !bar.classList.contains('open')) return;
+    var field = bar.querySelector('#dsh-fz-input');
+    if (!field) return;
+    var active = null;
+    try {
+      active = document.activeElement;
+    } catch (e) {
+      active = null;
+    }
+    if (active !== field && !isUiNode(active)) {
+      try {
+        field.focus();
+      } catch (e) { /* element may be gone */ }
+    }
   }
 
   function scheduleSearch() {
@@ -298,6 +320,18 @@
       } catch (e) { /* element may be gone */ }
       savedFocus = null;
     }
+    // Never leave focus on the now-hidden field: further keystrokes would go
+    // nowhere visible, and Cmd+F would reselect instead of reopening.
+    try {
+      var field = bar.querySelector('#dsh-fz-input');
+      if (field && document.activeElement === field) {
+        if (document.body && typeof document.body.focus === 'function') {
+          document.body.focus();
+        } else if (typeof field.blur === 'function') {
+          field.blur();
+        }
+      }
+    } catch (e) { /* ignore */ }
   }
 
   function buildBar() {
@@ -320,8 +354,33 @@
 
     var input = bar.querySelector('#dsh-fz-input');
     input.addEventListener('input', scheduleSearch);
+    // Swallow key events that must not reach the page (keypress/keyup have no
+    // behavior of their own here; blocking them starves page-level thieves).
+    input.addEventListener('keypress', function (e) { e.stopPropagation(); });
+    input.addEventListener('keyup', function (e) { e.stopPropagation(); });
     input.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter') {
+      var mod = e.metaKey || e.ctrlKey;
+      var key = e.key;
+      // Modified keys other than our own shortcuts (copy/paste, etc.) keep
+      // their default behavior and are page-irrelevant: let them through.
+      if (mod && key !== 'f' && key !== 'F' && key !== '+' && key !== '=' &&
+          key !== '-' && key !== '_' && key !== '0') {
+        return;
+      }
+      // Anything else typed here belongs to the find UI. Keep it from
+      // bubbling to page listeners: web apps that refocus their composer on
+      // any keydown would otherwise steal the field on every keystroke.
+      e.stopPropagation();
+      if (mod && (key === 'f' || key === 'F')) {
+        e.preventDefault();
+        input.select();
+        return;
+      }
+      // Zoom stays available while the find field has focus (as in browsers).
+      if (mod && (key === '+' || key === '=')) { e.preventDefault(); zoomBy(ZOOM_STEP); return; }
+      if (mod && (key === '-' || key === '_')) { e.preventDefault(); zoomBy(-ZOOM_STEP); return; }
+      if (mod && key === '0') { e.preventDefault(); zoomReset(); return; }
+      if (key === 'Enter') {
         e.preventDefault();
         if (debounceTimer) {
           // Keystrokes still pending: flush the search first so Enter lands
@@ -336,7 +395,6 @@
         }
       } else if (e.key === 'Escape') {
         e.preventDefault();
-        e.stopPropagation();
         closeFind();
       }
     });
@@ -395,7 +453,8 @@
   // ---- Shortcuts ------------------------------------------------------------
   // Browser conventions: Cmd on macOS, Ctrl elsewhere. Handled at the window
   // level in the bubble phase so page inputs keep working, except our own bar
-  // input (Enter/Escape there are handled above and must not double-fire).
+  // input (its key handler stops propagation, so these never double-fire).
+  // Consumed shortcuts never reach the page (browsers reserve them too).
   window.addEventListener('keydown', function (e) {
     var mod = e.metaKey || e.ctrlKey;
     if (!mod || e.altKey) return;
@@ -405,18 +464,22 @@
 
     if ((key === 'f' || key === 'F') && !e.shiftKey) {
       e.preventDefault();
+      e.stopPropagation();
       openFind();
       return;
     }
     if (inFindInput) return; // let the bar's own key handler own other keys
     if (key === '+' || key === '=' || code === 'NumpadAdd') {
       e.preventDefault();
+      e.stopPropagation();
       zoomBy(ZOOM_STEP);
     } else if (key === '-' || key === '_' || code === 'NumpadSubtract') {
       e.preventDefault();
+      e.stopPropagation();
       zoomBy(-ZOOM_STEP);
     } else if (key === '0' || code === 'Numpad0') {
       e.preventDefault();
+      e.stopPropagation();
       zoomReset();
     }
   });
