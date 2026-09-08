@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.1.89 — Webview find (Cmd/Ctrl+F) and zoom (Cmd/Ctrl +/−/0)
+- Both webviews (harness window + Control Panel) now have browser-style
+  in-page find (floating bar, match count, Enter/Shift+Enter navigation,
+  Esc to close) and page zoom (10% steps, 50–200%, Cmd/Ctrl+0 resets).
+- Zoom level persists per origin across restarts and redeploys; user data
+  (`~/.dsh`, installed versions, settings) is untouched.
+
 ## v0.1.88 — v0.1.3-alpha.2 boot failure fixed (fs-ext native binding)
 - Root cause: vendored npm 12 blocks install scripts by default, so
   `fs-ext` (new via `dsh-session-persistence-jsonl`) never compiled and
