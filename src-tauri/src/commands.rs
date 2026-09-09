@@ -121,7 +121,9 @@ fn invalidate_version_cache(app: &AppHandle) {
 /// message; anything else keeps the port/holder diagnosis.
 fn serve_failure_message(app: &AppHandle, version: &str, port: u16) -> String {
     let tail = app.state::<AppState>().runtime.tail_text(40);
-    if versions::is_native_binding_failure(&tail) {
+    if crate::mcp_env::is_mcp_config_failure(&tail) {
+        crate::mcp_env::mcp_config_error(version, &tail)
+    } else if versions::is_native_binding_failure(&tail) {
         versions::native_binding_error(version, &tail)
     } else {
         format!(

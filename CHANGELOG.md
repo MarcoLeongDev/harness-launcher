@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.1.93 — Durable engine updates via MCP env bridging
+- Root cause of the 0.1.5-alpha.1 boot loop: user patch layers use process.env secrets for MCP headers; a GUI launch leaves them unset so the value resolves to undefined, which logs as empty headers but fails schemastery validation and bricks the whole plugin tree.
+- The launcher now bridges missing process.env names from the host env, credentials refs, and the Agentqueue server config into the engine child (env-only, values redacted in logs, user files never written), with empty-string fallback so validation passes and boot continues.
+- Boot failures are classified: MCP invalid-config gets an actionable missing-env message, native-binding failures keep the rebuild path; the native classifier no longer swallows MCP errors. Sessions, settings, and sibling versions are untouched throughout.
+
 ## v0.1.92 — Ad-hoc sign deployed app for Gatekeeper
 - `scripts/deploy.mjs` re-signs the installed bundle (`codesign --force --deep --sign -`) and verifies it, so a locally built app launches from Finder without a Gatekeeper block. Repeatable and never touches user data (`~/.dsh`).
 

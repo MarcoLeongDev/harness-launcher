@@ -13,6 +13,7 @@ use tauri::{AppHandle, Emitter};
 use tauri_plugin_shell::process::CommandEvent;
 use tauri_plugin_shell::ShellExt;
 
+use crate::mcp_env;
 use crate::presets;
 use crate::versions;
 
@@ -277,7 +278,26 @@ pub fn start(
         });
     }
 
-    let (mut rx_async, child) = app
+    // Bridge MCP secrets referenced as process.env.NAME in user patch layers
+    // into the engine child. A GUI launch inherits a minimal launchd env, so
+    // an unset NAME would resolve to undefined and fail schemastery dict
+    // validation (logs show empty headers). Resolution is env-only, values
+    // are only logged redacted, and user files are never written.
+    let bridged = mcp_env::bridge_missing_env(&crate::presets::dsh_home());
+    for (name, _, source) in &bridged {
+        let line = if *source == "empty-fallback" {
+            format!("[launcher] env {name} is unset and has no stored value -- passing empty string so MCP validation passes; set {name} to enable the entry")
+        } else {
+            format!("[launcher] bridged env {name} from {source} so user MCP patch validates (value redacted)")
+        };
+        append_log(runtime_dir, &line);
+    }
+    let bridged_for_child = bridged.clone();
+    let app_for_console = app.clone();
+    for (name, _, source) in &bridged {
+        crate::progress::push_console(&app_for_console, "", "info", &format!("[launcher] bridged env {name} from {source} (value redacted)"));
+    }
+    let mut cmd = app
         .shell()
         .sidecar("node")
         .map_err(|e| format!("node sidecar unavailable: {e}"))?
@@ -292,7 +312,11 @@ pub fn start(
             "--no-open".into(),
         ])
         .current_dir(runtime_dir)
-        .env("npm_config_update_notifier", "false")
+        .env("npm_config_update_notifier", "false");
+    for (k, v, _) in bridged_for_child {
+        cmd = cmd.env(k, v);
+    }
+    let (mut rx_async, child) = cmd
         .spawn()
         .map_err(|e| format!("failed to spawn harness: {e}"))?;
     let (tx, rx) = std::sync::mpsc::channel::<CommandEvent>();
