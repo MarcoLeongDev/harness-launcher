@@ -46,8 +46,55 @@ mod fullscreen_tests {
     }
 }
 
+#[cfg(test)]
+mod findzoom_tests {
+    use super::findzoom_script;
+
+    #[test]
+    fn script_is_self_contained_and_guarded() {
+        let js = findzoom_script();
+        assert!(js.len() > 1000, "findzoom.js looks truncated");
+        // Single-install guard so re-navigation never double-binds shortcuts.
+        assert!(js.contains("__DSH_FINDZOOM__"), "missing install guard");
+    }
+
+    #[test]
+    fn script_handles_find_shortcut_and_bar() {
+        let js = findzoom_script();
+        // Cmd (macOS) or Ctrl with F opens the bar; bar has search semantics.
+        assert!(js.contains("e.metaKey || e.ctrlKey"), "missing mod-key check");
+        assert!(js.contains("dsh-fz-bar"), "missing find bar id");
+        assert!(js.contains("role', 'search'") || js.contains("role\",\"search\""),
+            "find bar must expose role=search");
+        // Next/previous/close affordances.
+        for id in ["dsh-fz-prev", "dsh-fz-next", "dsh-fz-close", "dsh-fz-count"] {
+            assert!(js.contains(id), "missing find bar element {id}");
+        }
+    }
+
+    #[test]
+    fn script_handles_zoom_keys_and_persistence() {
+        let js = findzoom_script();
+        // Zoom in/out/reset keys (incl. '=' for Shift-less Cmd+=, numpad codes).
+        for key in ["NumpadAdd", "NumpadSubtract", "Numpad0"] {
+            assert!(js.contains(key), "missing zoom key {key}");
+        }
+        // Bounded range persisted per origin so it survives redeploys.
+        assert!(js.contains("dsh-zoom"), "missing zoom storage key");
+        assert!(js.contains("MIN_ZOOM = 50"), "missing lower zoom bound");
+        assert!(js.contains("MAX_ZOOM = 200"), "missing upper zoom bound");
+    }
+}
+
 pub fn overlay_script() -> &'static str {
     include_str!("../resources/overlay.js")
+}
+
+/// Browser-style find-in-page + zoom (Cmd/Ctrl+F, Cmd/Ctrl +/−/0), injected
+/// into every webview. Self-contained (no IPC): safe for both launcher-owned
+/// pages and untrusted engine-served content.
+pub fn findzoom_script() -> &'static str {
+    include_str!("../resources/findzoom.js")
 }
 
 fn parse_url(url: &str) -> Result<tauri::Url, String> {
@@ -73,6 +120,7 @@ pub fn ensure_window(app: &AppHandle, url: &str) -> Result<(), String> {
         .inner_size(1280.0, 800.0)
         .min_inner_size(900.0, 600.0)
         .initialization_script(overlay_script())
+        .initialization_script(findzoom_script())
         .build()
         .map_err(|e| e.to_string())?;
     #[cfg(target_os = "macos")]
@@ -100,6 +148,7 @@ pub fn open_settings_window(app: &AppHandle) -> Result<(), String> {
         .title("Harness Launcher - Control Panel")
         .inner_size(680.0, 800.0)
         .min_inner_size(560.0, 640.0)
+        .initialization_script(findzoom_script())
         .build()
         .map_err(|e| e.to_string())?;
     #[cfg(target_os = "macos")]

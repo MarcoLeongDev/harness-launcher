@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.1.92 — Ad-hoc sign deployed app for Gatekeeper
+- `scripts/deploy.mjs` re-signs the installed bundle (`codesign --force --deep --sign -`) and verifies it, so a locally built app launches from Finder without a Gatekeeper block. Repeatable and never touches user data (`~/.dsh`).
+
+## v0.1.91 — Find field keeps focus while typing
+- Fixed: the find text field lost focus on every keystroke because page
+  keydown listeners (e.g. the harness composer refocus) received the field's
+  key events. Keystrokes in the find field no longer propagate to the page;
+  focus is also restored after search, and closing the bar never strands
+  focus on the hidden field. Zoom shortcuts work from inside the field.
+
+## v0.1.89 — Webview find (Cmd/Ctrl+F) and zoom (Cmd/Ctrl +/−/0)
+- Both webviews (harness window + Control Panel) now have browser-style
+  in-page find (floating bar, match count, Enter/Shift+Enter navigation,
+  Esc to close) and page zoom (10% steps, 50–200%, Cmd/Ctrl+0 resets).
+- Zoom level persists per origin across restarts and redeploys; user data
+  (`~/.dsh`, installed versions, settings) is untouched.
+
 ## v0.1.88 — v0.1.3-alpha.2 boot failure fixed (fs-ext native binding)
 - Root cause: vendored npm 12 blocks install scripts by default, so
   `fs-ext` (new via `dsh-session-persistence-jsonl`) never compiled and
