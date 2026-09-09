@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.1.92 — Ad-hoc sign deployed app for Gatekeeper
+- `scripts/deploy.mjs` re-signs the installed bundle (`codesign --force --deep --sign -`) and verifies it, so a locally built app launches from Finder without a Gatekeeper block. Repeatable and never touches user data (`~/.dsh`).
+
 ## v0.1.91 — Find field keeps focus while typing
 - Fixed: the find text field lost focus on every keystroke because page
   keydown listeners (e.g. the harness composer refocus) received the field's

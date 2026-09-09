@@ -57,6 +57,16 @@ ensureAgent(bundle);
 // instance's loaded binaries intact until the user relaunches the app.
 execFileSync("ditto", [bundle, dest], { stdio: "inherit" });
 
+// Ad-hoc sign so Gatekeeper lets the app launch from Finder (local unsigned
+// builds are rejected by spctl and may refuse to open). Re-signing is safe to
+// repeat and never touches user data in ~/.dsh.
+try {
+  execFileSync("codesign", ["--force", "--deep", "--sign", "-", dest], { stdio: "inherit" });
+  execFileSync("codesign", ["--verify", "--deep", "--strict", dest], { stdio: "inherit" });
+} catch {
+  console.error("Ad-hoc signing failed; the app may be blocked by Gatekeeper.");
+  process.exit(1);
+}
 const mainBin = path.join(dest, "Contents", "MacOS", "dsh-launcher");
 if (!existsSync(mainBin)) {
   console.error("Deployed app is missing its main binary:", mainBin);
