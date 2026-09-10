@@ -2,7 +2,7 @@
 use std::time::Duration;
 
 use serde::Serialize;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_updater::UpdaterExt;
 
 use crate::port;
@@ -816,6 +816,12 @@ pub async fn set_language(
     let lang = crate::settings::normalize_language(&language);
     state::update_settings(&app, |s| s.language = lang.clone());
     crate::tray::apply_language(&app, &lang);
+    // Push to open launcher-owned pages so the splash/panel repaint without
+    // waiting for their poll cycle (polling stays as a reconnect fallback).
+    let _ = app.emit(
+        "launcher://language",
+        serde_json::json!({ "language": lang }),
+    );
     Ok(format!("language set to {lang}"))
 }
 

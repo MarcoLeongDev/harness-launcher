@@ -1,7 +1,7 @@
 {
   "name": "dsh-launcher",
   "private": true,
-  "version": "0.1.98",
+  "version": "0.1.99",
   "description": "Harness Launcher - Tauri macOS menubar app to manage the DeepSeek Harness engine",
   "type": "module",
   "scripts": {
@@ -15,7 +15,7 @@
     "deploy:relaunch": "npm run build && node scripts/deploy.mjs --relaunch",
     "lint": "biome check scripts src-tauri/resources/overlay.js src-tauri/resources/findzoom.js src-tauri/resources/settings.js src-tauri/resources/stopped.js",
     "format": "biome check --write scripts src-tauri/resources/overlay.js src-tauri/resources/findzoom.js src-tauri/resources/settings.js src-tauri/resources/stopped.js",
-    "test": "npm run lint && node scripts/test-panel-feed.mjs && node scripts/test-findzoom.mjs && node scripts/test-stopped-i18n.mjs && node scripts/test-csp.mjs && node scripts/test-i18n-sync.mjs"
+    "test": "npm run lint && node scripts/test-panel-feed.mjs && node scripts/test-findzoom.mjs && node scripts/test-stopped-i18n.mjs && node scripts/test-csp.mjs && node scripts/test-i18n-sync.mjs && node scripts/test-events.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.13",

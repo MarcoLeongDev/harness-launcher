@@ -1087,6 +1087,11 @@
   listen("launcher://status", () => {
     refresh();
   });
+  // Instant repaint on language switch; the poll cycle below stays as a
+  // reconnect fallback.
+  listen("launcher://language", (p) => {
+    if (p?.language) applyLanguage(p.language);
+  });
 
   loadIconsIn(document);
 

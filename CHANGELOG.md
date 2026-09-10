@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.1.99 — Language switches push over events
+- `set_language` now emits `launcher://language` after applying; the Control Panel and engine-stopped splash repaint instantly via `applyLanguage` instead of waiting for their 3s poll (polling retained as reconnect fallback). New `scripts/test-events.mjs` pins the contract.
+
 ## v0.1.98 — Single JSON source of truth for all UI strings
 - New `src-tauri/resources/locales/*.json` (en, zh-Hant, zh-Hans, ja, es) with `tray`/`stopped`/`panel` sections: the tray menu now reads labels from JSON at compile time (`include_str`, English fallback per key), and `scripts/test-i18n-sync.mjs` fails the build when the `settings.js`/`stopped.js` tables or key sets drift from JSON.
 

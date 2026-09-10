@@ -117,6 +117,15 @@
       hint.textContent = String(err?.message || err);
     });
   });
+  // Instant repaint on language switch; polling stays as a reconnect fallback.
+  try {
+    const ev = window.__TAURI__?.event;
+    if (ev && typeof ev.listen === "function") {
+      ev.listen("launcher://language", (e) => {
+        if (e?.payload?.language) applyLanguage(e.payload.language);
+      });
+    }
+  } catch (_e) {}
   refresh();
   try {
     setInterval(refresh, 3000);
