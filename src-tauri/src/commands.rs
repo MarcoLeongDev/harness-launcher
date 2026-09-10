@@ -333,9 +333,7 @@ fn switch_running_feedback(version: &str, port: u16) -> String {
 fn switch_version_inner(app: &AppHandle, version: &str, op: &str) -> Result<String, String> {
     // Defense in depth: install_version re-validates, but reject here before
     // stopping a running engine for a bogus version.
-    if !versions::is_valid_version_name(version) {
-        return Err(format!("invalid version name: {version}"));
-    }
+    versions::checked_version_name(version)?;
     ensure_runtime_dirs(app).map_err(|e| format!("runtime dirs: {e}"))?;
     let st = app.state::<AppState>();
     let was_running = st.runtime.is_running();
@@ -566,9 +564,7 @@ pub async fn install_and_switch(
     version: String,
 ) -> Result<String, String> {
     require_panel(&window)?;
-    if !versions::is_valid_version_name(&version) {
-        return Err(format!("invalid version name: {version}"));
-    }
+    versions::checked_version_name(&version)?;
     let op = progress::op_key("switch", Some(&version));
     tauri::async_runtime::spawn_blocking(move || {
         // SN12: serialize with concurrent version mutations (two lines: the
@@ -599,9 +595,7 @@ pub async fn download_version(
         let _state = app.state::<AppState>();
         let _mutation = _state.version_mutation.lock().unwrap();
         with_progress_cleanup(&app, &op, || {
-            if !versions::is_valid_version_name(&version) {
-                return Err(format!("invalid version name: {version}"));
-            }
+            versions::checked_version_name(&version)?;
             ensure_runtime_dirs(&app).map_err(|e| format!("runtime dirs: {e}"))?;
             let rd = state::runtime_dir(&app);
             if versions::is_installed(&rd, &version) {
@@ -670,9 +664,7 @@ pub async fn rollback(app: AppHandle, window: tauri::Window) -> Result<String, S
             .ok_or_else(|| "no previous version to roll back to".to_string())?;
         // `previous_version` is persisted state (user-writable file): validate
         // before it becomes a path or npm spec.
-        if !versions::is_valid_version_name(&previous) {
-            return Err(format!("invalid version name: {previous}"));
-        }
+        versions::checked_version_name(&previous)?;
         let op = progress::op_key("rollback", Some(&previous));
         with_progress_cleanup(&app, &op, || {
             let rd = state::runtime_dir(&app);
@@ -707,7 +699,7 @@ pub async fn rollback(app: AppHandle, window: tauri::Window) -> Result<String, S
 pub async fn set_port(app: AppHandle, window: tauri::Window, port: u16) -> Result<String, String> {
     require_panel(&window)?;
     if port == 0 {
-        return Err("port must be between 1 and 65535".into());
+        return Err(crate::errors::AppError::InvalidPort.into());
     }
     tauri::async_runtime::spawn_blocking(move || {
         with_progress_cleanup(&app, "port", || {
@@ -1036,9 +1028,7 @@ pub async fn set_version(
     require_panel(&window)?;
     // Async: selecting a version that is not installed yet shells out to npm
     // (install) and must never block the main thread.
-    if !versions::is_valid_version_name(&version) {
-        return Err(format!("invalid version name: {version}"));
-    }
+    versions::checked_version_name(&version)?;
     tauri::async_runtime::spawn_blocking(move || {
         let _state = app.state::<AppState>();
         let _mutation = _state.version_mutation.lock().unwrap();
@@ -1087,9 +1077,7 @@ pub async fn delete_version(
     require_panel(&window)?;
     // Validate BEFORE resolving the path: this ends in remove_dir_all, so a
     // traversal name must never reach version_dir.
-    if !versions::is_valid_version_name(&version) {
-        return Err(format!("invalid version name: {version}"));
-    }
+    versions::checked_version_name(&version)?;
     tauri::async_runtime::spawn_blocking(move || {
         let _state = app.state::<AppState>();
         let _mutation = _state.version_mutation.lock().unwrap();
@@ -1140,9 +1128,7 @@ pub fn open_version_dir(
     version: String,
 ) -> Result<String, String> {
     require_panel(&window)?;
-    if !versions::is_valid_version_name(&version) {
-        return Err(format!("invalid version name: {version}"));
-    }
+    versions::checked_version_name(&version)?;
     let rd = state::runtime_dir(&app);
     let dir = versions::version_dir(&rd, &version);
     if !dir.is_dir() {

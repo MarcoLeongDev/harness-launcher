@@ -6,9 +6,10 @@ pub fn is_free(port: u16) -> bool {
     TcpListener::bind(("127.0.0.1", port)).is_ok()
 }
 
-pub fn resolve(desired: u16) -> Result<(u16, bool), String> {
+pub fn resolve(desired: u16) -> Result<(u16, bool), crate::errors::AppError> {
+    use crate::errors::AppError;
     if desired == 0 {
-        return Err("port must be between 1 and 65535".into());
+        return Err(AppError::InvalidPort);
     }
     if is_free(desired) {
         return Ok((desired, false));
@@ -18,7 +19,7 @@ pub fn resolve(desired: u16) -> Result<(u16, bool), String> {
             return Ok((candidate, true));
         }
     }
-    Err(format!("no free port found near {desired}"))
+    Err(AppError::NoFreePort { port: desired })
 }
 pub fn wait_until_serving(port: u16, timeout: Duration) -> bool {
     let deadline = std::time::Instant::now() + timeout;

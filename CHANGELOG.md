@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.1.100 — Typed errors with stable codes
+- New `src-tauri/src/errors.rs`: `AppError` (`thiserror`) with stable `code()` values (`invalid-port`, `no-free-port`, `invalid-version`) and user-safe messages identical to the legacy strings; converts into the IPC `String` boundary unchanged.
+- Migrated `port::resolve`, the port zero-guard, `versions::checked_version_name` plus all 9 version gates in commands/versions to return the typed errors. Unit tests pin codes, messages, and conversions.
+
 ## v0.1.99 — Language switches push over events
 - `set_language` now emits `launcher://language` after applying; the Control Panel and engine-stopped splash repaint instantly via `applyLanguage` instead of waiting for their 3s poll (polling retained as reconnect fallback). New `scripts/test-events.mjs` pins the contract.
 

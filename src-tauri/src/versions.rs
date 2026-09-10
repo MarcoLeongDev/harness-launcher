@@ -261,6 +261,20 @@ pub fn version_dir(runtime_dir: &Path, version: &str) -> PathBuf {
 /// Guard for anything that turns a user-supplied version string into a path
 /// (directory open, delete, …): a version must be a plain npm dist/semver
 /// name, never a path segment, so traversal and absolute paths are rejected.
+/// Typed gate for anything that turns a user-supplied version string into a
+/// path or npm spec: returns the borrowed name on success so call sites keep
+/// their types, and propagates [`crate::errors::AppError::InvalidVersion`]
+/// (converted to the legacy message at the IPC boundary) on failure.
+pub fn checked_version_name(version: &str) -> Result<&str, crate::errors::AppError> {
+    if is_valid_version_name(version) {
+        Ok(version)
+    } else {
+        Err(crate::errors::AppError::InvalidVersion {
+            name: version.to_string(),
+        })
+    }
+}
+
 pub fn is_valid_version_name(version: &str) -> bool {
     !version.is_empty()
         && version.len() <= 64
@@ -350,9 +364,7 @@ pub fn install_version(
     // so a single gate covers registry-supplied and caller-supplied names.
     // Without this, `runtime/versions/<version>` could escape its parent and
     // the npm spec `@deepseek-ai/dsh@<version>` could be attacker-shaped.
-    if !is_valid_version_name(version) {
-        return Err(format!("invalid version name: {version}"));
-    }
+    checked_version_name(version)?;
     if is_installed(runtime_dir, version) {
         return Ok(());
     }
@@ -912,9 +924,7 @@ pub fn repair_native_bindings(
     version: &str,
     op: &str,
 ) -> Result<(), String> {
-    if !is_valid_version_name(version) {
-        return Err(format!("invalid version name: {version}"));
-    }
+    checked_version_name(version)?;
     if !is_installed(runtime_dir, version) {
         return Err(format!("version {version} is not installed"));
     }
