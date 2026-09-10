@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.1.98 — Single JSON source of truth for all UI strings
+- New `src-tauri/resources/locales/*.json` (en, zh-Hant, zh-Hans, ja, es) with `tray`/`stopped`/`panel` sections: the tray menu now reads labels from JSON at compile time (`include_str`, English fallback per key), and `scripts/test-i18n-sync.mjs` fails the build when the `settings.js`/`stopped.js` tables or key sets drift from JSON.
+
 ## v0.1.97 — Split page assets, CSP without inline execution
 - Control Panel and engine-stopped pages are now markup + same-origin assets (`settings.css/js`, `stopped.css/js`, served from the `dsh-ui` protocol with correct content types); visual style and behavior unchanged.
 - Content-Security-Policy tightened: `script-src`/`style-src 'self'` (no more `unsafe-inline`), mirrored in `tauri.conf.json`. New `scripts/test-csp.mjs` contract pins it; panel/stopped/i18n tests updated to span the split files.

@@ -25,65 +25,56 @@ pub struct TrayState {
     pub quit: IconMenuItem<tauri::Wry>,
 }
 
-/// Tray menu labels per UI language (same five codes as the Control Panel
-/// switcher; English is the fallback for unknown codes).
+/// Tray menu labels per UI language, read from the single locale source of
+/// truth (`resources/locales/<lang>.json`, `tray` section) so the tray can
+/// never drift from the Control Panel and splash. English is the fallback
+/// for unknown codes and for individual missing keys.
 struct TrayLabels {
-    open: &'static str,
-    settings: &'static str,
-    start: &'static str,
-    stop: &'static str,
-    restart: &'static str,
-    browser: &'static str,
-    quit: &'static str,
+    open: String,
+    settings: String,
+    start: String,
+    stop: String,
+    restart: String,
+    browser: String,
+    quit: String,
+}
+
+fn locale_tray_table(lang: &str) -> Option<std::collections::HashMap<String, String>> {
+    let content = match lang {
+        "en" => include_str!("../resources/locales/en.json"),
+        "zh-Hant" => include_str!("../resources/locales/zh-Hant.json"),
+        "zh-Hans" => include_str!("../resources/locales/zh-Hans.json"),
+        "ja" => include_str!("../resources/locales/ja.json"),
+        "es" => include_str!("../resources/locales/es.json"),
+        _ => return None,
+    };
+    let doc: serde_json::Value = serde_json::from_str(content).ok()?;
+    let tray = doc.get("tray")?.as_object()?;
+    Some(
+        tray.iter()
+            .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+            .collect(),
+    )
 }
 
 fn labels_for(lang: &str) -> TrayLabels {
-    match lang {
-        "zh-Hant" => TrayLabels {
-            open: "開啟 Harness",
-            settings: "控制面板…",
-            start: "啟動 Harness",
-            stop: "停止 Harness",
-            restart: "重新啟動 Harness",
-            browser: "在瀏覽器中開啟",
-            quit: "結束 Harness Launcher",
-        },
-        "zh-Hans" => TrayLabels {
-            open: "打开 Harness",
-            settings: "控制面板…",
-            start: "启动 Harness",
-            stop: "停止 Harness",
-            restart: "重新启动 Harness",
-            browser: "在浏览器中打开",
-            quit: "退出 Harness Launcher",
-        },
-        "ja" => TrayLabels {
-            open: "Harness を開く",
-            settings: "コントロールパネル…",
-            start: "Harness を起動",
-            stop: "Harness を停止",
-            restart: "Harness を再起動",
-            browser: "ブラウザで開く",
-            quit: "Harness Launcher を終了",
-        },
-        "es" => TrayLabels {
-            open: "Abrir Harness",
-            settings: "Panel de control…",
-            start: "Iniciar Harness",
-            stop: "Detener Harness",
-            restart: "Reiniciar Harness",
-            browser: "Abrir en el navegador",
-            quit: "Salir de Harness Launcher",
-        },
-        _ => TrayLabels {
-            open: "Open Harness",
-            settings: "Control Panel…",
-            start: "Start Harness",
-            stop: "Stop Harness",
-            restart: "Restart Harness",
-            browser: "Open in Browser",
-            quit: "Quit Harness Launcher",
-        },
+    let table = locale_tray_table(lang).unwrap_or_default();
+    let english = locale_tray_table("en").unwrap_or_default();
+    let pick = |key: &str| {
+        table
+            .get(key)
+            .or_else(|| english.get(key))
+            .cloned()
+            .unwrap_or_else(|| format!("<missing:{key}>"))
+    };
+    TrayLabels {
+        open: pick("open"),
+        settings: pick("settings"),
+        start: pick("start"),
+        stop: pick("stop"),
+        restart: pick("restart"),
+        browser: pick("browser"),
+        quit: pick("quit"),
     }
 }
 
@@ -95,13 +86,13 @@ pub fn apply_language(app: &AppHandle, lang: &str) {
         return;
     };
     let l = labels_for(lang);
-    let _ = items.open.set_text(l.open);
-    let _ = items.settings.set_text(l.settings);
-    let _ = items.start.set_text(l.start);
-    let _ = items.stop.set_text(l.stop);
-    let _ = items.restart.set_text(l.restart);
-    let _ = items.browser.set_text(l.browser);
-    let _ = items.quit.set_text(l.quit);
+    let _ = items.open.set_text(l.open.as_str());
+    let _ = items.settings.set_text(l.settings.as_str());
+    let _ = items.start.set_text(l.start.as_str());
+    let _ = items.stop.set_text(l.stop.as_str());
+    let _ = items.restart.set_text(l.restart.as_str());
+    let _ = items.browser.set_text(l.browser.as_str());
+    let _ = items.quit.set_text(l.quit.as_str());
 }
 
 /// Update tray item enablement from the current engine phase.
@@ -276,5 +267,41 @@ mod language_tests {
     #[test]
     fn unknown_language_falls_back_to_english() {
         assert_eq!(labels_for("fr").quit, "Quit Harness Launcher");
+    }
+
+    #[test]
+    fn locale_files_share_one_tray_key_set() {
+        use super::locale_tray_table;
+        let english = locale_tray_table("en").expect("en locale must parse");
+        assert_eq!(english.len(), 7, "en tray table must carry 7 keys");
+        for lang in ["zh-Hant", "zh-Hans", "ja", "es"] {
+            let table = locale_tray_table(lang).expect("{lang} locale must parse");
+            for key in english.keys() {
+                let value = table.get(key).expect("{lang} tray table is missing {key}");
+                assert!(!value.is_empty(), "{lang} tray key {key} is empty");
+            }
+        }
+        assert!(locale_tray_table("fr").is_none(), "unknown codes must miss");
+    }
+
+    #[test]
+    fn labels_never_surface_missing_sentinels() {
+        for lang in ["en", "zh-Hant", "zh-Hans", "ja", "es", "fr"] {
+            let l = labels_for(lang);
+            for label in [
+                &l.open,
+                &l.settings,
+                &l.start,
+                &l.stop,
+                &l.restart,
+                &l.browser,
+                &l.quit,
+            ] {
+                assert!(
+                    !label.starts_with("<missing:"),
+                    "{lang} surfaced an unresolved tray key"
+                );
+            }
+        }
     }
 }
