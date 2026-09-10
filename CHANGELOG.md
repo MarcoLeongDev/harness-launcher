@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.1.94 — Engine-stopped splash speaks five languages
+- The no-engine splash now renders in the saved UI language (En | 繁 | 簡 | 日 | Es, default En): same locale table as the Control Panel, painted from get_status.language with English fallback, polling so a Control Panel switch repaints the open splash. Visual style unchanged; backend log lines stay English.
+
 ## v0.1.93 — Durable engine updates via MCP env bridging
 - Root cause of the 0.1.5-alpha.1 boot loop: user patch layers use process.env secrets for MCP headers; a GUI launch leaves them unset so the value resolves to undefined, which logs as empty headers but fails schemastery validation and bricks the whole plugin tree.
 - The launcher now bridges missing process.env names from the host env, credentials refs, and the Agentqueue server config into the engine child (env-only, values redacted in logs, user files never written), with empty-string fallback so validation passes and boot continues.

@@ -8,8 +8,6 @@
 <style>
   :root { color-scheme: light dark; }
   * { box-sizing: border-box; }
-  /* Dark default; light palette keeps the window in step with the system
-     appearance (the native titlebar already follows it). */
   body { margin: 0; height: 100vh; display: flex; align-items: center; justify-content: center;
     background:
       radial-gradient(700px 400px at 80% -10%, rgba(34,211,238,0.10), transparent 60%),
@@ -44,9 +42,6 @@
   button.ghost { background: transparent; border: 1px solid #2a3d61; color: #c7d6ec; }
   button.ghost:hover { background: rgba(59,130,246,0.12); }
   .hint { margin-top: 18px; font-size: 11px; color: #5f7294; min-height: 16px; }
-  /* Brand link: the logo and app name open the project GitHub page.
-     Unstyled — inherits the card look (no underline, no color shift, no
-     extra decoration); only clickable. */
   a.brand-link { display: block; text-decoration: none; color: inherit; cursor: pointer;
     border-radius: 12px; }
   a.brand-link:focus-visible { outline: 2px solid #3b82f6; outline-offset: 4px; }
@@ -54,14 +49,14 @@
 </head>
 <body>
   <div class="card">
-    <a class="brand-link" id="brand-link" href="https://github.com/MarcoLeongDev/harness-launcher" title="Open Harness Launcher on GitHub" aria-label="Open Harness Launcher on GitHub">
-      <div class="logo"><img id="brand-logo" src="dsh-ui://localhost/brand/logo.png" alt="Harness Launcher logo" /></div>
+    <a class="brand-link" id="brand-link" href="https://github.com/MarcoLeongDev/harness-launcher" title="Open Harness Launcher on GitHub" aria-label="Open Harness Launcher on GitHub" data-i18n-title="brandGithub" data-i18n-aria="brandGithub">
+      <div class="logo"><img id="brand-logo" src="dsh-ui://localhost/brand/logo.png" alt="Harness Launcher logo" data-i18n-alt="logoAlt" /></div>
       <h1>Harness Launcher</h1>
     </a>
-    <div class="sub">The harness engine is stopped</div>
-    <p>The DeepSeek Harness background engine is not running. Start it to open the harness UI, or open the Control Panel to manage versions, updates, port and logs.</p>
-    <button id="btn-start">Start Engine</button>
-    <button id="btn-settings" class="ghost">Open Control Panel</button>
+    <div class="sub" data-i18n="stoppedSub">The harness engine is stopped</div>
+    <p data-i18n="stoppedDesc">The DeepSeek Harness background engine is not running. Start it to open the harness UI, or open the Control Panel to manage versions, updates, port and logs.</p>
+    <button id="btn-start" data-i18n="startEngine">Start Engine</button>
+    <button id="btn-settings" class="ghost" data-i18n="openPanel">Open Control Panel</button>
     <div class="hint" id="hint"></div>
   </div>
 <script>
@@ -74,30 +69,101 @@
       return window.__TAURI_INTERNALS__.invoke(cmd, args || {}, undefined);
     return Promise.reject(new Error('Tauri IPC unavailable'));
   }
-  var hint = document.getElementById('hint');
+  var LOCALES = {
+    en: {
+      title: "Engine Stopped - Harness Launcher",
+      stoppedSub: "The harness engine is stopped",
+      stoppedDesc: "The DeepSeek Harness background engine is not running. Start it to open the harness UI, or open the Control Panel to manage versions, updates, port and logs.",
+      startEngine: "Start Engine",
+      openPanel: "Open Control Panel",
+      brandGithub: "Open Harness Launcher on GitHub",
+      logoAlt: "Harness Launcher logo"
+    },
+    "zh-Hant": {
+      title: "引擎已停止 - Harness Launcher",
+      stoppedSub: "Harness 引擎已停止",
+      stoppedDesc: "DeepSeek Harness 背景引擎尚未執行。啟動以開啟 Harness 介面，或開啟控制面板以管理版本、更新、連接埠和日誌。",
+      startEngine: "啟動引擎",
+      openPanel: "開啟控制面板",
+      brandGithub: "在 GitHub 上開啟 Harness Launcher",
+      logoAlt: "Harness Launcher 標誌"
+    },
+    "zh-Hans": {
+      title: "引擎已停止 - Harness Launcher",
+      stoppedSub: "Harness 引擎已停止",
+      stoppedDesc: "DeepSeek Harness 后台引擎尚未运行。启动以打开 Harness 界面，或打开控制面板以管理版本、更新、端口和日志。",
+      startEngine: "启动引擎",
+      openPanel: "打开控制面板",
+      brandGithub: "在 GitHub 上打开 Harness Launcher",
+      logoAlt: "Harness Launcher 标志"
+    },
+    ja: {
+      title: "エンジン停止中 - Harness Launcher",
+      stoppedSub: "Harness エンジンは停止しています",
+      stoppedDesc: "DeepSeek Harness バックグラウンドエンジンは実行されていません。起動して Harness UI を開くか、コントロールパネルでバージョン・更新・ポート・ログを管理してください。",
+      startEngine: "エンジンを起動",
+      openPanel: "コントロールパネルを開く",
+      brandGithub: "GitHub で Harness Launcher を開く",
+      logoAlt: "Harness Launcher のロゴ"
+    },
+    es: {
+      title: "Motor detenido - Harness Launcher",
+      stoppedSub: "El motor Harness está detenido",
+      stoppedDesc: "El motor en segundo plano de DeepSeek Harness no está en ejecución. Inícialo para abrir la interfaz de Harness o abre el panel de control para gestionar versiones, actualizaciones, puerto y registros.",
+      startEngine: "Iniciar motor",
+      openPanel: "Abrir panel de control",
+      brandGithub: "Abrir Harness Launcher en GitHub",
+      logoAlt: "Logotipo de Harness Launcher"
+    }
+  };
+  var lang = "en";
+  function t(key) { return (LOCALES[lang] && LOCALES[lang][key]) || LOCALES.en[key] || key; }
+  function applyLanguage(l) {
+    if (!LOCALES[l]) l = "en";
+    lang = l;
+    try { document.documentElement.lang = l; } catch (e) {}
+    try { document.title = t("title"); } catch (e) {}
+    var i, els;
+    els = document.querySelectorAll("[data-i18n]");
+    for (i = 0; i < els.length; i++) els[i].textContent = t(els[i].getAttribute("data-i18n"));
+    els = document.querySelectorAll("[data-i18n-title]");
+    for (i = 0; i < els.length; i++) els[i].title = t(els[i].getAttribute("data-i18n-title"));
+    els = document.querySelectorAll("[data-i18n-aria]");
+    for (i = 0; i < els.length; i++) els[i].setAttribute("aria-label", t(els[i].getAttribute("data-i18n-aria")));
+    els = document.querySelectorAll("[data-i18n-alt]");
+    for (i = 0; i < els.length; i++) els[i].setAttribute("alt", t(els[i].getAttribute("data-i18n-alt")));
+  }
+  function refresh() {
+    invoke("get_status", {}).then(function (s) {
+      if (s && s.language) applyLanguage(s.language);
+    }).catch(function () { applyLanguage("en"); });
+  }
+  var hint = document.getElementById("hint");
   function run(fn) {
-    hint.textContent = '…';
+    hint.textContent = "...";
     fn().then(function (r) {
-      hint.textContent = (r && r.message) || 'done';
-      setTimeout(function () { hint.textContent = ''; }, 4000);
+      hint.textContent = (r && r.message) || "done";
+      setTimeout(function () { hint.textContent = ""; }, 4000);
     }).catch(function (e) {
       hint.textContent = String(e && e.message || e);
     });
   }
-  document.getElementById('btn-start').addEventListener('click', function () {
-    run(function () { return invoke('engine_start', {}); });
+  document.getElementById("btn-start").addEventListener("click", function () {
+    run(function () { return invoke("engine_start", {}); });
   });
-  document.getElementById('btn-settings').addEventListener('click', function () {
-    run(function () { return invoke('open_settings', {}); });
+  document.getElementById("btn-settings").addEventListener("click", function () {
+    run(function () { return invoke("open_settings", {}); });
   });
-  // Brand header (logo, app name): opens the project GitHub page.
-  // preventDefault keeps the view on dsh-ui:// instead of navigating away.
-  document.getElementById('brand-link').addEventListener('click', function (e) {
+  document.getElementById("brand-link").addEventListener("click", function (e) {
     e.preventDefault();
-    invoke('open_repo_page', {}).catch(function (err) {
+    invoke("open_repo_page", {}).catch(function (err) {
       hint.textContent = String(err && err.message || err);
     });
   });
+  refresh();
+  try { setInterval(refresh, 3000); } catch (e) {}
+  try { document.addEventListener("visibilitychange", function () { if (!document.hidden) refresh(); }); } catch (e) {}
+  try { window.addEventListener("focus", refresh); } catch (e) {}
 })();
 </script>
 </body>
