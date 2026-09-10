@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.1.101 — Poison-safe shared state
+- New `state::mutex_lock` helper recovers with the guarded value instead of panicking on a poisoned mutex; all 58 production `.lock().unwrap()` sites across commands/lib/progress/runtime/state/tray now use it, so one poisoned lock can no longer crash the menubar app. New unit test proves recovery keeps the guarded value.
+
 ## v0.1.100 — Typed errors with stable codes
 - New `src-tauri/src/errors.rs`: `AppError` (`thiserror`) with stable `code()` values (`invalid-port`, `no-free-port`, `invalid-version`) and user-safe messages identical to the legacy strings; converts into the IPC `String` boundary unchanged.
 - Migrated `port::resolve`, the port zero-guard, `versions::checked_version_name` plus all 9 version gates in commands/versions to return the typed errors. Unit tests pin codes, messages, and conversions.

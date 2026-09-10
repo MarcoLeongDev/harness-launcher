@@ -82,7 +82,7 @@ fn labels_for(lang: &str) -> TrayLabels {
 /// language) and whenever the Control Panel changes the language.
 pub fn apply_language(app: &AppHandle, lang: &str) {
     let st = app.state::<AppState>();
-    let Some(items) = st.tray_state.lock().unwrap().clone() else {
+    let Some(items) = crate::state::mutex_lock(&st.tray_state).clone() else {
         return;
     };
     let l = labels_for(lang);
@@ -98,7 +98,7 @@ pub fn apply_language(app: &AppHandle, lang: &str) {
 /// Update tray item enablement from the current engine phase.
 pub fn refresh(app: &AppHandle) {
     let st = app.state::<AppState>();
-    let Some(items) = st.tray_state.lock().unwrap().clone() else {
+    let Some(items) = crate::state::mutex_lock(&st.tray_state).clone() else {
         return;
     };
     let running = st.runtime.phase() != crate::runtime::PHASE_STOPPED;
@@ -146,7 +146,7 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
     ];
     let menu = Menu::with_items(app, items)?;
 
-    *app.state::<AppState>().tray_state.lock().unwrap() = Some(TrayState {
+    *crate::state::mutex_lock(&app.state::<AppState>().tray_state) = Some(TrayState {
         open,
         settings,
         start,
@@ -245,7 +245,7 @@ pub fn show_main_window(app: &AppHandle) -> Result<(), String> {
 }
 
 fn current_port(app: &AppHandle) -> u16 {
-    *app.state::<AppState>().effective_port.lock().unwrap()
+    *crate::state::mutex_lock(&app.state::<AppState>().effective_port)
 }
 
 #[cfg(test)]

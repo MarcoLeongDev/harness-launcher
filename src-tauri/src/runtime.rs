@@ -109,14 +109,14 @@ pub fn redact_token(line: &str) -> String {
 impl HarnessRuntime {
     /// The captured authenticated WebUI URL, if any.
     pub fn captured_web_url(&self) -> Option<String> {
-        self.web_url.lock().unwrap().clone()
+        crate::state::mutex_lock(&self.web_url).clone()
     }
 
     /// The most recent `max_lines` of captured engine output as one block.
     /// Used to classify boot failures (e.g. missing native bindings) so the
     /// error names the cause instead of reporting a generic timeout.
     pub fn tail_text(&self, max_lines: usize) -> String {
-        let tail = self.log_tail.lock().unwrap();
+        let tail = crate::state::mutex_lock(&self.log_tail);
         let lines: Vec<&str> = tail.iter().map(|s| s.as_str()).collect();
         let start = lines.len().saturating_sub(max_lines.max(1));
         lines[start..].join("\n")
@@ -139,7 +139,7 @@ impl HarnessRuntime {
     }
 
     pub fn clear_web_url(&self) {
-        *self.web_url.lock().unwrap() = None;
+        *crate::state::mutex_lock(&self.web_url) = None;
     }
 }
 
@@ -176,16 +176,13 @@ impl HarnessRuntime {
     }
 
     pub fn status(&self) -> HarnessStatus {
-        let proc = self.process.lock().unwrap();
+        let proc = crate::state::mutex_lock(&self.process);
         let (running, version, port) = match proc.as_ref() {
             Some(p) => (true, Some(p.version.clone()), Some(p.port)),
             None => (false, None, None),
         };
-        let phase = self.phase.lock().unwrap().clone();
-        let last_log = self
-            .log_tail
-            .lock()
-            .unwrap()
+        let phase = crate::state::mutex_lock(&self.phase).clone();
+        let last_log = crate::state::mutex_lock(&self.log_tail)
             .iter()
             .next_back()
             .cloned()
@@ -200,15 +197,15 @@ impl HarnessRuntime {
     }
 
     pub fn is_running(&self) -> bool {
-        self.process.lock().unwrap().is_some()
+        crate::state::mutex_lock(&self.process).is_some()
     }
 
     pub fn phase(&self) -> String {
-        self.phase.lock().unwrap().clone()
+        crate::state::mutex_lock(&self.phase).clone()
     }
 
     pub fn mark_phase(&self, phase: &str) {
-        *self.phase.lock().unwrap() = phase.to_string();
+        *crate::state::mutex_lock(&self.phase) = phase.to_string();
     }
 }
 
@@ -249,7 +246,7 @@ pub fn emit_status(app: &AppHandle, runtime: &HarnessRuntime) {
 /// held by any other process is never killed — use `port::holder_hint` to
 /// report the holder so the user can free the port or pick another one.
 pub fn stop(runtime: &HarnessRuntime, runtime_dir: &Path) -> bool {
-    let mut proc = runtime.process.lock().unwrap();
+    let mut proc = crate::state::mutex_lock(&runtime.process);
     if let Some(state) = proc.take() {
         runtime.mark_phase(PHASE_STOPPING);
         let _ = state.child.kill();
@@ -357,7 +354,7 @@ pub fn start(
     // callers can never navigate to the previous process's token.
     runtime.clear_web_url();
     runtime.mark_phase(PHASE_STARTING);
-    *runtime.process.lock().unwrap() = Some(ChildState {
+    *crate::state::mutex_lock(&runtime.process) = Some(ChildState {
         child,
         version: version_s.clone(),
         port: port_n,
@@ -389,7 +386,7 @@ pub fn start(
                     // The raw URL is captured for navigation; everything
                     // stored or broadcast uses the redacted form (SN9).
                     if let Some(url) = parse_web_url_line(&trimmed) {
-                        *web_url.lock().unwrap() = Some(url.clone());
+                        *crate::state::mutex_lock(&web_url) = Some(url.clone());
                         let _ = app_handle.emit(
                             "launcher://status",
                             HarnessStatus {
@@ -403,7 +400,7 @@ pub fn start(
                     }
                     let stored = redact_token(&trimmed);
                     append_log(&runtime_dir_buf, &stored);
-                    let mut t = tail.lock().unwrap();
+                    let mut t = crate::state::mutex_lock(&tail);
                     t.push_back(stored);
                     while t.len() > TAIL_BUFFER_LINES {
                         t.pop_front();
@@ -419,11 +416,11 @@ pub fn start(
                         &format!("[harness] exited with code {code}"),
                     );
                     // Only clear the slot if this event belongs to the current child.
-                    let mut guard = proc.lock().unwrap();
+                    let mut guard = crate::state::mutex_lock(&proc);
                     let matches = matches!(guard.as_ref(), Some(s) if s.id == id);
                     if matches {
                         *guard = None;
-                        *phase.lock().unwrap() = PHASE_STOPPED.to_string();
+                        *crate::state::mutex_lock(&phase) = PHASE_STOPPED.to_string();
                     }
                     drop(guard);
                     break;
@@ -443,11 +440,11 @@ pub fn start(
             }
         }
         {
-            let mut guard = proc.lock().unwrap();
+            let mut guard = crate::state::mutex_lock(&proc);
             let matches = matches!(guard.as_ref(), Some(s) if s.id == id);
             if matches {
                 *guard = None;
-                *phase.lock().unwrap() = PHASE_STOPPED.to_string();
+                *crate::state::mutex_lock(&phase) = PHASE_STOPPED.to_string();
             }
         }
         let _ = app_handle.emit(
@@ -474,7 +471,7 @@ mod tests {
     fn tail_text_returns_the_most_recent_lines() {
         let rt = HarnessRuntime::new();
         for i in 0..5 {
-            rt.log_tail.lock().unwrap().push_back(format!("line{i}"));
+            crate::state::mutex_lock(&rt.log_tail).push_back(format!("line{i}"));
         }
         assert_eq!(rt.tail_text(2), "line3\nline4");
         assert_eq!(rt.tail_text(99).lines().count(), 5);

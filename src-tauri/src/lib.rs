@@ -145,7 +145,7 @@ pub fn run() {
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             let data_dir = state::data_dir(app.handle());
             let saved = settings::load(&data_dir);
-            *app.state::<AppState>().settings.lock().unwrap() = saved;
+            *crate::state::mutex_lock(&app.state::<AppState>().settings) = saved;
             tray::setup_tray(app.handle())?;
             // No background update checker: update discovery is manual-only
             // ("Check now"); the launcher never polls the registry on its own.
@@ -194,7 +194,7 @@ fn boot(app: AppHandle) {
             });
         }
         Err(e) => {
-            *app.state::<AppState>().boot_error.lock().unwrap() = Some(e.clone());
+            *crate::state::mutex_lock(&app.state::<AppState>().boot_error) = Some(e.clone());
             settings::log(&state::data_dir(&app), &format!("boot failed: {e}"));
             let _ = app
                 .notification()
@@ -224,7 +224,7 @@ fn boot_inner(app: &AppHandle) -> Result<u16, String> {
         versions::install_version(app, &rd, &latest, &op)?;
         {
             let st = app.state::<AppState>();
-            let mut vc = st.version_cache.lock().unwrap();
+            let mut vc = crate::state::mutex_lock(&st.version_cache);
             vc.fetched_at = None;
         }
         state::update_settings(app, |s| s.current_version = Some(latest));
@@ -233,7 +233,7 @@ fn boot_inner(app: &AppHandle) -> Result<u16, String> {
 
     let settings_snapshot = state::read_settings(app);
     let (actual, _) = port::resolve(settings_snapshot.port)?;
-    *app.state::<AppState>().effective_port.lock().unwrap() = actual;
+    *crate::state::mutex_lock(&app.state::<AppState>().effective_port) = actual;
 
     if !settings_snapshot.start_on_launch {
         settings::log(

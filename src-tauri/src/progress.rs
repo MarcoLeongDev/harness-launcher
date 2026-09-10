@@ -67,7 +67,7 @@ pub fn push_console(app: &AppHandle, op: &str, stream: &str, text: &str) {
     };
     {
         let st = app.state::<AppState>();
-        let mut buf = st.console.lock().unwrap();
+        let mut buf = crate::state::mutex_lock(&st.console);
         buf.push_back(line.clone());
         while buf.len() > CONSOLE_MAX_LINES {
             buf.pop_front();
@@ -78,10 +78,7 @@ pub fn push_console(app: &AppHandle, op: &str, stream: &str, text: &str) {
 
 /// Snapshot of the recent console lines (for windows that open mid-operation).
 pub fn console_snapshot(app: &AppHandle) -> Vec<ConsoleLine> {
-    app.state::<AppState>()
-        .console
-        .lock()
-        .unwrap()
+    crate::state::mutex_lock(&app.state::<AppState>().console)
         .iter()
         .cloned()
         .collect()
@@ -91,7 +88,7 @@ pub fn console_snapshot(app: &AppHandle) -> Vec<ConsoleLine> {
 /// empty) so a retried operation starts with a clean terminal.
 pub fn reset_console(app: &AppHandle, op: &str) {
     let st = app.state::<AppState>();
-    let mut buf = st.console.lock().unwrap();
+    let mut buf = crate::state::mutex_lock(&st.console);
     if op.is_empty() {
         buf.clear();
     } else {
@@ -119,7 +116,7 @@ pub fn emit(
     };
     {
         let st = app.state::<AppState>();
-        let mut ops = st.current_ops.lock().unwrap();
+        let mut ops = crate::state::mutex_lock(&st.current_ops);
         if phase == "failed" {
             // A failed op is terminal for the current moment: drop it so UIs
             // do not stay stuck in a "busy" state after the failure.
@@ -129,7 +126,7 @@ pub fn emit(
         }
         // Legacy single slot: mirror the first in-flight op (BTreeMap keeps
         // the order stable across polls).
-        *st.current_op.lock().unwrap() = ops.values().next().cloned();
+        *crate::state::mutex_lock(&st.current_op) = ops.values().next().cloned();
     }
     let _ = app.emit("launcher://progress", payload);
 }
@@ -138,9 +135,9 @@ pub fn emit(
 pub fn clear_op(app: &AppHandle, op: &str) {
     let st = app.state::<AppState>();
     {
-        let mut ops = st.current_ops.lock().unwrap();
+        let mut ops = crate::state::mutex_lock(&st.current_ops);
         ops.remove(op);
-        *st.current_op.lock().unwrap() = ops.values().next().cloned();
+        *crate::state::mutex_lock(&st.current_op) = ops.values().next().cloned();
     }
 }
 
@@ -149,18 +146,15 @@ pub fn clear_op(app: &AppHandle, op: &str) {
 pub fn clear(app: &AppHandle) {
     let st = app.state::<AppState>();
     {
-        let mut ops = st.current_ops.lock().unwrap();
+        let mut ops = crate::state::mutex_lock(&st.current_ops);
         ops.clear();
-        *st.current_op.lock().unwrap() = None;
+        *crate::state::mutex_lock(&st.current_op) = None;
     }
 }
 
 /// All in-flight operations, ordered by key.
 pub fn current_ops(app: &AppHandle) -> Vec<ProgressPayload> {
-    app.state::<AppState>()
-        .current_ops
-        .lock()
-        .unwrap()
+    crate::state::mutex_lock(&app.state::<AppState>().current_ops)
         .values()
         .cloned()
         .collect()

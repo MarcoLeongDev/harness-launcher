@@ -10,6 +10,17 @@ use crate::progress::ProgressPayload;
 use crate::runtime::HarnessRuntime;
 use crate::settings::{self, Settings};
 
+/// Poison-tolerant mutex acquisition for shared app state.
+///
+/// A panic while a lock is held poisons the mutex; the old unwrap-on-lock
+/// idiom would then crash the whole menubar app on the next access (often
+/// the tray refresh or status path). Recovering with the guarded value
+/// keeps the app alive on last-known state: user data and a running engine
+/// are never at risk from a poisoned lock.
+pub fn mutex_lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(|poison| poison.into_inner())
+}
+
 pub struct AppState {
     pub settings: Mutex<Settings>,
     pub effective_port: Mutex<u16>,
@@ -77,12 +88,12 @@ pub fn runtime_dir(app: &tauri::AppHandle) -> PathBuf {
 }
 
 pub fn read_settings(app: &tauri::AppHandle) -> Settings {
-    app.state::<AppState>().settings.lock().unwrap().clone()
+    mutex_lock(&app.state::<AppState>().settings).clone()
 }
 
 pub fn update_settings(app: &tauri::AppHandle, mutate: impl FnOnce(&mut Settings)) {
     let state = app.state::<AppState>();
-    let mut guard = state.settings.lock().unwrap();
+    let mut guard = mutex_lock(&state.settings);
     mutate(&mut guard);
     let snapshot = guard.clone();
     drop(guard);
@@ -95,7 +106,7 @@ pub fn active_version(app: &tauri::AppHandle) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::AppState;
+    use super::{AppState, mutex_lock};
     use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -109,7 +120,7 @@ mod tests {
             let (s, c, m) = (state.clone(), counter.clone(), max_seen.clone());
             handles.push(std::thread::spawn(move || {
                 for _ in 0..50 {
-                    let _guard = s.version_mutation.lock().unwrap();
+                    let _guard = mutex_lock(&s.version_mutation);
                     let n = c.fetch_add(1, Ordering::SeqCst) + 1;
                     m.fetch_max(n, Ordering::SeqCst);
                     std::thread::yield_now();
@@ -122,5 +133,24 @@ mod tests {
             h.join().unwrap();
         }
         assert_eq!(max_seen.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn poisoned_lock_recovers_with_guarded_value() {
+        use std::sync::Mutex;
+        let mutex = Mutex::new(41u32);
+        std::thread::scope(|scope| {
+            let handle = scope.spawn(|| {
+                let mut guard = mutex_lock(&mutex);
+                *guard = 42;
+                panic!("intentional poison");
+            });
+            handle
+                .join()
+                .expect_err("the child must panic to poison the lock");
+            // Recovery path: no panic, guarded value intact.
+            let guard = mutex_lock(&mutex);
+            assert_eq!(*guard, 42);
+        });
     }
 }

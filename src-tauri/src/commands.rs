@@ -115,7 +115,7 @@ fn with_progress_cleanup<T>(
 /// Invalidate the cached version list so the next `get_status` refreshes it.
 fn invalidate_version_cache(app: &AppHandle) {
     let st = app.state::<AppState>();
-    let mut vc = st.version_cache.lock().unwrap();
+    let mut vc = crate::state::mutex_lock(&st.version_cache);
     vc.fetched_at = None;
 }
 
@@ -184,7 +184,7 @@ fn start_engine(app: &AppHandle, op: &str) -> Result<u16, String> {
         .ok_or_else(|| "no active harness version installed".to_string())?;
     let st = app.state::<AppState>();
     let rd = state::runtime_dir(app);
-    let actual = *st.effective_port.lock().unwrap();
+    let actual = *crate::state::mutex_lock(&st.effective_port);
 
     if st.runtime.is_running() {
         st.runtime.mark_phase(runtime::PHASE_RUNNING);
@@ -243,7 +243,7 @@ fn restart_engine(app: &AppHandle, op: &str, version: Option<&str>) -> Result<u1
         None => state::active_version(app)
             .ok_or_else(|| "no active harness version installed".to_string())?,
     };
-    let actual = *st.effective_port.lock().unwrap();
+    let actual = *crate::state::mutex_lock(&st.effective_port);
 
     // Only the tracked child is ever signalled (SIGKILL via the shell plugin).
     // A port held by any other process is REPORTED, never killed: the error
@@ -480,7 +480,7 @@ pub async fn get_status(app: AppHandle) -> Result<StatusPayload, String> {
         let st = app.state::<AppState>();
         let settings = state::read_settings(&app);
         let status = st.runtime.status();
-        let actual = *st.effective_port.lock().unwrap();
+        let actual = *crate::state::mutex_lock(&st.effective_port);
         let rd = state::runtime_dir(&app);
 
         let mut installed: Vec<String> = std::fs::read_dir(rd.join("versions"))
@@ -495,7 +495,7 @@ pub async fn get_status(app: AppHandle) -> Result<StatusPayload, String> {
             .unwrap_or_default();
         installed.sort();
 
-        let remote = st.latest_remote.lock().unwrap().clone();
+        let remote = crate::state::mutex_lock(&st.latest_remote).clone();
         let update_available = remote
             .as_ref()
             .zip(settings.current_version.as_ref())
@@ -505,7 +505,7 @@ pub async fn get_status(app: AppHandle) -> Result<StatusPayload, String> {
         // Use cached version list to avoid spawning an npm process every 3 s.
         // Refresh is triggered explicitly after installs/updates or on a 60 s TTL.
         let version_list = {
-            let mut vc = st.version_cache.lock().unwrap();
+            let mut vc = crate::state::mutex_lock(&st.version_cache);
             let stale = vc
                 .fetched_at
                 .map(|t| t.elapsed().as_secs() >= 60)
@@ -525,8 +525,8 @@ pub async fn get_status(app: AppHandle) -> Result<StatusPayload, String> {
             }
         };
 
-        let boot_error = st.boot_error.lock().unwrap().clone();
-        let current_op = st.current_op.lock().unwrap().clone();
+        let boot_error = crate::state::mutex_lock(&st.boot_error).clone();
+        let current_op = crate::state::mutex_lock(&st.current_op).clone();
         let current_ops = progress::current_ops(&app);
         let console = progress::console_snapshot(&app);
 
@@ -571,7 +571,7 @@ pub async fn install_and_switch(
         // State guard must be bound before locking through it). Inner helpers
         // MUST NOT take this lock again.
         let _state = app.state::<AppState>();
-        let _mutation = _state.version_mutation.lock().unwrap();
+        let _mutation = crate::state::mutex_lock(&_state.version_mutation);
         with_progress_cleanup(&app, &op, || switch_version_inner(&app, &version, &op))
     })
     .await
@@ -593,7 +593,7 @@ pub async fn download_version(
     let op = progress::op_key("download", Some(&version));
     tauri::async_runtime::spawn_blocking(move || {
         let _state = app.state::<AppState>();
-        let _mutation = _state.version_mutation.lock().unwrap();
+        let _mutation = crate::state::mutex_lock(&_state.version_mutation);
         with_progress_cleanup(&app, &op, || {
             versions::checked_version_name(&version)?;
             ensure_runtime_dirs(&app).map_err(|e| format!("runtime dirs: {e}"))?;
@@ -619,7 +619,7 @@ pub async fn update_to_latest(app: AppHandle, window: tauri::Window) -> Result<S
     require_panel(&window)?;
     tauri::async_runtime::spawn_blocking(move || {
         let _state = app.state::<AppState>();
-        let _mutation = _state.version_mutation.lock().unwrap();
+        let _mutation = crate::state::mutex_lock(&_state.version_mutation);
         with_progress_cleanup(&app, "update", || {
             let rd = state::runtime_dir(&app);
             progress::emit(
@@ -631,7 +631,8 @@ pub async fn update_to_latest(app: AppHandle, window: tauri::Window) -> Result<S
                 Some(5),
             );
             let latest = versions::latest_dist_tag(&app, &rd)?;
-            *app.state::<AppState>().latest_remote.lock().unwrap() = Some(latest.clone());
+            *crate::state::mutex_lock(&app.state::<AppState>().latest_remote) =
+                Some(latest.clone());
             if state::active_version(&app).as_deref() == Some(latest.as_str()) {
                 progress::finish(
                     &app,
@@ -658,7 +659,7 @@ pub async fn rollback(app: AppHandle, window: tauri::Window) -> Result<String, S
     require_panel(&window)?;
     tauri::async_runtime::spawn_blocking(move || {
         let _state = app.state::<AppState>();
-        let _mutation = _state.version_mutation.lock().unwrap();
+        let _mutation = crate::state::mutex_lock(&_state.version_mutation);
         let previous = state::read_settings(&app)
             .previous_version
             .ok_or_else(|| "no previous version to roll back to".to_string())?;
@@ -705,7 +706,7 @@ pub async fn set_port(app: AppHandle, window: tauri::Window, port: u16) -> Resul
         with_progress_cleanup(&app, "port", || {
             let st = app.state::<AppState>();
             let running = st.runtime.is_running();
-            let previous_effective = *st.effective_port.lock().unwrap();
+            let previous_effective = *crate::state::mutex_lock(&st.effective_port);
             let previous_desired = state::read_settings(&app).port;
 
             progress::emit(
@@ -719,7 +720,7 @@ pub async fn set_port(app: AppHandle, window: tauri::Window, port: u16) -> Resul
             let (actual, changed) = port::resolve(port)?;
 
             state::update_settings(&app, |s| s.port = port);
-            *st.effective_port.lock().unwrap() = actual;
+            *crate::state::mutex_lock(&st.effective_port) = actual;
 
             // When the engine is stopped, only persist the port — do NOT auto-start.
             if !running {
@@ -764,7 +765,7 @@ pub async fn set_port(app: AppHandle, window: tauri::Window, port: u16) -> Resul
                     // Revert the persisted selection and effective port, then try
                     // to bring the engine back on the previous effective port.
                     state::update_settings(&app, |s| s.port = previous_desired);
-                    *st.effective_port.lock().unwrap() = previous_effective;
+                    *crate::state::mutex_lock(&st.effective_port) = previous_effective;
                     if let Err(revert_err) = restart_engine(&app, "port", None) {
                         progress::emit(
                             &app,
@@ -826,7 +827,8 @@ pub async fn check_updates(app: AppHandle) -> Result<String, String> {
         let rd = state::runtime_dir(&app2);
         match versions::latest_dist_tag(&app2, &rd) {
             Ok(latest) => {
-                *app2.state::<AppState>().latest_remote.lock().unwrap() = Some(latest.clone());
+                *crate::state::mutex_lock(&app2.state::<AppState>().latest_remote) =
+                    Some(latest.clone());
                 let active = state::active_version(&app2).unwrap_or_default();
                 if update::is_newer(&active, &latest) {
                     parts.push(format!("Harness update available: {active} → {latest}"));
@@ -900,7 +902,7 @@ pub fn tail_logs(app: AppHandle, lines: Option<usize>) -> Result<String, String>
 
 #[tauri::command]
 pub fn open_in_browser(app: AppHandle) -> Result<String, String> {
-    let actual = *app.state::<AppState>().effective_port.lock().unwrap();
+    let actual = *crate::state::mutex_lock(&app.state::<AppState>().effective_port);
     let running = app.state::<AppState>().runtime.is_running();
     // A running token engine prints its URL right after binding, so a short
     // wait is enough; a stopped engine opens the plain URL immediately.
@@ -1031,7 +1033,7 @@ pub async fn set_version(
     versions::checked_version_name(&version)?;
     tauri::async_runtime::spawn_blocking(move || {
         let _state = app.state::<AppState>();
-        let _mutation = _state.version_mutation.lock().unwrap();
+        let _mutation = crate::state::mutex_lock(&_state.version_mutation);
         let rd = state::runtime_dir(&app);
         ensure_runtime_dirs(&app).map_err(|e| format!("runtime dirs: {e}"))?;
         let st = app.state::<AppState>();
@@ -1080,7 +1082,7 @@ pub async fn delete_version(
     versions::checked_version_name(&version)?;
     tauri::async_runtime::spawn_blocking(move || {
         let _state = app.state::<AppState>();
-        let _mutation = _state.version_mutation.lock().unwrap();
+        let _mutation = crate::state::mutex_lock(&_state.version_mutation);
         let rd = state::runtime_dir(&app);
         let dir = versions::version_dir(&rd, &version);
         if !dir.exists() {
@@ -1088,7 +1090,7 @@ pub async fn delete_version(
         }
         {
             let st = app.state::<AppState>();
-            let proc = st.runtime.process.lock().unwrap();
+            let proc = crate::state::mutex_lock(&st.runtime.process);
             if let Some(state) = proc.as_ref() {
                 if state.version == version {
                     return Err(format!(
@@ -1194,7 +1196,7 @@ pub async fn refresh_versions(app: AppHandle, window: tauri::Window) -> Result<S
             Ok(v) => {
                 let n = v.len();
                 let st = app.state::<AppState>();
-                let mut vc = st.version_cache.lock().unwrap();
+                let mut vc = crate::state::mutex_lock(&st.version_cache);
                 vc.versions = v;
                 vc.include_prerelease = settings.include_prerelease;
                 vc.fetched_at = Some(std::time::Instant::now());
