@@ -1,0 +1,42 @@
+// Static contract for src-tauri/resources/stopped.html i18n.
+// The stopped splash must support the same five UI languages as the Control
+// Panel + tray (en, zh-Hant, zh-Hans, ja, es) with English fallback.
+// Run: node scripts/test-stopped-i18n.mjs
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+var root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+var html = readFileSync(path.join(root, "src-tauri", "resources", "stopped.html"), "utf8");
+var failures = 0;
+function check(name, cond, extra) {
+  if (cond) console.log("  PASS " + name);
+  else { failures++; console.error("  FAIL " + name + " " + (extra || "")); }
+}
+console.log("stopped-i18n: locales");
+var langs = ["en", "zh-Hant", "zh-Hans", "ja", "es"];
+var i;
+for (i = 0; i < langs.length; i++) {
+  var present = html.indexOf(langs[i] + ": {") !== -1 || html.indexOf("\"" + langs[i] + "\": {") !== -1;
+  check("locale " + langs[i] + " present", present);
+}
+var keys = ["title", "stoppedSub", "stoppedDesc", "startEngine", "openPanel", "brandGithub", "logoAlt"];
+console.log("stopped-i18n: keys");
+for (i = 0; i < keys.length; i++) {
+  var count = html.split(keys[i] + ":").length - 1;
+  check("key " + keys[i] + " in all 5 locales", count >= 5, "found " + count);
+}
+console.log("stopped-i18n: wiring");
+check("splash sub uses data-i18n", html.indexOf('data-i18n="stoppedSub"') !== -1);
+check("splash desc uses data-i18n", html.indexOf('data-i18n="stoppedDesc"') !== -1);
+check("start button uses data-i18n", html.indexOf('data-i18n="startEngine"') !== -1);
+check("panel button uses data-i18n", html.indexOf('data-i18n="openPanel"') !== -1);
+check("brand link title wired", html.indexOf('data-i18n-title="brandGithub"') !== -1);
+check("brand link aria wired", html.indexOf('data-i18n-aria="brandGithub"') !== -1);
+check("logo alt wired", html.indexOf('data-i18n-alt="logoAlt"') !== -1);
+check("reads saved language via get_status", html.indexOf("get_status") !== -1);
+check("English fallback for unknown codes", html.indexOf("LOCALES[l]") !== -1 && html.indexOf("en") !== -1);
+check("repaints document title", html.indexOf("document.title") !== -1);
+check("no hardcoded English-only splash", html.indexOf("The harness engine is stopped") !== -1);
+if (failures > 0) { console.error("test-stopped-i18n: " + failures + " failures"); process.exit(1); }
+console.log("test-stopped-i18n: all green");

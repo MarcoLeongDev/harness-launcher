@@ -1,6 +1,7 @@
 //! Harness Launcher \u2014 a Tauri macOS menubar app that installs,
 //! updates, versions and manages the DeepSeek Harness background engine.
 mod commands;
+mod mcp_env;
 mod port;
 mod presets;
 mod progress;
@@ -210,6 +211,11 @@ fn boot_inner(app: &AppHandle) -> Result<u16, String> {
     runtime::start(app, &st.runtime, &rd, &version, actual)?;
     let served = port::wait_until_serving(actual, Duration::from_secs(30));
     if !served {
+        let tail = st.runtime.tail_text(40);
+        if crate::mcp_env::is_mcp_config_failure(&tail) {
+            runtime::stop(&st.runtime, &state::runtime_dir(app));
+            return Err(crate::mcp_env::mcp_config_error(&version, &tail));
+        }
         runtime::stop(&st.runtime, &state::runtime_dir(app));
         // A pre-existing tree can predate the install-script fix (e.g. a
         // 0.1.3-alpha.2 installed while scripts were blocked): one in-place

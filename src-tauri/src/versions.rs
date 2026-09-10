@@ -9,6 +9,8 @@ use tauri::Manager;
 use tauri_plugin_shell::process::CommandEvent;
 use tauri_plugin_shell::ShellExt;
 
+use crate::mcp_env;
+
 pub const PACKAGE: &str = "@deepseek-ai/dsh";
 
 /// npm 12 blocks install-time lifecycle scripts by default (the `allowScripts`
@@ -721,6 +723,11 @@ fn node_shim_dir(app: &AppHandle, runtime_dir: &Path) -> Result<PathBuf, String>
 /// an ABI mismatch (`was compiled against a different Node.js version`),
 /// or the resulting plugin-tree load failure.
 pub fn is_native_binding_failure(text: &str) -> bool {
+    // MCP invalid-config shares the plugin-tree prefix but needs env help,
+    // not a native rebuild -- let the MCP classifier own it.
+    if mcp_env::is_mcp_config_failure(text) {
+        return false;
+    }
     let lower = text.to_lowercase();
     lower.contains("fs_ext.node")
         || lower.contains("cannot find module")
