@@ -1,0 +1,366 @@
+  :root { color-scheme: light dark; }
+  /* Dark palette (default). The native macOS titlebar follows the system
+     appearance, and the light overrides below keep the content in step so
+     the whole window follows the system theme. */
+  :root {
+    --bg: #0a0e17; --bg2: #0d1220;
+    --cell: rgba(255,255,255,0.055); --cell-hover: rgba(255,255,255,0.08);
+    --hair: rgba(255,255,255,0.09); --hair2: rgba(255,255,255,0.16);
+    --text: #f2f5fa; --dim: #98a5bf; --faint: #5d6c8c;
+    --accent: #0a84ff; --accent2: #40a9ff;
+    --ok: #30d158; --warn: #ffd60a; --err: #ff453a;
+    --radius: 13px;
+    --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f5f6f8; --bg2: #eceef2;
+      --cell: rgba(0,0,0,0.045); --cell-hover: rgba(0,0,0,0.085);
+      --hair: rgba(0,0,0,0.10); --hair2: rgba(0,0,0,0.18);
+      --text: #1d2430; --dim: #5a6679; --faint: #98a1b0;
+      --accent: #0071e3; --accent2: #0077ed;
+      --ok: #1f9d4d; --warn: #b58a00; --err: #d70015;
+    }
+    body { -webkit-font-smoothing: auto; }
+    .logo { background: #fff; }
+    .switch .slider { background: rgba(0,0,0,0.12); }
+    .switch input:checked + .slider { background: var(--ok); }
+    input[type=number], select { background: rgba(255,255,255,0.85); }
+    .pop { background: #ffffff; box-shadow: 0 12px 32px rgba(0,0,0,0.18); }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; color: var(--text); overflow: hidden;
+    font: 13px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+    background: linear-gradient(180deg, var(--bg2), var(--bg)); min-height: 100vh;
+    display: flex; flex-direction: column; -webkit-font-smoothing: antialiased;
+    overflow: hidden; }
+  /* Minimal iOS-style scroll bars */
+  *::-webkit-scrollbar { width: 3px; height: 3px; }
+  *::-webkit-scrollbar-track { background: transparent; }
+  *::-webkit-scrollbar-thumb { background: var(--faint); border-radius: 2px; }
+  *::-webkit-scrollbar-thumb:hover { background: var(--dim); }
+  * { scrollbar-width: thin; scrollbar-color: var(--faint) transparent; }
+  svg.ico { width: 20px; height: 20px; flex: none; }
+  svg.ico.sm { width: 16px; height: 16px; }
+  /* header */
+  header { display: flex; align-items: center; gap: 10px; padding: 14px 22px 10px; }
+  .logo { width: 34px; height: 34px; border-radius: 9px; overflow: hidden; flex: none;
+    border: 1px solid var(--hair2); background: #fff; }
+  .logo img { width: 100%; height: 100%; display: block; object-fit: cover; }
+  .header-title { font-size: 15px; font-weight: 650; letter-spacing: -0.2px; }
+  /* Brand link: the logo, app name and launcher version open the project
+     GitHub page. Unstyled — inherits the surrounding header look (no
+     underline, no color shift, no extra decoration); only clickable. */
+  a.brand-link { display: flex; align-items: center; gap: 10px;
+    text-decoration: none; color: inherit; cursor: pointer; border-radius: 9px; }
+  a.brand-link:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
+  header .spacer { flex: 1; }
+  /* Language switcher: borderless segmented control (En | 繁 | 簡 | 日 | Es)
+     next to the quit button. The active segment reads as highlighted text;
+     inactive segments are dim. No background pill — header stays minimal. */
+  .lang-seg { display: flex; align-items: center; gap: 2px; flex: none; }
+  .lang-seg button { border: none; background: transparent; color: var(--faint);
+    font-size: 11.5px; font-weight: 600; letter-spacing: 0.2px; cursor: pointer;
+    padding: 4px 6px; border-radius: 6px; }
+  .lang-seg button:hover { color: var(--dim); background: var(--cell-hover); }
+  .lang-seg button[aria-pressed="true"] { color: var(--accent2); }
+  .lang-seg button:focus-visible { outline: 2px solid var(--accent2); outline-offset: 1px; }
+  .lang-seg button:disabled { opacity: 0.4; cursor: default; }
+  /* Launcher version: bare, subtle text — no tag styling. The header stays
+     minimal: no engine version tag beside the power button. */
+  .hdr-ver-subtle { font-family: var(--mono); font-size: 10.5px; color: var(--faint);
+    letter-spacing: 0.2px; user-select: text; }
+  .hdr-quit { width: 28px; height: 28px; border-radius: 50%; border: none;
+    background: transparent; color: var(--dim); cursor: pointer; display: inline-flex;
+    align-items: center; justify-content: center; padding: 0; flex: none; }
+  .hdr-quit:hover { background: var(--cell-hover); }
+  .hdr-quit svg { width: 16px; height: 16px; }
+  .pill { display: inline-flex; align-items: center; gap: 7px; padding: 3px 11px; border-radius: 999px;
+    font-size: 11.5px; font-weight: 550; color: var(--dim); background: var(--cell);
+    border: 1px solid var(--hair); }
+  .pill i { width: 8px; height: 8px; border-radius: 50%; background: var(--warn); display: inline-block; }
+  .pill i.ok { background: var(--ok); box-shadow: 0 0 8px rgba(48,209,88,0.9); }
+  .pill i.stop { background: var(--faint); }
+  .pill i.err { background: var(--err); }
+  main { flex: 1; min-height: 0; padding: 12px 22px 24px; margin: 0 auto; width: 100%;
+    max-width: 640px; display: flex; flex-direction: column; overflow: hidden; }
+  .tabpanel { display: none; flex-direction: column; gap: 14px;
+    flex: 1; min-height: 0; overflow: auto; }
+  .tabpanel.active { display: flex; }
+  /* Log drawer: an in-flow bottom drawer of the merged panel, hidden by
+     default; the bottom-right circular button toggles it. When open it takes
+     a fixed band at the bottom of the window and the panel scrolls above. */
+  .log-drawer { display: none; flex: none; border-top: 1px solid var(--hair2);
+    background: var(--bg2); }
+  .log-drawer.open { display: flex; flex-direction: column; height: 250px;
+    animation: drawer-in .18s ease-out both; }
+  @keyframes drawer-in { from { opacity: 0; transform: translateY(10px); } }
+  @media (prefers-reduced-motion: reduce) { .log-drawer.open { animation: none; } }
+  /* Log toggle: circle button, image only — no background or border (only a
+     hover background), pinned bottom-right of the window. aria-pressed shows
+     the toggled (open) state. */
+  .log-toggle { position: fixed; right: 14px; bottom: 14px; z-index: 30;
+    width: 34px; height: 34px; border-radius: 50%; border: none; padding: 0;
+    background: transparent; color: var(--dim); cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: background .15s, color .15s; }
+  .log-toggle:hover { background: var(--cell-hover); color: var(--accent2); }
+  .log-toggle:active { transform: translateY(1px); }
+  .log-toggle:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
+  .log-toggle[aria-pressed="true"] { color: var(--accent2); }
+  .log-toggle svg { width: 17px; height: 17px; }
+  /* grouped macOS-style rows */
+  .group { background: var(--cell); border: 1px solid var(--hair); border-radius: var(--radius);
+    overflow: visible; backdrop-filter: blur(8px); }
+  .cell { display: flex; align-items: center; gap: 13px; padding: 13px 16px; min-height: 52px; }
+  .cell + .cell { border-top: 1px solid var(--hair); }
+  .cell.col { flex-direction: column; align-items: stretch; }
+  .lbl { font-size: 13px; font-weight: 500; white-space: nowrap; }
+  .hint { font-size: 11.5px; color: var(--dim); }
+  /* buttons */
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    padding: 7px 14px; border-radius: 8px; font-size: 12.5px; font-weight: 550; cursor: pointer;
+    border: 1px solid var(--hair2); background: var(--cell); color: var(--text); transition: all .15s; }
+  .btn:hover { background: var(--cell-hover); }
+  .btn:active { transform: translateY(1px); }
+  .btn:disabled { opacity: 0.4; cursor: default; transform: none; }
+  .btn:focus-visible { outline: 2px solid var(--accent2); outline-offset: 1px; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.primary:hover { background: #2f9bff; }
+  .btn.ok { background: var(--ok); border-color: var(--ok); color: #04231a; }
+  .btn.ok:hover { background: #4cd870; }
+  .btn.warn { background: transparent; border-color: rgba(255,69,58,0.5); color: var(--err); }
+  .btn.warn:hover { background: rgba(255,69,58,0.12); }
+  .btn.icon { padding: 0; border-radius: 50%; width: 36px; height: 36px; border: none; background: transparent; color: var(--text); transition: background .15s, color .15s; }
+  .btn.icon:hover { background: var(--cell-hover); color: var(--accent2); }
+  input[type=number], select {
+    background: rgba(0,0,0,0.3); color: var(--text); border: 1px solid var(--hair2);
+    border-radius: 8px; padding: 6px 10px; font-size: 13px; font-family: var(--mono);
+    appearance: none; -webkit-appearance: none; cursor: pointer; }
+  input:focus, select:focus { outline: none; border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(10,132,255,0.25); }
+  select { font-family: inherit; }
+  .err { color: var(--err); }
+  .ok2 { color: var(--ok); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .ico.spin { animation: spin .9s linear infinite; display: inline-block; }
+  @media (prefers-reduced-motion: reduce) { .ico.spin { animation: none; } }
+  /* engine card */
+  .ec-row { display: flex; align-items: center; gap: 12px; padding: 14px 16px; flex-wrap: nowrap; }
+  .ec-status-icon { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center;
+    justify-content: center; flex: none; background: rgba(93,108,140,0.15);
+    border: 1px solid rgba(93,108,140,0.4); color: var(--dim); }
+  .ec-status-icon svg { width: 18px; height: 18px; }
+  .ec-status-icon.running { background: rgba(48,209,88,0.12); border-color: rgba(48,209,88,0.45); color: var(--ok); }
+  .ec-status-icon.running svg { animation: spin-gear 3s linear infinite; transform-origin: 50% 50%; }
+  .ec-status-icon.stopped { background: rgba(93,108,140,0.15); border-color: rgba(93,108,140,0.4); color: var(--dim); }
+  .ec-status-icon.error { background: rgba(255,69,58,0.12); border-color: rgba(255,69,58,0.45); color: var(--err); }
+  @keyframes spin-gear { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  .ec-ver { font-family: var(--mono); font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .ec-select { background: none; border: none; color: var(--text); font-family: var(--mono);
+    font-size: 13px; font-weight: 600; cursor: pointer; padding: 0; appearance: none;
+    -webkit-appearance: none; }
+  .ec-select:focus { outline: none; }
+  .ec-select-wrap { display: inline-flex; align-items: center; gap: 2px; cursor: pointer; }
+  .ec-select-wrap svg { width: 10px; height: 10px; color: var(--faint); transition: transform .15s; flex: none; pointer-events: none; }
+  select { background-image: none !important; }
+  .ec-sep { color: var(--faint); font-size: 13px; }
+  .ec-port { font-family: var(--mono); font-size: 13px; background: transparent; border: none;
+    color: var(--text); width: 64px; padding: 2px 0; text-align: left; }
+  .ec-port:focus { outline: none; border-bottom: 1px solid var(--accent); }
+  .ec-open-btn { width: 28px; height: 28px; border-radius: 50%; border: none;
+    background: transparent; color: var(--dim); cursor: pointer; display: inline-flex;
+    align-items: center; justify-content: center; padding: 0; flex: none; }
+  .ec-open-btn:hover { background: var(--cell-hover); }
+  .ec-open-btn svg { width: 16px; height: 16px; }
+  .ec-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+  .ec-btn { display: inline-flex; align-items: center; justify-content: center;
+    width: 34px; height: 34px; border-radius: 50%; cursor: pointer; border: 1px solid var(--hair2);
+    background: var(--cell); color: var(--text); transition: all .15s; flex: none; }
+  .ec-btn svg { width: 16px; height: 16px; }
+  .ec-btn:hover { background: var(--cell-hover); }
+  .ec-btn:active { transform: translateY(1px); }
+  .ec-btn:disabled { opacity: 0.4; cursor: default; transform: none; }
+  .ec-btn.icon-start { background: var(--ok); border-color: var(--ok); color: #04231a; }
+  .ec-btn.icon-start:hover { background: #4cd870; }
+  .ec-btn.icon-stop { background: var(--err); border-color: var(--err); color: #fff; }
+  .ec-btn.icon-stop:hover { background: #ff6259; }
+  .ec-btn.icon-restart { background: transparent; }
+  .ecterm-toggle { display: inline-flex; align-items: center; gap: 6px; background: none;
+    border: none; color: var(--dim); font-size: 11.5px; cursor: pointer; padding: 8px 12px;
+    border-radius: 6px; margin: 4px; }
+  .ecterm-toggle:hover { color: var(--text); background: var(--cell-hover); }
+  .ecterm-toggle svg { transition: transform .2s; }
+  .ecterm-toggle.open svg { transform: rotate(180deg); }
+  .ecterm { border-top: 1px solid var(--hair); background: rgba(0,0,0,0.35); display: none; }
+  .ecterm.open { display: block; }
+  /* Operation feeds: the notification surface of the panel, in their OWN
+     section BELOW the versions table group (never between the table's rows).
+     Each in-flight operation owns one feed — header with npm command +
+     elapsed time, mono output lines, and the circular stop button overlaid
+     on the output while that version downloads. Feeds stack; parallel
+     downloads never share one. #op-feeds:empty (below) collapses the whole
+     section once the last feed is removed. */
+  .op-feed { border-top: 1px solid var(--hair); overflow: hidden;
+    animation: feed-in .18s ease-out both; }
+  .op-feed + .op-feed { border-top: 1px solid var(--hair); }
+  /* Inside its own group the first feed's top border would double the group
+     border — drop it. */
+  .op-feeds-group .op-feed:first-child { border-top: none; }
+  .op-feed.leaving { animation: feed-out .16s ease-in both; }
+  #op-feeds:empty { display: none; }
+  @keyframes feed-in { from { opacity: 0; transform: translateY(-6px); } }
+  @keyframes feed-out { to { opacity: 0; transform: translateY(-6px); } }
+  @media (prefers-reduced-motion: reduce) {
+    .op-feed, .op-feed.leaving { animation: none; }
+  }
+  .op-feed-head { display: flex; align-items: center; gap: 8px; padding: 10px 16px 6px; }
+  .op-feed-cmd { font-family: var(--mono); font-size: 10.5px; color: var(--faint);
+    white-space: normal; word-break: break-all; flex: 1; min-width: 0; }
+  .op-feed-elapsed { font-family: var(--mono); font-size: 11px; color: var(--faint);
+    min-width: 40px; text-align: right; }
+  .op-feed-body { position: relative; }
+  /* Shared terminal styling: one look for every terminal surface in the app
+     (operation feeds, harness log) — dark backing, mono, muted green text. */
+  .terminal { background: rgba(0,0,0,0.35); color: #9bd1c0;
+    font: 11px/1.5 var(--mono); white-space: pre-wrap; word-break: break-all; }
+  .term-out { margin: 0; padding: 8px 16px 46px; max-height: 220px; overflow: auto;
+    font-size: 10.5px; }
+  .op-feed.idle .term-out { padding-bottom: 14px; }
+  .term-out .ln { display: block; }
+  .term-out .ln.out { color: #a9d5ff; }
+  .term-out .ln.info { color: #8ecdf7; font-weight: 600; }
+  .term-out .ln.err { color: #ff8a8a; }
+  /* Logs tab now also surfaces the live engine run output (merged view) */
+
+  /* version tiles */
+  .ver-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  .ver-tile { border: 1px solid var(--hair); border-radius: 10px; padding: 9px 11px;
+    display: flex; flex-direction: column; gap: 6px; background: var(--cell); }
+  .ver-tile .ver { font-family: var(--mono); font-size: 12.5px; font-weight: 600; }
+  .ver-tile .meta { display: flex; align-items: center; gap: 5px; }
+  .tag { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px;
+    padding: 1.5px 7px; border-radius: 999px; }
+  .tag.active { background: rgba(48,209,88,0.15); color: var(--ok); border: 1px solid rgba(48,209,88,0.35); }
+  .tag.prev { background: rgba(255,214,10,0.1); color: var(--warn); border: 1px solid rgba(255,214,10,0.3); }
+  .tag.inst { color: var(--faint); }
+  .ver-tile .del { margin-left: auto; }
+  /* switch */
+  .switch { position: relative; display: inline-block; width: 40px; height: 24px; flex: none; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .switch .slider { position: absolute; inset: 0; background: rgba(0,0,0,0.3);
+    border: 1px solid var(--hair2); border-radius: 999px; transition: .2s; }
+  .switch .slider::before { content: ""; position: absolute; width: 18px; height: 18px; left: 2px; top: 2px;
+    background: #fff; border-radius: 50%; transition: .2s; box-shadow: 0 1px 4px rgba(0,0,0,0.4); }
+  .switch input:checked + .slider { background: var(--ok); border-color: var(--ok); }
+  .switch input:checked + .slider::before { transform: translateX(16px); }
+  .switch input:focus-visible + .slider { outline: 2px solid var(--accent2); outline-offset: 1px; }
+  /* version table */
+  .vhead { display: flex; align-items: center; gap: 16px; padding: 12px 16px;
+    border-bottom: 1px solid var(--hair); flex-wrap: wrap; }
+  .vtable { }
+  .vrow { display: flex; align-items: center; gap: 12px; padding: 10px 16px;
+    border-top: 1px solid var(--hair); position: relative; }
+  .vtable .vrow:first-child { border-top: none; }
+  .vhead-row { color: var(--faint); font-size: 10.5px; text-transform: uppercase;
+    letter-spacing: 0.7px; font-weight: 650; padding: 8px 16px; }
+  .vc-ver { flex: 1; font-family: var(--mono); font-size: 12.5px; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .vc-dir { width: 64px; flex: none; display: flex; align-items: center; justify-content: center; }
+  /* Directory link: circular borderless button revealing the version directory */
+  .btn.dir { width: 30px; height: 30px; padding: 0; border-radius: 50%;
+    border: none; background: transparent; color: var(--dim);
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: background .15s, color .15s; }
+  .btn.dir svg { width: 15px; height: 15px; }
+  .btn.dir:hover { background: var(--cell-hover); color: var(--accent2); }
+  .btn.dir:active { transform: translateY(1px); }
+  .btn.dir:disabled { opacity: 0.4; cursor: default; transform: none; }
+  .btn.dir:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
+  .vc-acts { width: 72px; flex: none; display: flex; align-items: center; justify-content: center; }
+  /* Delete action: circular borderless button with a white trash glyph;
+     hovering turns the disc red and keeps the glyph white. In light mode the
+     glyph gets a dim backing disc so white-on-white stays readable. */
+  .btn.del { width: 30px; height: 30px; padding: 0; border-radius: 50%;
+    border: none; background: transparent; color: #fff;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: background .15s; }
+  .btn.del svg { width: 15px; height: 15px; }
+  .btn.del:hover { background: var(--err); }
+  .btn.del:active { transform: translateY(1px); }
+  .btn.del:disabled { opacity: 0.4; cursor: default; transform: none; }
+  .btn.del:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
+  @media (prefers-color-scheme: light) {
+    .btn.del { background: rgba(29, 36, 48, 0.32); }
+    .btn.del:hover { background: var(--err); }
+  }
+  .vc-def { width: 64px; flex: none; display: flex; align-items: center; justify-content: center; }
+  /* custom radio for the "Active" version selector (the radio makes this
+     version the active engine version) */
+  .vc-radio { appearance: none; -webkit-appearance: none; width: 16px; height: 16px;
+    border: 1.5px solid var(--hair2); border-radius: 50%; background: transparent;
+    cursor: pointer; position: relative; transition: border-color .15s, background .15s; flex: none; }
+  .vc-radio:hover { border-color: var(--accent2); }
+  .vc-radio:checked { border-color: var(--ok); background: var(--ok); }
+  .vc-radio:checked::after { content: ""; position: absolute; width: 6px; height: 6px;
+    border-radius: 50%; background: #04231a; left: 50%; top: 50%; transform: translate(-50%,-50%); }
+  .vc-radio:disabled { opacity: 0.35; cursor: default; }
+  .vc-radio:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
+  /* Install row: the persistent LAST row of the versions table — the
+     published-version dropdown sits in the Version column and the
+     cloud-download install button in the Actions column; the Active and
+     Directory cells stay empty. */
+  .vc-ver-install { display: flex; align-items: center; gap: 6px; }
+  .vc-ver-install select { width: 100%; max-width: 240px; }
+  /* Version-list refresh: borderless circular icon-only button (same
+     treatment as the engine-card open-in-browser button) sitting right of
+     the install-row dropdown. */
+  .ver-refresh-btn { width: 28px; height: 28px; border-radius: 50%; border: none;
+    background: transparent; color: var(--dim); cursor: pointer; display: inline-flex;
+    align-items: center; justify-content: center; padding: 0; flex: none; }
+  .ver-refresh-btn:hover { background: var(--cell-hover); color: var(--accent2); }
+  .ver-refresh-btn:disabled { opacity: 0.4; cursor: default; }
+  .ver-refresh-btn:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
+  .ver-refresh-btn svg { width: 16px; height: 16px; }
+  /* Install action: white cloud-download glyph (same treatment as the delete
+     button) — dim backing disc in light mode so white stays readable, accent
+     disc on hover. */
+  .btn.install { color: #fff; }
+  .btn.install:hover { background: var(--accent); color: #fff; }
+  @media (prefers-color-scheme: light) {
+    .btn.install { background: rgba(29, 36, 48, 0.32); }
+  }
+  .btn.danger { background: var(--err); border-color: var(--err); color: #fff; }
+  .btn.danger:hover { background: #ff6259; }
+  .btn.ghost-danger { background: transparent; border-color: rgba(255,69,58,0.45);
+    color: var(--err); }
+  .btn.ghost-danger:hover { background: rgba(255,69,58,0.12); }
+  /* delete confirmation popover */
+  .pop { position: absolute; right: 40px; top: calc(100% - 2px); z-index: 40;
+    background: #141b2c; border: 1px solid var(--hair2); border-radius: 11px;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.55); padding: 11px 12px; min-width: 200px;
+    display: none; }
+  .pop.open { display: block; }
+  .pop-txt { font-size: 12px; margin-bottom: 10px; color: var(--text); }
+  .pop-txt b { font-family: var(--mono); }
+  .pop-acts { display: flex; gap: 8px; justify-content: flex-end; }
+  /* logs — the log fills the control panel and resizes with the window;
+     refresh (top-right) and go-to-last (bottom-right) overlay the log itself
+     as circular buttons with a background only while hovered. */
+  .log-group { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+  .log-wrap { position: relative; flex: 1; min-height: 0; display: flex; }
+  .log-view { margin: 0; flex: 1; min-height: 0; overflow: auto; padding: 12px 0 12px 16px; }
+  .log-view .ln { display: block; }
+  .log-overlay { position: absolute; right: 6px; width: 32px; height: 32px;
+    border-radius: 50%; border: none; background: rgba(255,255,255,0.08); color: var(--dim);
+    cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+    padding: 0; z-index: 3; transition: background .15s, color .15s, opacity .15s; opacity: 0.55; }
+  .log-overlay:hover { background: rgba(255,255,255,0.25); color: var(--accent2); opacity: 1; }
+  .log-overlay:active { transform: translateY(1px); }
+  .log-overlay:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
+  .log-overlay svg { width: 15px; height: 15px; }
+  .log-overlay.top { top: 10px; }
+  .log-overlay.bottom { bottom: 10px; }
+  .log-overlay.pressed { color: var(--accent2); }
+  @media (max-width: 560px) { .actions { grid-template-columns: 1fr 1fr; } }

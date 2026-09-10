@@ -19,7 +19,21 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const html = readFileSync(path.join(root, "src-tauri", "resources", "settings.html"), "utf8");
-const script = html.match(/<script>([\s\S]*?)<\/script>/)[1];
+// Panel behavior lives in settings.js (CSP: no inline scripts); fall back to
+// the inline block when present so the test also accepts the unsplit layout.
+const inline = html.match(/<script>([\s\S]*?)<\/script>/);
+const script = inline
+  ? inline[1]
+  : readFileSync(path.join(root, "src-tauri", "resources", "settings.js"), "utf8");
+// Style assertions span the extracted stylesheet when present, so CSS
+// regressions are caught whichever file carries the rules.
+let settingsCss = "";
+try {
+  settingsCss = readFileSync(path.join(root, "src-tauri", "resources", "settings.css"), "utf8");
+} catch {
+  settingsCss = "";
+}
+const page = `${html}\n${settingsCss}\n${script}`;
 
 // ---------- virtual clock ----------
 function makeScheduler() {
@@ -491,7 +505,7 @@ console.log("6. install row merged into the versions table; log toggle bottom-ri
     "feeds render in their own section below the table",
     html.includes('class="group op-feeds-group" id="op-feeds"') && html.indexOf("vinstall-row") < opFeeds,
   );
-  check("feeds section collapses when empty", /#op-feeds:empty \{ display: none; \}/.test(html));
+  check("feeds section collapses when empty", /#op-feeds:empty \{ display: none; \}/.test(page));
   check(
     "install button uses the cloud-down icon",
     /id="btn-install"[^>]*>\s*<i class="ico sm bi" data-ico="cloud-arrow-down-fill"><\/i>/.test(html),
@@ -502,8 +516,8 @@ console.log("6. install row merged into the versions table; log toggle bottom-ri
       html,
     ),
   );
-  check("log toggle pinned bottom-right", /\.log-toggle \{ position: fixed; right: 14px/.test(html));
-  check("log toggle no longer pinned left", !/\.log-toggle \{[^}]*left: 14px/.test(html));
+  check("log toggle pinned bottom-right", /\.log-toggle \{ position: fixed; right: 14px/.test(page));
+  check("log toggle no longer pinned left", !/\.log-toggle \{[^}]*left: 14px/.test(page));
 }
 
 // ---------- 7. stopped download dismisses and is never resurrected ----------
@@ -639,11 +653,11 @@ console.log("8. structure: no stop control; white install button glyph");
     "no stop button in the overlay panel",
     !overlay.includes("lc-stopdown") && !overlay.includes("stop-btn"),
   );
-  check("install button glyph is white", /\.btn\.install \{ color: #fff; \}/.test(html));
+  check("install button glyph is white", /\.btn\.install \{ color: #fff; \}/.test(page));
   check(
     "install button gets a light-mode backing disc",
     /\(prefers-color-scheme: light\)\s*\{\s*\.btn\.install \{ background: rgba\(29, 36, 48, 0\.32\); \}/.test(
-      html,
+      page,
     ),
   );
   check(
@@ -724,7 +738,7 @@ console.log("9. versions table renders hostile version names as inert text");
     texts.some((t) => t.indexOf(EVIL) !== -1),
     texts.join("|").slice(0, 200),
   );
-  check("no innerHTML sink interpolates a version variable", !/\.innerHTML\s*=[^;]*\+\s*v\b/.test(html));
+  check("no innerHTML sink interpolates a version variable", !/\.innerHTML\s*=[^;]*\+\s*v\b/.test(page));
   h.restore();
 }
 
@@ -743,7 +757,7 @@ console.log("11. install row refresh button refetches the list, keeps selection"
   check("refresh glyph bundled", glyphOk);
   check(
     "refresh button styled icon-only",
-    /\.ver-refresh-btn svg \{ width: 16px; height: 16px; \}/.test(html),
+    /\.ver-refresh-btn svg \{ width: 16px; height: 16px; \}/.test(page),
   );
   let refreshCalls = 0,
     extraVersion = false;
@@ -803,7 +817,7 @@ console.log("12. operation terminals head with Harness Launcher #");
 {
   check(
     "panel feed default header is neutral",
-    html.includes('<span class="op-feed-cmd">Harness Launcher #</span>'),
+    page.includes('<span class="op-feed-cmd">Harness Launcher #</span>'),
   );
   check(
     "no install-claim header remains in the panel",
@@ -828,7 +842,7 @@ console.log("13. header language switcher persists and repaints");
   );
   // Locale table spot-checks (the fake DOM carries no markup attributes, so
   // table content is asserted on the script source instead).
-  const scriptSrc = html.match(/<script>([\s\S]*?)<\/script>/)[1];
+  const scriptSrc = script;
   function localeVal(lang, key) {
     const bare = lang === "en" || lang === "ja" || lang === "es";
     const open = `    ${bare ? lang : `"${lang}"`}: {`;

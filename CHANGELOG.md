@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.1.97 — Split page assets, CSP without inline execution
+- Control Panel and engine-stopped pages are now markup + same-origin assets (`settings.css/js`, `stopped.css/js`, served from the `dsh-ui` protocol with correct content types); visual style and behavior unchanged.
+- Content-Security-Policy tightened: `script-src`/`style-src 'self'` (no more `unsafe-inline`), mirrored in `tauri.conf.json`. New `scripts/test-csp.mjs` contract pins it; panel/stopped/i18n tests updated to span the split files.
+
 ## v0.1.96 — Biome lint/format gate for JavaScript
 - Added `@biomejs/biome` (pinned devDependency) with `biome.json` (space indent, `noVar`/`noAssignInExpressions` as errors) covering `scripts/**/*.mjs` plus the shipped `overlay.js`/`findzoom.js`; new `npm run lint` / `npm run format` scripts, and `npm test` now runs the lint gate first. Fixed all findings (`var` → `let`/`const`, template literals, brace-bodied `forEach`, assignment-free search loops, expanded test shims). All suites stay green.
 

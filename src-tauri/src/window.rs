@@ -168,7 +168,9 @@ mod findzoom_tests {
         );
         assert!(js.contains("dsh-fz-bar"), "missing find bar id");
         assert!(
-            js.contains("role', 'search'") || js.contains("role\",\"search\""),
+            js.contains("role', 'search'")
+                || js.contains("role\",\"search\"")
+                || js.contains("role\", \"search\""),
             "find bar must expose role=search"
         );
         // Next/previous/close affordances.

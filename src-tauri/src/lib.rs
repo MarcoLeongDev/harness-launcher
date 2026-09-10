@@ -22,10 +22,11 @@ use tauri_plugin_notification::NotificationExt;
 use crate::state::AppState;
 
 /// Restrictive Content Security Policy for launcher-owned `dsh-ui://` pages.
-/// Inline scripts/styles are allowed (the pages are self-contained); everything
-/// else is locked down: no object embeds, no framing, no external loads, and
-/// icon fetches stay on the custom protocol.
-const DSH_UI_CSP: &str = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' dsh-ui: data:; connect-src 'self' dsh-ui:; font-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'";
+/// No inline script or style execution: behavior and presentation load from
+/// same-origin asset files. Everything else is locked down: no object
+/// embeds, no framing, no external loads, and icon fetches stay on the
+/// custom protocol.
+const DSH_UI_CSP: &str = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' dsh-ui: data:; connect-src 'self' dsh-ui:; font-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'";
 
 pub fn run() {
     tauri::Builder::default()
@@ -73,6 +74,30 @@ pub fn run() {
                             .as_bytes()
                             .to_vec(),
                     )
+                    .unwrap(),
+                "/stopped.css" => tauri::http::Response::builder()
+                    .header("Content-Type", "text/css; charset=utf-8")
+                    .header("Content-Security-Policy", DSH_UI_CSP)
+                    .body(include_str!("../resources/stopped.css").as_bytes().to_vec())
+                    .unwrap(),
+                "/stopped.js" => tauri::http::Response::builder()
+                    .header("Content-Type", "text/javascript; charset=utf-8")
+                    .header("Content-Security-Policy", DSH_UI_CSP)
+                    .body(include_str!("../resources/stopped.js").as_bytes().to_vec())
+                    .unwrap(),
+                "/settings.css" => tauri::http::Response::builder()
+                    .header("Content-Type", "text/css; charset=utf-8")
+                    .header("Content-Security-Policy", DSH_UI_CSP)
+                    .body(
+                        include_str!("../resources/settings.css")
+                            .as_bytes()
+                            .to_vec(),
+                    )
+                    .unwrap(),
+                "/settings.js" => tauri::http::Response::builder()
+                    .header("Content-Type", "text/javascript; charset=utf-8")
+                    .header("Content-Security-Policy", DSH_UI_CSP)
+                    .body(include_str!("../resources/settings.js").as_bytes().to_vec())
                     .unwrap(),
                 _ => tauri::http::Response::builder()
                     .header("Content-Type", "text/html; charset=utf-8")
