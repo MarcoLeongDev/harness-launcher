@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.1.96 — Biome lint/format gate for JavaScript
+- Added `@biomejs/biome` (pinned devDependency) with `biome.json` (space indent, `noVar`/`noAssignInExpressions` as errors) covering `scripts/**/*.mjs` plus the shipped `overlay.js`/`findzoom.js`; new `npm run lint` / `npm run format` scripts, and `npm test` now runs the lint gate first. Fixed all findings (`var` → `let`/`const`, template literals, brace-bodied `forEach`, assignment-free search loops, expanded test shims). All suites stay green.
+
 ## v0.1.95 — Rust edition 2024, clippy/fmt gates green
 - Toolchain modernized: Rust edition 2021 → 2024, MSRV 1.77 → 1.85; `cargo fmt` applied across the tree and all `cargo clippy` warnings in our crate fixed (unit bindings, `next_back`, `&Path` params, derived `Default`, type alias, doc formatting, test-module placement). Vendored `muda` fork warnings left untouched. All 63 Rust tests + Node contract suites stay green.
 

@@ -4,12 +4,13 @@
 // Node hand-rolled PNG decoder previously turned the logo into black
 // transparent garbage. Node only parses a sips-produced BMP to build the
 // monochrome menu-bar template glyph.
-import { deflateSync } from "node:zlib";
+
 import { execFileSync } from "node:child_process";
-import { mkdir, writeFile, readFile, rm } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { deflateSync } from "node:zlib";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const LOGO_PATH = path.join(root, "logo", "DSH Launcher.png");
@@ -28,22 +29,31 @@ function crc32(buf) {
   return ~c >>> 0;
 }
 function chunk(type, data) {
-  const len = Buffer.alloc(4); len.writeUInt32BE(data.length);
+  const len = Buffer.alloc(4);
+  len.writeUInt32BE(data.length);
   const t = Buffer.from(type, "ascii");
-  const crc = Buffer.alloc(4); crc.writeUInt32BE(crc32(Buffer.concat([t, data])));
+  const crc = Buffer.alloc(4);
+  crc.writeUInt32BE(crc32(Buffer.concat([t, data])));
   return Buffer.concat([len, t, data, crc]);
 }
 function encodePng(width, height, rgba) {
   const sig = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
   const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(width, 0); ihdr.writeUInt32BE(height, 4);
-  ihdr[8] = 8; ihdr[9] = 6;
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8;
+  ihdr[9] = 6;
   const raw = Buffer.alloc((width * 4 + 1) * height);
   for (let y = 0; y < height; y++) {
     raw[y * (width * 4 + 1)] = 0;
     rgba.copy(raw, y * (width * 4 + 1) + 1, y * width * 4, (y + 1) * width * 4);
   }
-  return Buffer.concat([sig, chunk("IHDR", ihdr), chunk("IDAT", deflateSync(raw)), chunk("IEND", Buffer.alloc(0))]);
+  return Buffer.concat([
+    sig,
+    chunk("IHDR", ihdr),
+    chunk("IDAT", deflateSync(raw)),
+    chunk("IEND", Buffer.alloc(0)),
+  ]);
 }
 
 /// Resize src PNG to a square of `size` pixels, writing an 8-bit PNG.
@@ -66,7 +76,9 @@ function decodeBmp(buf) {
     for (let x = 0; x < w; x++) {
       const i = rowOff + x * (bpp >> 3);
       const d = (y * w + x) * 4;
-      rgba[d] = buf[i + 2]; rgba[d + 1] = buf[i + 1]; rgba[d + 2] = buf[i];
+      rgba[d] = buf[i + 2];
+      rgba[d + 1] = buf[i + 1];
+      rgba[d + 2] = buf[i];
       rgba[d + 3] = bpp === 32 ? buf[i + 3] : 255;
     }
   }
@@ -94,7 +106,10 @@ function glyphAlpha(rgba, w, h) {
 
 /// Bounding box of visible mark pixels.
 function bbox(alpha, w, h) {
-  let minX = w, minY = h, maxX = -1, maxY = -1;
+  let minX = w,
+    minY = h,
+    maxX = -1,
+    maxY = -1;
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       if (alpha[y * w + x] > 8) {
@@ -123,10 +138,14 @@ function fitAlpha(alpha, crop, srcSize, target) {
       const sx1 = crop.x + Math.max(1, Math.floor(((x + 1) * crop.w) / outW));
       const sy0 = crop.y + Math.floor((y * crop.h) / outH);
       const sy1 = crop.y + Math.max(1, Math.floor(((y + 1) * crop.h) / outH));
-      let sum = 0, n = 0;
+      let sum = 0,
+        n = 0;
       for (let yy = sy0; yy < sy1; yy++) {
         for (let xx = sx0; xx < sx1; xx++) {
-          if (xx < srcSize && yy < srcSize) { sum += alpha[yy * srcSize + xx]; n++; }
+          if (xx < srcSize && yy < srcSize) {
+            sum += alpha[yy * srcSize + xx];
+            n++;
+          }
         }
       }
       res[y * outW + x] = n ? Math.round(sum / n) : 0;
@@ -146,7 +165,10 @@ function fitAlpha(alpha, crop, srcSize, target) {
 function alphaToRgba(a, size) {
   const out = Buffer.alloc(size * size * 4);
   for (let i = 0; i < size * size; i++) {
-    out[i * 4] = 0; out[i * 4 + 1] = 0; out[i * 4 + 2] = 0; out[i * 4 + 3] = a[i];
+    out[i * 4] = 0;
+    out[i * 4 + 1] = 0;
+    out[i * 4 + 2] = 0;
+    out[i * 4 + 3] = a[i];
   }
   return out;
 }

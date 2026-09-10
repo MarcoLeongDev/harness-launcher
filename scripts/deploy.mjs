@@ -11,7 +11,16 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 // Default builds are universal, so prefer that bundle dir; fall back to the
 // host-arch dir (e.g. after `npm run build:host`).
 const candidates = [
-  path.join(root, "src-tauri", "target", "universal-apple-darwin", "release", "bundle", "macos", "Harness Launcher.app"),
+  path.join(
+    root,
+    "src-tauri",
+    "target",
+    "universal-apple-darwin",
+    "release",
+    "bundle",
+    "macos",
+    "Harness Launcher.app",
+  ),
   path.join(root, "src-tauri", "target", "release", "bundle", "macos", "Harness Launcher.app"),
 ];
 const bundle = candidates.find((p) => existsSync(p));
@@ -25,7 +34,7 @@ const relaunch = process.argv.includes("--relaunch");
 
 if (!bundle) {
   console.error("Release bundle not found. Looked in:");
-  for (const p of candidates) console.error("  " + p);
+  for (const p of candidates) console.error(`  ${p}`);
   console.error("Run `npm run build` first (assets + tauri build).");
   process.exit(1);
 }
@@ -48,7 +57,9 @@ function ensureAgent(bundlePath) {
   } catch {
     execFileSync("/usr/libexec/PlistBuddy", ["-c", "Add :LSUIElement bool true", plist], { stdio: "ignore" });
   }
-  const out = execFileSync("/usr/libexec/PlistBuddy", ["-c", "Print :LSUIElement", plist], { encoding: "utf8" });
+  const out = execFileSync("/usr/libexec/PlistBuddy", ["-c", "Print :LSUIElement", plist], {
+    encoding: "utf8",
+  });
   console.log("  LSUIElement:", out.trim());
 }
 ensureAgent(bundle);

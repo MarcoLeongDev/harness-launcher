@@ -12,53 +12,64 @@
 // (https://registry.npmjs.org/npm/<version> -> dist.integrity).
 // DSH_NPM_VERSION override is verified against that version's packument
 // instead (transport trust only — prefer pinning).
-import { createWriteStream } from "node:fs";
-import { mkdir, readFile, writeFile, rm, access, chmod, readdir, stat } from "node:fs/promises";
-import { pipeline } from "node:stream/promises";
-import { Readable } from "node:stream";
-import { createHash } from "node:crypto";
+
 import { spawnSync } from "node:child_process";
-import { gunzipSync } from "node:zlib";
+import { createHash } from "node:crypto";
+import { createWriteStream } from "node:fs";
+import { access, chmod, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { fileURLToPath } from "node:url";
 
 const PINNED_NPM_VERSION = "12.0.2";
-const PINNED_NPM_INTEGRITY = "sha512-uIXokLlBj6FpNUTQX1PmT5pz7BlIN9QlixX+zdaSNHsd0qUXsbDLr50xzY6Sw7cJVr0uzHKDOle0swmPW/p5Qw==";
+const PINNED_NPM_INTEGRITY =
+  "sha512-uIXokLlBj6FpNUTQX1PmT5pz7BlIN9QlixX+zdaSNHsd0qUXsbDLr50xzY6Sw7cJVr0uzHKDOle0swmPW/p5Qw==";
 const NPM_VERSION = process.env.DSH_NPM_VERSION ?? PINNED_NPM_VERSION;
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const destDir = path.join(root, "src-tauri", "resources", "npm");
 const marker = path.join(destDir, ".version");
 
-async function exists(p) { try { await access(p); return true; } catch { return false; } }
+async function exists(p) {
+  try {
+    await access(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 const version = NPM_VERSION;
-console.log("[bundle-npm] vendoring npm@" + version);
+console.log(`[bundle-npm] vendoring npm@${version}`);
 
 /// Expected tarball integrity: the repo pin, or the version's packument
 /// dist.integrity for overrides (fail closed when unreachable).
 async function expectedIntegrity(ver) {
   if (ver === PINNED_NPM_VERSION) return PINNED_NPM_INTEGRITY;
   console.log("[bundle-npm] non-pinned version", ver, "— verifying against packument integrity");
-  const res = await fetch("https://registry.npmjs.org/npm/" + encodeURIComponent(ver));
-  if (!res.ok) throw new Error("cannot fetch packument for npm@" + ver + ": " + res.status);
+  const res = await fetch(`https://registry.npmjs.org/npm/${encodeURIComponent(ver)}`);
+  if (!res.ok) throw new Error(`cannot fetch packument for npm@${ver}: ${res.status}`);
   const integrity = (await res.json())?.dist?.integrity;
   if (typeof integrity !== "string" || !integrity.startsWith("sha512-")) {
-    throw new Error("no sha512 integrity in packument for npm@" + ver);
+    throw new Error(`no sha512 integrity in packument for npm@${ver}`);
   }
   return integrity;
 }
 
 function verifyIntegrity(buf, integrity) {
   const m = /^(sha512)-(.+)$/.exec(integrity);
-  if (!m) throw new Error("unsupported integrity format: " + integrity);
+  if (!m) throw new Error(`unsupported integrity format: ${integrity}`);
   const got = createHash("sha512").update(buf).digest("base64");
-  if (got !== m[2]) throw new Error("[bundle-npm] CHECKSUM MISMATCH for npm-" + version + ".tgz");
-  console.log("[bundle-npm] checksum OK (sha512:" + got.slice(0, 16) + "…)");
+  if (got !== m[2]) throw new Error(`[bundle-npm] CHECKSUM MISMATCH for npm-${version}.tgz`);
+  console.log(`[bundle-npm] checksum OK (sha512:${got.slice(0, 16)}…)`);
 }
 
-if (!process.argv.includes("--force") && await exists(marker)) {
+if (!process.argv.includes("--force") && (await exists(marker))) {
   const cur = (await readFile(marker, "utf8")).trim();
-  if (cur === version) { console.log("[bundle-npm] vendored npm", version, "already present"); process.exit(0); }
+  if (cur === version) {
+    console.log("[bundle-npm] vendored npm", version, "already present");
+    process.exit(0);
+  }
   console.log("[bundle-npm] version changed, re-vendoring");
   await rm(destDir, { recursive: true, force: true });
 }
@@ -70,7 +81,7 @@ async function copyTree(src, dest, rel) {
   for (const entry of entries) {
     const s = path.join(src, entry.name);
     const d = path.join(dest, entry.name);
-    const rel2 = rel ? rel + "/" + entry.name : entry.name;
+    const rel2 = rel ? `${rel}/${entry.name}` : entry.name;
     if (entry.isDirectory()) {
       await copyTree(s, d, rel2);
     } else {
@@ -91,14 +102,14 @@ async function copyTree(src, dest, rel) {
 }
 
 async function vendoring(version) {
-  const stage = path.join(root, "target", "npm-stage-" + version);
+  const stage = path.join(root, "target", `npm-stage-${version}`);
   await rm(stage, { recursive: true, force: true });
   await mkdir(stage, { recursive: true });
 
-  const url = "https://registry.npmjs.org/npm/-/npm-" + version + ".tgz";
+  const url = `https://registry.npmjs.org/npm/-/npm-${version}.tgz`;
   console.log("[bundle-npm] fetching", url);
   const res = await fetch(url);
-  if (!res.ok) throw new Error("npm tarball fetch failed: " + res.status);
+  if (!res.ok) throw new Error(`npm tarball fetch failed: ${res.status}`);
   const tgz = path.join(stage, ".npm.tgz");
   await pipeline(Readable.fromWeb(res.body), createWriteStream(tgz));
   verifyIntegrity(await readFile(tgz), await expectedIntegrity(version));
@@ -114,57 +125,87 @@ async function vendoring(version) {
   await rm(tgz, { force: true });
 
   const runNpm = (args) => {
-    const r = spawnSync(process.platform === "win32" ? "npm.cmd" : "npm", args, { cwd: unpack, stdio: ["ignore", "pipe", "pipe"] });
+    const r = spawnSync(process.platform === "win32" ? "npm.cmd" : "npm", args, {
+      cwd: unpack,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
     if (r.status !== 0) {
-      console.error("[bundle-npm] npm step failed:", (r.stderr || "").toString(), (r.stdout || "").toString());
+      console.error(
+        "[bundle-npm] npm step failed:",
+        (r.stderr || "").toString(),
+        (r.stdout || "").toString(),
+      );
       return false;
     }
     return true;
   };
   const ok = runNpm([
-    "install", "--prefix", path.join(stage, "installed"),
-    "--no-audit", "--no-fund", "--loglevel=warn", "--ignore-scripts",
-    pkgRoot
+    "install",
+    "--prefix",
+    path.join(stage, "installed"),
+    "--no-audit",
+    "--no-fund",
+    "--loglevel=warn",
+    "--ignore-scripts",
+    pkgRoot,
   ]);
   if (!ok) throw new Error("could not materialize a working npm tree (build machine needs npm)");
-  const depCheck = spawnSync("npm", ["ls", "--prefix", path.join(stage, "installed"), "--depth=0", "npm-normalize-package-bin", "--json"], { cwd: unpack, stdio: ["ignore", "pipe", "pipe"] });
-  console.log("[bundle-npm] flattened tree deps:", (depCheck.stdout || "").toString().slice(0, 120).replace(/\n/g, " "));
+  const depCheck = spawnSync(
+    "npm",
+    ["ls", "--prefix", path.join(stage, "installed"), "--depth=0", "npm-normalize-package-bin", "--json"],
+    { cwd: unpack, stdio: ["ignore", "pipe", "pipe"] },
+  );
+  console.log(
+    "[bundle-npm] flattened tree deps:",
+    (depCheck.stdout || "").toString().slice(0, 120).replace(/\n/g, " "),
+  );
 
   const srcPkg = path.join(stage, "installed", "node_modules", "npm");
   await rm(destDir, { recursive: true, force: true });
-  let copied = 0;
+  let _copied = 0;
   await copyTree(srcPkg, destDir, "").then(() => {});
-  for await (const _ of walk(srcPkg)) { copied++; }
+  for await (const _ of walk(srcPkg)) {
+    _copied++;
+  }
   await rm(stage, { recursive: true, force: true });
-  await writeFile(marker, version + "\n").catch((e) => console.warn("[bundle-npm] marker write skipped:", e.code));
-  console.log("[bundle-npm] vendored npm " + version + " -> " + destDir);
+  await writeFile(marker, `${version}\n`).catch((e) =>
+    console.warn("[bundle-npm] marker write skipped:", e.code),
+  );
+  console.log(`[bundle-npm] vendored npm ${version} -> ${destDir}`);
 
   // Fail closed when lifecycle helpers lost their executable bit: without
   // +x on node-gyp, every harness install with scripts allowed fails native
   // builds with `Permission denied` (exit 126) — the silent second half of
   // the 0.1.3-alpha.2 fs-ext outage.
   if (process.platform !== "win32") {
-    const helpers = [
-      "node_modules/@npmcli/run-script/lib/node-gyp-bin/node-gyp",
-    ];
+    const helpers = ["node_modules/@npmcli/run-script/lib/node-gyp-bin/node-gyp"];
     for (const h of helpers) {
       const p = path.join(destDir, h);
       const mode = (await stat(p)).mode & 0o777;
       if ((mode & 0o111) === 0) {
-        throw new Error(`[bundle-npm] ${h} is not executable (mode ${mode.toString(8)}); fix copyTree mode preservation`);
+        throw new Error(
+          `[bundle-npm] ${h} is not executable (mode ${mode.toString(8)}); fix copyTree mode preservation`,
+        );
       }
       console.log(`[bundle-npm] exec check OK: ${h} (${mode.toString(8)})`);
     }
   }
 
-  const nodeSidecars = ["node-aarch64-apple-darwin", "node-x86_64-apple-darwin"]
-    .map((n) => path.join(root, "src-tauri", "binaries", n));
+  const nodeSidecars = ["node-aarch64-apple-darwin", "node-x86_64-apple-darwin"].map((n) =>
+    path.join(root, "src-tauri", "binaries", n),
+  );
   let checked = 0;
   for (const nodeSidecar of nodeSidecars) {
     if (await exists(nodeSidecar)) {
-      const check = spawnSync(nodeSidecar, [path.join(destDir, "bin", "npm-cli.js"), "--version"], { encoding: "utf8" });
-      console.log("[bundle-npm] verified:", (check.stdout || "?").trim(), "(npm " + version + ", " + path.basename(nodeSidecar) + ")");
-      if (check.status !== 0) throw new Error("vendored npm failed to run: " + (check.stderr || ""));
+      const check = spawnSync(nodeSidecar, [path.join(destDir, "bin", "npm-cli.js"), "--version"], {
+        encoding: "utf8",
+      });
+      console.log(
+        "[bundle-npm] verified:",
+        (check.stdout || "?").trim(),
+        `(npm ${version}, ${path.basename(nodeSidecar)})`,
+      );
+      if (check.status !== 0) throw new Error(`vendored npm failed to run: ${check.stderr || ""}`);
       checked++;
     }
   }

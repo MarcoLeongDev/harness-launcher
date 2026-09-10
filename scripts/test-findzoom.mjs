@@ -105,7 +105,8 @@ function makeContext({ storage = {}, bodyText = "", withHighlight = false } = {}
         return child;
       },
       addEventListener(type, fn) {
-        (this._listeners[type] ||= []).push(fn);
+        if (!this._listeners[type]) this._listeners[type] = [];
+        this._listeners[type].push(fn);
       },
       dispatch(type, event = {}) {
         event.target ||= this;
@@ -167,7 +168,8 @@ function makeContext({ storage = {}, bodyText = "", withHighlight = false } = {}
     createElement: (tag) => makeEl(tag),
     getElementById: (id) => byId.get(id) || null,
     addEventListener(type, fn) {
-      (listeners.doc[type] ||= []).push(fn);
+      if (!listeners.doc[type]) listeners.doc[type] = [];
+      listeners.doc[type].push(fn);
     },
     createTreeWalker(rootNode, whatToShow, filter) {
       const all = collectTextNodes(rootNode, []);
@@ -201,7 +203,8 @@ function makeContext({ storage = {}, bodyText = "", withHighlight = false } = {}
       setItem: (k, v) => store.set(String(k), String(v)),
     },
     addEventListener(type, fn) {
-      (listeners.window[type] ||= []).push(fn);
+      if (!listeners.window[type]) listeners.window[type] = [];
+      listeners.window[type].push(fn);
     },
     find(query) {
       findCalls.push(query);
@@ -249,7 +252,7 @@ function makeContext({ storage = {}, bodyText = "", withHighlight = false } = {}
       ...event,
     };
     const phases = [
-      ...((e.target && e.target._listeners && e.target._listeners.keydown) || []),
+      ...(e.target?._listeners?.keydown || []),
       ...(listeners.doc.keydown || []),
       ...(listeners.window.keydown || []),
     ];
@@ -260,16 +263,25 @@ function makeContext({ storage = {}, bodyText = "", withHighlight = false } = {}
     return e;
   }
 
-  return { document, window, body, byId, store, findCalls, keydown, sandbox, hooks,
-    selectionCleared: () => selectionCleared };
+  return {
+    document,
+    window,
+    body,
+    byId,
+    store,
+    findCalls,
+    keydown,
+    sandbox,
+    hooks,
+    selectionCleared: () => selectionCleared,
+  };
 }
 
 // ---- 1. Boots once -----------------------------------------------------------
 console.log("findzoom: boots once");
 {
   const ctx = makeContext();
-  const bars = () =>
-    ctx.body.children.filter((c) => c.id === "dsh-fz-bar").length;
+  const bars = () => ctx.body.children.filter((c) => c.id === "dsh-fz-bar").length;
   check("install guard set", ctx.sandbox.window.__DSH_FINDZOOM__ === true);
   check("exactly one find bar built", bars() === 1);
   check("zoom badge built", !!ctx.document.getElementById("dsh-fz-zoom"));
@@ -343,10 +355,13 @@ console.log("findzoom: find");
   input().dispatch("keydown", { key: "Escape" });
   check("Esc closes the bar", !bar().classList.contains("open"));
   check("Esc clears the selection", ctx.selectionCleared() > clearedBefore);
-  check("bar keeps working after close", (() => {
-    ctx.keydown({ key: "f", ctrlKey: true });
-    return bar().classList.contains("open");
-  })());
+  check(
+    "bar keeps working after close",
+    (() => {
+      ctx.keydown({ key: "f", ctrlKey: true });
+      return bar().classList.contains("open");
+    })(),
+  );
 }
 
 // ---- 4. Focus survives hostile pages -----------------------------------------
@@ -383,7 +398,10 @@ console.log("findzoom: keeps focus against page thieves");
   input().value = "hello";
   input().dispatch("input");
   await sleep(250); // debounce fires runSearch (nativeFind steals focus first)
-  check("search runs despite selection steal", ctx.document.getElementById("dsh-fz-count").textContent === "1 of 2");
+  check(
+    "search runs despite selection steal",
+    ctx.document.getElementById("dsh-fz-count").textContent === "1 of 2",
+  );
   check("focus restored to the field after search", ctx.document.activeElement === input());
 
   // Zoom shortcut from inside the field still works.

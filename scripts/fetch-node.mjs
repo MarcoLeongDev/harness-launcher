@@ -6,15 +6,16 @@
 // updating PINNED_NODE_SHA256 from https://nodejs.org/dist/vX.Y.Z/SHASUMS256.txt.
 // An env override (DSH_NODE_VERSION) is verified against that version's
 // published SHASUMS256.txt instead (transport trust only — prefer pinning).
-import { createWriteStream } from "node:fs";
-import { mkdir, readFile, access, rename, unlink, writeFile, chmod, stat } from "node:fs/promises";
-import { pipeline } from "node:stream/promises";
-import { Readable } from "node:stream";
-import { createHash } from "node:crypto";
+
 import { execFileSync } from "node:child_process";
-import { gunzipSync } from "node:zlib";
+import { createHash } from "node:crypto";
+import { createWriteStream } from "node:fs";
+import { access, chmod, mkdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { fileURLToPath } from "node:url";
+import { gunzipSync } from "node:zlib";
 
 const PINNED_NODE_VERSION = "v24.20.0";
 const PINNED_NODE_SHA256 = {
@@ -25,7 +26,7 @@ const PINNED_NODE_SHA256 = {
 function assetArch(triple) {
   if (triple === "aarch64-apple-darwin") return "arm64";
   if (triple === "x86_64-apple-darwin") return "x64";
-  throw new Error("unsupported node sidecar triple: " + triple);
+  throw new Error(`unsupported node sidecar triple: ${triple}`);
 }
 // Triples to materialize: explicit DSH_TARGET_TRIPLE, else both macOS arches
 // so `tauri build --target universal-apple-darwin` always finds its sidecars.
@@ -36,12 +37,19 @@ const NODE_VERSION = process.env.DSH_NODE_VERSION ?? PINNED_NODE_VERSION;
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const outDir = path.join(root, "src-tauri", "binaries");
 
-async function exists(p) { try { await access(p); return true; } catch { return false; } }
+async function exists(p) {
+  try {
+    await access(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 async function download(url, dest) {
   console.log("[fetch-node] downloading", url);
   const res = await fetch(url);
-  if (!res.ok) throw new Error("download failed: " + res.status + " " + res.statusText);
+  if (!res.ok) throw new Error(`download failed: ${res.status} ${res.statusText}`);
   await pipeline(Readable.fromWeb(res.body), createWriteStream(dest));
 }
 
@@ -56,14 +64,14 @@ async function expectedSha256(version, triple, stem) {
     return PINNED_NODE_SHA256[triple];
   }
   console.log("[fetch-node] non-pinned version", version, "— verifying against published SHASUMS256.txt");
-  const res = await fetch("https://nodejs.org/dist/" + version + "/SHASUMS256.txt");
-  if (!res.ok) throw new Error("cannot fetch SHASUMS256.txt for " + version + ": " + res.status);
+  const res = await fetch(`https://nodejs.org/dist/${version}/SHASUMS256.txt`);
+  if (!res.ok) throw new Error(`cannot fetch SHASUMS256.txt for ${version}: ${res.status}`);
   const text = await res.text();
   for (const line of text.split("\n")) {
     const [hash, name] = line.trim().split(/\s+/);
-    if (name === stem + ".tar.gz" && /^[0-9a-f]{64}$/.test(hash || "")) return hash;
+    if (name === `${stem}.tar.gz` && /^[0-9a-f]{64}$/.test(hash || "")) return hash;
   }
-  throw new Error("no checksum entry for " + stem + ".tar.gz in SHASUMS256.txt");
+  throw new Error(`no checksum entry for ${stem}.tar.gz in SHASUMS256.txt`);
 }
 
 async function extractNode(tarball, destDir, stem) {
@@ -78,7 +86,7 @@ async function extractNode(tarball, destDir, stem) {
     const size = parseInt(header.subarray(124, 136).toString("utf8").trim().replace(/\0.*$/, ""), 8);
     const typeflag = String.fromCharCode(header[156]);
     const dataStart = off + 512;
-    if (name === stem + "/bin/node" && typeflag !== "5") {
+    if (name === `${stem}/bin/node` && typeflag !== "5") {
       const out = path.join(destDir, "node");
       await writeFile(out, body.subarray(dataStart, dataStart + size));
       await chmod(out, 0o755);
@@ -94,16 +102,20 @@ async function extractNode(tarball, destDir, stem) {
 
 await mkdir(outDir, { recursive: true });
 for (const triple of TRIPLES) {
-  const stem = "node-" + NODE_VERSION + "-darwin-" + assetArch(triple);
-  const url = "https://nodejs.org/dist/" + NODE_VERSION + "/" + stem + ".tar.gz";
-  const outFile = path.join(outDir, "node-" + triple);
-  const pinMarker = path.join(outDir, ".node.pinned." + triple);
-  const pinWant = NODE_VERSION + " " + (await expectedSha256(NODE_VERSION, triple, stem)) + "\n";
-  if ((await exists(outFile)) && (await exists(pinMarker)) && (await readFile(pinMarker, "utf8")) === pinWant) {
+  const stem = `node-${NODE_VERSION}-darwin-${assetArch(triple)}`;
+  const url = `https://nodejs.org/dist/${NODE_VERSION}/${stem}.tar.gz`;
+  const outFile = path.join(outDir, `node-${triple}`);
+  const pinMarker = path.join(outDir, `.node.pinned.${triple}`);
+  const pinWant = `${NODE_VERSION} ${await expectedSha256(NODE_VERSION, triple, stem)}\n`;
+  if (
+    (await exists(outFile)) &&
+    (await exists(pinMarker)) &&
+    (await readFile(pinMarker, "utf8")) === pinWant
+  ) {
     console.log("[fetch-node] verified sidecar already present:", path.basename(outFile));
     continue;
   }
-  const tgz = path.join(outDir, ".node-" + triple + ".tgz");
+  const tgz = path.join(outDir, `.node-${triple}.tgz`);
   await download(url, tgz);
   const sum = sha256Hex(await readFile(tgz));
   // Re-derived on every run — the marker only gates the skip path above,
@@ -111,9 +123,9 @@ for (const triple of TRIPLES) {
   const authoritative = await expectedSha256(NODE_VERSION, triple, stem);
   if (sum !== authoritative) {
     await unlink(tgz).catch(() => {});
-    throw new Error("[fetch-node] CHECKSUM MISMATCH for " + stem + ".tar.gz: got " + sum + ", want " + authoritative);
+    throw new Error(`[fetch-node] CHECKSUM MISMATCH for ${stem}.tar.gz: got ${sum}, want ${authoritative}`);
   }
-  console.log("[fetch-node] checksum OK", triple, "(sha256:" + sum.slice(0, 16) + "…)");
+  console.log("[fetch-node] checksum OK", triple, `(sha256:${sum.slice(0, 16)}…)`);
   const extracted = await extractNode(tgz, outDir, stem);
   await rename(extracted, outFile);
   await unlink(tgz).catch(() => {});
@@ -127,13 +139,14 @@ for (const triple of TRIPLES) {
 const UNIVERSAL_TRIPLE = "universal-apple-darwin";
 const UNIVERSAL_SLICES = ["aarch64-apple-darwin", "x86_64-apple-darwin"];
 if (UNIVERSAL_SLICES.every((t) => TRIPLES.includes(t))) {
-  const slices = UNIVERSAL_SLICES.map((t) => path.join(outDir, "node-" + t));
-  const universal = path.join(outDir, "node-" + UNIVERSAL_TRIPLE);
-  const uniMarker = path.join(outDir, ".node.pinned." + UNIVERSAL_TRIPLE);
-  const uniWant = NODE_VERSION + " " + UNIVERSAL_SLICES.map((t) => PINNED_NODE_SHA256[t] ?? "?").join("+") + "\n";
-  const uniCurrent = (await exists(universal)) && (await exists(uniMarker))
-    ? await readFile(uniMarker, "utf8").catch(() => "")
-    : "";
+  const slices = UNIVERSAL_SLICES.map((t) => path.join(outDir, `node-${t}`));
+  const universal = path.join(outDir, `node-${UNIVERSAL_TRIPLE}`);
+  const uniMarker = path.join(outDir, `.node.pinned.${UNIVERSAL_TRIPLE}`);
+  const uniWant = `${NODE_VERSION} ${UNIVERSAL_SLICES.map((t) => PINNED_NODE_SHA256[t] ?? "?").join("+")}\n`;
+  const uniCurrent =
+    (await exists(universal)) && (await exists(uniMarker))
+      ? await readFile(uniMarker, "utf8").catch(() => "")
+      : "";
   if (uniCurrent === uniWant) {
     console.log("[fetch-node] universal sidecar already present:", path.basename(universal));
   } else {

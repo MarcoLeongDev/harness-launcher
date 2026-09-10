@@ -1,18 +1,17 @@
 // Harness Launcher overlay — floating control panel, bottom-left of the harness WebUI.
 // Injected at documentStart by the Rust shell (initialization_script).
-(function () {
-  'use strict';
+(() => {
   if (window.__DSH_LAUNCHER_OVERLAY__) return;
   window.__DSH_LAUNCHER_OVERLAY__ = true;
   // Do not inject into launcher-owned pages (Control Panel / stopped page).
-  if (window.location.protocol === 'dsh-ui:') return;
+  if (window.location.protocol === "dsh-ui:") return;
 
   function invoke(cmd, args) {
-    const core = window.__TAURI__ && window.__TAURI__.core;
-    if (core && typeof core.invoke === 'function') return core.invoke(cmd, args || {});
-    if (window.__TAURI_INTERNALS__ && typeof window.__TAURI_INTERNALS__.invoke === 'function')
+    const core = window.__TAURI__?.core;
+    if (core && typeof core.invoke === "function") return core.invoke(cmd, args || {});
+    if (window.__TAURI_INTERNALS__ && typeof window.__TAURI_INTERNALS__.invoke === "function")
       return window.__TAURI_INTERNALS__.invoke(cmd, args || {}, undefined);
-    return Promise.reject(new Error('Tauri IPC unavailable in this context'));
+    return Promise.reject(new Error("Tauri IPC unavailable in this context"));
   }
 
   const css = `
@@ -80,12 +79,12 @@
   #dsh-lc button.sm { padding: 2px 8px; font-size: 11px; }
   `;
 
-  const styleEl = document.createElement('style');
+  const styleEl = document.createElement("style");
   styleEl.textContent = css;
   document.head.appendChild(styleEl);
 
-  const rootEl = document.createElement('div');
-  rootEl.id = 'dsh-lc';
+  const rootEl = document.createElement("div");
+  rootEl.id = "dsh-lc";
   rootEl.innerHTML = `
     <div id="dsh-lc-panel">
       <div class="meta"><a id="lc-repo" class="repo" href="https://github.com/MarcoLeongDev/harness-launcher" target="_blank" rel="noreferrer noopener" title="Open Harness Launcher on GitHub"><span class="big">Harness Launcher</span><span id="lc-ver" class="hint"></span></a></div>
@@ -157,39 +156,48 @@
   `;
   document.body.appendChild(rootEl);
 
-  const $ = (id) => rootEl.querySelector('#' + id);
-  const panel = rootEl.querySelector('#dsh-lc-panel');
-  const toggle = rootEl.querySelector('#dsh-lc-toggle');
-  const dot = rootEl.querySelector('#dsh-lc-dot');
-  const msg = $('lc-msg');
+  const $ = (id) => rootEl.querySelector(`#${id}`);
+  const panel = rootEl.querySelector("#dsh-lc-panel");
+  const toggle = rootEl.querySelector("#dsh-lc-toggle");
+  const dot = rootEl.querySelector("#dsh-lc-dot");
+  const msg = $("lc-msg");
   let logsVisible = false;
   let pollTimer = null;
 
-  function setMsg(text, isErr) { msg.textContent = text || ''; msg.className = isErr ? 'err' : (text ? 'hint' : 'hint'); }
-  function busy(btn, on) { if (btn) btn.disabled = on; }
+  function setMsg(text, isErr) {
+    msg.textContent = text || "";
+    msg.className = isErr ? "err" : text ? "hint" : "hint";
+  }
+  function busy(btn, on) {
+    if (btn) btn.disabled = on;
+  }
 
-  function stateDot(ok) { dot.className = ok ? 'ok' : 'err'; }
+  function stateDot(ok) {
+    dot.className = ok ? "ok" : "err";
+  }
 
-  var downloadingOps = { install: 1, update: 1, rollback: 1 };
-  var downloadingPhases = { registry: 1, installing: 1, verifying: 1 };
-  var termOpKey = null;
+  const downloadingOps = { install: 1, update: 1, rollback: 1 };
+  const downloadingPhases = { registry: 1, installing: 1, verifying: 1 };
+  let termOpKey = null;
 
-  function isDownloading(p) { return !!(p && downloadingOps[p.op] && downloadingPhases[p.phase]); }
+  function isDownloading(p) {
+    return !!(p && downloadingOps[p.op] && downloadingPhases[p.phase]);
+  }
 
   function showTerminal(show, op) {
-    $('lc-term').classList.toggle('on', !!show);
+    $("lc-term").classList.toggle("on", !!show);
     if (show && op) {
-      $('lc-termtitle').textContent = 'Harness Launcher #';
-      $('lc-termout').innerHTML = '';
+      $("lc-termtitle").textContent = "Harness Launcher #";
+      $("lc-termout").innerHTML = "";
     }
   }
   function appendTermLine(stream, text) {
-    var t = $('lc-term');
-    if (!t.classList.contains('on')) return;
-    var ln = document.createElement('span');
-    ln.className = 'ln ' + (stream === 'err' ? 'err' : stream === 'info' ? 'info' : 'out');
+    const t = $("lc-term");
+    if (!t.classList.contains("on")) return;
+    const ln = document.createElement("span");
+    ln.className = `ln ${stream === "err" ? "err" : stream === "info" ? "info" : "out"}`;
     ln.textContent = text;
-    var out = $('lc-termout');
+    const out = $("lc-termout");
     out.appendChild(ln);
     while (out.childElementCount > 400) out.removeChild(out.firstChild);
     out.scrollTop = out.scrollHeight;
@@ -197,21 +205,27 @@
 
   function applyProgress(p) {
     if (!p) {
-      $('lc-prog').style.display = 'none';
+      $("lc-prog").style.display = "none";
       showTerminal(false);
       return;
     }
-    $('lc-prog').style.display = 'block';
-    $('lc-progphase').textContent = p.phase || '';
-    $('lc-progmsg').textContent = p.message || '';
-    if (typeof p.percent === 'number') $('lc-progbar').style.width = Math.max(0, Math.min(100, p.percent)) + '%';
+    $("lc-prog").style.display = "block";
+    $("lc-progphase").textContent = p.phase || "";
+    $("lc-progmsg").textContent = p.message || "";
+    if (typeof p.percent === "number")
+      $("lc-progbar").style.width = `${Math.max(0, Math.min(100, p.percent))}%`;
     if (isDownloading(p)) {
-      var key = p.op + ':' + (p.version || '');
-      if (termOpKey !== key) { termOpKey = key; showTerminal(true, p); }
-      else { showTerminal(true); }
-    }
-    else if (p.phase === 'done' || p.phase === 'failed' || p.phase === 'cancelled') {
-      setTimeout(function () { showTerminal(false); }, 2500);
+      const key = `${p.op}:${p.version || ""}`;
+      if (termOpKey !== key) {
+        termOpKey = key;
+        showTerminal(true, p);
+      } else {
+        showTerminal(true);
+      }
+    } else if (p.phase === "done" || p.phase === "failed" || p.phase === "cancelled") {
+      setTimeout(() => {
+        showTerminal(false);
+      }, 2500);
     } else if (!downloadingOps[p.op]) {
       showTerminal(false);
     }
@@ -219,90 +233,131 @@
 
   async function refreshStatus() {
     try {
-      const s = await invoke('get_status');
-      const ep = s.enginePhase || (s.running ? 'running' : 'stopped');
-      $('lc-state').textContent = ep;
-      stateDot(ep === 'running');
-      $('lc-start').disabled = ep !== 'stopped';
+      const s = await invoke("get_status");
+      const ep = s.enginePhase || (s.running ? "running" : "stopped");
+      $("lc-state").textContent = ep;
+      stateDot(ep === "running");
+      $("lc-start").disabled = ep !== "stopped";
       // Least privilege: the harness window may not mutate versions, engine
       // state (beyond start), ports or the app — those commands require the
       // Control Panel. Reflect that here so buttons never promise otherwise.
-      var ro = 'Available in the Control Panel';
-      ['lc-install', 'lc-delete', 'lc-update', 'lc-rollback',
-       'lc-apply-port', 'lc-port',
-       'lc-stop', 'lc-restart', 'lc-quit'].forEach(function (id) {
-        var b = $(id);
-        if (b) { b.disabled = true; b.title = ro; }
+      const ro = "Available in the Control Panel";
+      [
+        "lc-install",
+        "lc-delete",
+        "lc-update",
+        "lc-rollback",
+        "lc-apply-port",
+        "lc-port",
+        "lc-stop",
+        "lc-restart",
+        "lc-quit",
+      ].forEach((id) => {
+        const b = $(id);
+        if (b) {
+          b.disabled = true;
+          b.title = ro;
+        }
       });
       applyProgress(s.currentOp || null);
       // Window opened mid-download: seed the terminal with the snapshot.
-      if (isDownloading(s.currentOp) && !$('lc-termout').childElementCount && s.console && s.console.length) {
+      if (isDownloading(s.currentOp) && !$("lc-termout").childElementCount && s.console?.length) {
         showTerminal(true, s.currentOp);
-        s.console.forEach(function (line) { appendTermLine(line.stream || 'out', line.text); });
+        s.console.forEach((line) => {
+          appendTermLine(line.stream || "out", line.text);
+        });
       }
-      $('lc-active').textContent = s.activeVersion ? 'v' + s.activeVersion : '(none)';
-      $('lc-ver').textContent = s.launcherVersion ? 'app v' + s.launcherVersion : '';
+      $("lc-active").textContent = s.activeVersion ? `v${s.activeVersion}` : "(none)";
+      $("lc-ver").textContent = s.launcherVersion ? `app v${s.launcherVersion}` : "";
       if (s.actualPort) {
         // Prefer the authenticated URL the engine printed (token engines
         // 401 on the plain URL); fall back to constructing it.
-        const url = s.webUrl || ('http://127.0.0.1:' + s.actualPort);
-        const a = $('lc-url'); a.textContent = url.replace('http://', ''); a.href = url;
-        $('lc-actual').textContent = 'in use: ' + s.actualPort + (s.portChanged ? ' (fallback)' : '');
-        if ($('lc-port').value === '') $('lc-port').value = String(s.port);
+        const url = s.webUrl || `http://127.0.0.1:${s.actualPort}`;
+        const a = $("lc-url");
+        a.textContent = url.replace("http://", "");
+        a.href = url;
+        $("lc-actual").textContent = `in use: ${s.actualPort}${s.portChanged ? " (fallback)" : ""}`;
+        if ($("lc-port").value === "") $("lc-port").value = String(s.port);
       }
       if (s.updateAvailable) {
-        setMsg('Update available: v' + s.latestRemote + ' (' + (s.activeVersion || '?') + ' -> ' + s.latestRemote + ')', false);
+        setMsg(
+          "Update available: v" +
+            s.latestRemote +
+            " (" +
+            (s.activeVersion || "?") +
+            " -> " +
+            s.latestRemote +
+            ")",
+          false,
+        );
       }
       fillVersions(s);
       fillSettings(s);
       populatePreRelease(s.includePrerelease);
-      const rb = $('lc-rollback'); rb.disabled = !s.previousVersion;
-      rb.title = s.previousVersion ? 'Rollback to v' + s.previousVersion : 'No previous version installed';
+      const rb = $("lc-rollback");
+      rb.disabled = !s.previousVersion;
+      rb.title = s.previousVersion ? `Rollback to v${s.previousVersion}` : "No previous version installed";
       updateDeleteState(s);
     } catch (e) {
       stateDot(false);
-      $('lc-state').textContent = 'error';
-      setMsg(String(e && e.message || e), true);
+      $("lc-state").textContent = "error";
+      setMsg(String(e?.message || e), true);
     }
   }
 
   function fillSettings(s) {
-    if ($('lc-port').value === '' && s.port) $('lc-port').value = String(s.port);
+    if ($("lc-port").value === "" && s.port) $("lc-port").value = String(s.port);
   }
-  function populatePreRelease(on) { $('lc-prerelease').checked = !!on; }
+  function populatePreRelease(on) {
+    $("lc-prerelease").checked = !!on;
+  }
 
   // Track the selected version so the Delete button is only usable on an
   // installed, non-active version.
-  var selMeta = { installed: false, active: false, version: null };
+  const selMeta = { installed: false, active: false, version: null };
   function updateDeleteState(s) {
-    var v = $('lc-versions').value;
+    const v = $("lc-versions").value;
     selMeta.version = v;
     selMeta.installed = !!(s.installedVersions && s.installedVersions.indexOf(v) !== -1);
     selMeta.active = s.activeVersion === v;
-    var del = $('lc-delete');
-    var hint = $('lc-deletehint');
-    if (s.currentOp) { del.disabled = true; hint.textContent = 'busy — try again after the operation finishes'; }
-    else if (!v) { del.disabled = true; hint.textContent = 'select a version'; }
-    else if (selMeta.active) { del.disabled = true; hint.textContent = 'the active version cannot be deleted'; }
-    else if (!selMeta.installed) { del.disabled = true; hint.textContent = 'v' + v + ' is not installed'; }
-    else { del.disabled = false; hint.textContent = 'removes the local install of v' + v; }
-    del.removeAttribute('data-arm');
-    del.textContent = 'Delete selected';
+    const del = $("lc-delete");
+    const hint = $("lc-deletehint");
+    if (s.currentOp) {
+      del.disabled = true;
+      hint.textContent = "busy — try again after the operation finishes";
+    } else if (!v) {
+      del.disabled = true;
+      hint.textContent = "select a version";
+    } else if (selMeta.active) {
+      del.disabled = true;
+      hint.textContent = "the active version cannot be deleted";
+    } else if (!selMeta.installed) {
+      del.disabled = true;
+      hint.textContent = `v${v} is not installed`;
+    } else {
+      del.disabled = false;
+      hint.textContent = `removes the local install of v${v}`;
+    }
+    del.removeAttribute("data-arm");
+    del.textContent = "Delete selected";
   }
 
-  let remoteVersions = [];
+  let _remoteVersions = [];
   function fillVersions(s) {
-    const sel = $('lc-versions');
+    const sel = $("lc-versions");
     const all = s.versions || [];
-    remoteVersions = all;
+    _remoteVersions = all;
     const currentSel = sel.value;
-    sel.innerHTML = '';
-    const opts = all.map(function (v) {
-      const o = document.createElement('option');
-      o.value = v; o.textContent = 'v' + v + (s.installedVersions && s.installedVersions.indexOf(v) !== -1 ? ' (installed)' : '');
+    sel.innerHTML = "";
+    const opts = all.map((v) => {
+      const o = document.createElement("option");
+      o.value = v;
+      o.textContent = `v${v}${s.installedVersions && s.installedVersions.indexOf(v) !== -1 ? " (installed)" : ""}`;
       return o;
     });
-    opts.forEach(function (o) { sel.appendChild(o); });
+    opts.forEach((o) => {
+      sel.appendChild(o);
+    });
     if (currentSel && all.indexOf(currentSel) !== -1) sel.value = currentSel;
     else if (s.latestRemote && all.indexOf(s.latestRemote) !== -1) sel.value = s.latestRemote;
   }
@@ -311,20 +366,20 @@
     busy(btn, true);
     try {
       const res = await fn();
-      setMsg(res || 'done', false);
+      setMsg(res || "done", false);
       await refreshStatus();
       return res;
     } catch (e) {
-      setMsg(String(e && e.message || e), true);
+      setMsg(String(e?.message || e), true);
     } finally {
       busy(btn, false);
     }
   }
 
-  toggle.addEventListener('click', function () {
-    panel.classList.toggle('open');
+  toggle.addEventListener("click", () => {
+    panel.classList.toggle("open");
     refreshStatus();
-    if (panel.classList.contains('open')) {
+    if (panel.classList.contains("open")) {
       pollTimer = setInterval(refreshStatus, 4000);
     } else if (pollTimer) {
       clearInterval(pollTimer);
@@ -332,95 +387,143 @@
     }
   });
 
-  $('lc-install').addEventListener('click', function () {
-    const v = $('lc-versions').value;
-    if (!v) return setMsg('select a version', true);
-    withBusy(this, function () { return invoke('install_and_switch', { version: v }); });
+  $("lc-install").addEventListener("click", function () {
+    const v = $("lc-versions").value;
+    if (!v) return setMsg("select a version", true);
+    withBusy(this, () => invoke("install_and_switch", { version: v }));
   });
 
-  $('lc-update').addEventListener('click', function () {
-    withBusy(this, function () { return invoke('update_to_latest', {}); });
+  $("lc-update").addEventListener("click", function () {
+    withBusy(this, () => invoke("update_to_latest", {}));
   });
 
-  $('lc-rollback').addEventListener('click', function () {
-    withBusy(this, function () { return invoke('rollback', {}); });
+  $("lc-rollback").addEventListener("click", function () {
+    withBusy(this, () => invoke("rollback", {}));
   });
 
   // Delete the currently selected version (two-step confirm).
-  $('lc-delete').addEventListener('click', function () {
-    var v = $('lc-versions').value;
-    if (!v) return setMsg('select a version first', true);
-    if (this.getAttribute('data-arm') !== '1') {
-      this.setAttribute('data-arm', '1');
-      this.textContent = 'Confirm delete v' + v + '?';
-      setTimeout(function () { $('lc-delete').removeAttribute('data-arm'); $('lc-delete').textContent = 'Delete selected'; }, 3500);
+  $("lc-delete").addEventListener("click", function () {
+    const v = $("lc-versions").value;
+    if (!v) return setMsg("select a version first", true);
+    if (this.getAttribute("data-arm") !== "1") {
+      this.setAttribute("data-arm", "1");
+      this.textContent = `Confirm delete v${v}?`;
+      setTimeout(() => {
+        $("lc-delete").removeAttribute("data-arm");
+        $("lc-delete").textContent = "Delete selected";
+      }, 3500);
       return;
     }
-    var btn = this;
-    btn.removeAttribute('data-arm');
-    btn.textContent = 'Delete selected';
-    btn.disabled = true;
-    invoke('delete_version', { version: v }).then(function (res) {
-      setMsg((res && res.message) || 'version deleted', false);
-      return refreshStatus();
-    }).catch(function (e) {
-      setMsg(String(e && e.message || e), true);
-    }).finally(function () { btn.disabled = false; });
+    this.removeAttribute("data-arm");
+    this.textContent = "Delete selected";
+    this.disabled = true;
+    invoke("delete_version", { version: v })
+      .then((res) => {
+        setMsg(res?.message || "version deleted", false);
+        return refreshStatus();
+      })
+      .catch((e) => {
+        setMsg(String(e?.message || e), true);
+      })
+      .finally(() => {
+        this.disabled = false;
+      });
   });
 
-  $('lc-apply-port').addEventListener('click', function () {
-    const port = parseInt($('lc-port').value, 10);
-    if (!port || port < 1 || port > 65535) return setMsg('invalid port', true);
-    withBusy(this, function () { return invoke('set_port', { port: port }); });
+  $("lc-apply-port").addEventListener("click", function () {
+    const port = parseInt($("lc-port").value, 10);
+    if (!port || port < 1 || port > 65535) return setMsg("invalid port", true);
+    withBusy(this, () => invoke("set_port", { port: port }));
   });
 
-  $('lc-prerelease').addEventListener('change', function () {
-    invoke('set_prerelease', { include: this.checked }).then(refreshStatus).catch(function (e) { setMsg(String(e.message || e), true); });
+  $("lc-prerelease").addEventListener("change", function () {
+    invoke("set_prerelease", { include: this.checked })
+      .then(refreshStatus)
+      .catch((e) => {
+        setMsg(String(e.message || e), true);
+      });
   });
 
-  $('lc-check').addEventListener('click', function () {
-    withBusy(this, function () { return invoke('check_updates', {}); });
+  $("lc-check").addEventListener("click", function () {
+    withBusy(this, () => invoke("check_updates", {}));
   });
 
-  $('lc-logrefresh').addEventListener('click', function () {
+  $("lc-logrefresh").addEventListener("click", function () {
     busy(this, true);
-    invoke('tail_logs', { lines: 200 }).then(function (text) {
-      $('lc-logs').textContent = text || '(no logs yet)';
-    }).catch(function (e) { setMsg(String(e.message || e), true); }).finally(function () { busy($('lc-logrefresh'), false); });
+    invoke("tail_logs", { lines: 200 })
+      .then((text) => {
+        $("lc-logs").textContent = text || "(no logs yet)";
+      })
+      .catch((e) => {
+        setMsg(String(e.message || e), true);
+      })
+      .finally(() => {
+        busy($("lc-logrefresh"), false);
+      });
   });
-  $('lc-logtoggle').addEventListener('click', function () {
+  $("lc-logtoggle").addEventListener("click", () => {
     logsVisible = !logsVisible;
-    $('lc-logs').style.display = logsVisible ? 'block' : 'none';
+    $("lc-logs").style.display = logsVisible ? "block" : "none";
   });
 
   // Brand line (app name, launcher version): opens the project GitHub page.
   // preventDefault keeps the harness view in place; falls back to a plain
   // new-tab open when Tauri IPC is unavailable in this context.
-  $('lc-repo').addEventListener('click', function (e) {
+  $("lc-repo").addEventListener("click", (e) => {
     e.preventDefault();
-    invoke('open_repo_page', {}).catch(function () {
-      window.open('https://github.com/MarcoLeongDev/harness-launcher', '_blank', 'noopener');
+    invoke("open_repo_page", {}).catch(() => {
+      window.open("https://github.com/MarcoLeongDev/harness-launcher", "_blank", "noopener");
     });
   });
-  $('lc-browser').addEventListener('click', function () { invoke('open_in_browser', {}).catch(function (e) { setMsg(String(e.message || e), true); }); });
-  $('lc-restart').addEventListener('click', function () { withBusy(this, function () { return invoke('restart_harness', {}); }); });
-  $('lc-quit').addEventListener('click', function () { invoke('quit_app', {}); });
+  $("lc-browser").addEventListener("click", () => {
+    invoke("open_in_browser", {}).catch((e) => {
+      setMsg(String(e.message || e), true);
+    });
+  });
+  $("lc-restart").addEventListener("click", function () {
+    withBusy(this, () => invoke("restart_harness", {}));
+  });
+  $("lc-quit").addEventListener("click", () => {
+    invoke("quit_app", {});
+  });
 
-  $('lc-start').addEventListener('click', function () { withBusy(this, function () { return invoke('engine_start', {}); }); });
-  $('lc-stop').addEventListener('click', function () { withBusy(this, function () { return invoke('engine_stop', {}); }); });
-  $('lc-settings').addEventListener('click', function () { invoke('open_settings', {}).catch(function (e) { setMsg(String(e.message || e), true); }); });
+  $("lc-start").addEventListener("click", function () {
+    withBusy(this, () => invoke("engine_start", {}));
+  });
+  $("lc-stop").addEventListener("click", function () {
+    withBusy(this, () => invoke("engine_stop", {}));
+  });
+  $("lc-settings").addEventListener("click", () => {
+    invoke("open_settings", {}).catch((e) => {
+      setMsg(String(e.message || e), true);
+    });
+  });
 
-  var lcEvents = window.__TAURI__ && window.__TAURI__.event;
-  if (lcEvents && typeof lcEvents.listen === 'function') {
-    lcEvents.listen('launcher://progress', function (e) { applyProgress(e.payload || null); }).catch(function () {});
-    lcEvents.listen('launcher://console', function (e) {
-      var line = e && e.payload;
-      if (line && line.text) appendTermLine(line.stream || 'out', line.text);
-    }).catch(function () {});
-    lcEvents.listen('launcher://status', function () { refreshStatus(); }).catch(function () {});
+  const lcEvents = window.__TAURI__?.event;
+  if (lcEvents && typeof lcEvents.listen === "function") {
+    lcEvents
+      .listen("launcher://progress", (e) => {
+        applyProgress(e.payload || null);
+      })
+      .catch(() => {});
+    lcEvents
+      .listen("launcher://console", (e) => {
+        const line = e?.payload;
+        if (line?.text) appendTermLine(line.stream || "out", line.text);
+      })
+      .catch(() => {});
+    lcEvents
+      .listen("launcher://status", () => {
+        refreshStatus();
+      })
+      .catch(() => {});
   }
 
-  $('lc-versions').addEventListener('change', function () { refreshStatus(); });
+  $("lc-versions").addEventListener("change", () => {
+    refreshStatus();
+  });
 
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') panel.classList.remove('open'); });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") panel.classList.remove("open");
+  });
 })();

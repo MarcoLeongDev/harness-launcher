@@ -5,8 +5,8 @@
 // Run automatically by scripts/prepare.mjs (dev and build).
 import { execFileSync } from "node:child_process";
 import { mkdir, rm, stat, writeFile } from "node:fs/promises";
-import path from "node:path";
 import os from "node:os";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -26,8 +26,8 @@ const SYMBOLS = [
 
 await rm(outDir, { recursive: true, force: true });
 await mkdir(outDir, { recursive: true });
-const manifest = SYMBOLS.map(([item, symbol]) => ({ symbol, out: path.join(outDir, item + ".png") }));
-const tmp = path.join(os.tmpdir(), "dsh-symbols-" + process.pid + ".json");
+const manifest = SYMBOLS.map(([item, symbol]) => ({ symbol, out: path.join(outDir, `${item}.png`) }));
+const tmp = path.join(os.tmpdir(), `dsh-symbols-${process.pid}.json`);
 await writeFile(tmp, JSON.stringify(manifest));
 try {
   execFileSync("/usr/bin/swift", [swift, tmp], { stdio: "inherit" });
@@ -41,4 +41,4 @@ for (const m of manifest) {
     process.exit(5);
   }
 }
-console.log("[gen-symbols] wrote " + manifest.length + " symbol PNGs to " + outDir);
+console.log(`[gen-symbols] wrote ${manifest.length} symbol PNGs to ${outDir}`);

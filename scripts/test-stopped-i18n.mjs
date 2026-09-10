@@ -6,25 +6,28 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-var root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-var html = readFileSync(path.join(root, "src-tauri", "resources", "stopped.html"), "utf8");
-var failures = 0;
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const html = readFileSync(path.join(root, "src-tauri", "resources", "stopped.html"), "utf8");
+let failures = 0;
 function check(name, cond, extra) {
-  if (cond) console.log("  PASS " + name);
-  else { failures++; console.error("  FAIL " + name + " " + (extra || "")); }
+  if (cond) console.log(`  PASS ${name}`);
+  else {
+    failures++;
+    console.error(`  FAIL ${name} ${extra || ""}`);
+  }
 }
 console.log("stopped-i18n: locales");
-var langs = ["en", "zh-Hant", "zh-Hans", "ja", "es"];
-var i;
+const langs = ["en", "zh-Hant", "zh-Hans", "ja", "es"];
+let i;
 for (i = 0; i < langs.length; i++) {
-  var present = html.indexOf(langs[i] + ": {") !== -1 || html.indexOf("\"" + langs[i] + "\": {") !== -1;
-  check("locale " + langs[i] + " present", present);
+  const present = html.indexOf(`${langs[i]}: {`) !== -1 || html.indexOf(`"${langs[i]}": {`) !== -1;
+  check(`locale ${langs[i]} present`, present);
 }
-var keys = ["title", "stoppedSub", "stoppedDesc", "startEngine", "openPanel", "brandGithub", "logoAlt"];
+const keys = ["title", "stoppedSub", "stoppedDesc", "startEngine", "openPanel", "brandGithub", "logoAlt"];
 console.log("stopped-i18n: keys");
 for (i = 0; i < keys.length; i++) {
-  var count = html.split(keys[i] + ":").length - 1;
-  check("key " + keys[i] + " in all 5 locales", count >= 5, "found " + count);
+  const count = html.split(`${keys[i]}:`).length - 1;
+  check(`key ${keys[i]} in all 5 locales`, count >= 5, `found ${count}`);
 }
 console.log("stopped-i18n: wiring");
 check("splash sub uses data-i18n", html.indexOf('data-i18n="stoppedSub"') !== -1);
@@ -38,5 +41,8 @@ check("reads saved language via get_status", html.indexOf("get_status") !== -1);
 check("English fallback for unknown codes", html.indexOf("LOCALES[l]") !== -1 && html.indexOf("en") !== -1);
 check("repaints document title", html.indexOf("document.title") !== -1);
 check("no hardcoded English-only splash", html.indexOf("The harness engine is stopped") !== -1);
-if (failures > 0) { console.error("test-stopped-i18n: " + failures + " failures"); process.exit(1); }
+if (failures > 0) {
+  console.error(`test-stopped-i18n: ${failures} failures`);
+  process.exit(1);
+}
 console.log("test-stopped-i18n: all green");

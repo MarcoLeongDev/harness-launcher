@@ -5,60 +5,65 @@
 // overlay panel cannot rely on page cooperation. Fully self-contained: no IPC,
 // no network, no page-JS interaction — DOM reads/writes only, plus one
 // per-origin localStorage key for the zoom level.
-(function () {
-  'use strict';
+(() => {
   if (window.__DSH_FINDZOOM__) return;
   window.__DSH_FINDZOOM__ = true;
 
-  var FIND_BAR_ID = 'dsh-fz-bar';
-  var ZOOM_BADGE_ID = 'dsh-fz-zoom';
-  var ZOOM_KEY = 'dsh-zoom';
-  var MIN_ZOOM = 50;
-  var MAX_ZOOM = 200;
-  var ZOOM_STEP = 10;
+  const FIND_BAR_ID = "dsh-fz-bar";
+  const ZOOM_BADGE_ID = "dsh-fz-zoom";
+  const ZOOM_KEY = "dsh-zoom";
+  const MIN_ZOOM = 50;
+  const MAX_ZOOM = 200;
+  const ZOOM_STEP = 10;
 
   // The DOM may not exist yet at documentStart: queue DOM work until ready.
   function onReady(fn) {
-    if (document.readyState !== 'loading') fn();
-    else document.addEventListener('DOMContentLoaded', fn, { once: true });
+    if (document.readyState !== "loading") fn();
+    else document.addEventListener("DOMContentLoaded", fn, { once: true });
   }
 
   // ---- Zoom ---------------------------------------------------------------
   function readZoom() {
-    var z = 100;
+    let z = 100;
     try {
-      var raw = window.localStorage.getItem(ZOOM_KEY);
+      const raw = window.localStorage.getItem(ZOOM_KEY);
       if (raw !== null) z = parseInt(raw, 10);
-    } catch (e) { /* storage unavailable: session-only zoom */ }
-    if (isNaN(z)) z = 100;
+    } catch (_e) {
+      /* storage unavailable: session-only zoom */
+    }
+    if (Number.isNaN(z)) z = 100;
     return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z));
   }
 
   function applyZoom(z) {
     z = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(z)));
     try {
-      if (document.documentElement) document.documentElement.style.zoom = z + '%';
-    } catch (e) { /* headless/shadow contexts */ }
+      if (document.documentElement) document.documentElement.style.zoom = `${z}%`;
+    } catch (_e) {
+      /* headless/shadow contexts */
+    }
     try {
       window.localStorage.setItem(ZOOM_KEY, String(z));
-    } catch (e) { /* ignore */ }
+    } catch (_e) {
+      /* ignore */
+    }
     return z;
   }
 
-  var badgeTimer = null;
+  let badgeTimer = null;
   function showZoomBadge(z) {
-    var badge = document.getElementById(ZOOM_BADGE_ID);
+    const badge = document.getElementById(ZOOM_BADGE_ID);
     if (!badge) return;
-    badge.textContent = z + '%';
-    badge.classList.add('on');
+    badge.textContent = `${z}%`;
+    badge.classList.add("on");
     if (badgeTimer) clearTimeout(badgeTimer);
-    badgeTimer = setTimeout(function () {
-      badge.classList.remove('on');
+    badgeTimer = setTimeout(() => {
+      badge.classList.remove("on");
     }, 1200);
   }
 
-  var currentZoom = readZoom();
-  onReady(function () {
+  let currentZoom = readZoom();
+  onReady(() => {
     currentZoom = applyZoom(currentZoom); // restore persisted level, no badge
   });
 
@@ -72,20 +77,20 @@
   }
 
   // ---- Find bar ------------------------------------------------------------
-  var lastQuery = '';
-  var searchedQuery = null; // query currently reflected by selection/highlights
-  var lastIndex = 0; // 1-based index of the current match for the count label
-  var totalMatches = 0;
-  var debounceTimer = null;
-  var savedFocus = null;
+  let lastQuery = "";
+  let searchedQuery = null; // query currently reflected by selection/highlights
+  let lastIndex = 0; // 1-based index of the current match for the count label
+  let totalMatches = 0;
+  let debounceTimer = null;
+  let savedFocus = null;
 
   function uiRoot() {
     return document.getElementById(FIND_BAR_ID);
   }
 
   function isUiNode(node) {
-    var bar = uiRoot();
-    var badge = document.getElementById(ZOOM_BADGE_ID);
+    const bar = uiRoot();
+    const badge = document.getElementById(ZOOM_BADGE_ID);
     while (node) {
       if (node === bar || node === badge) return true;
       node = node.parentNode;
@@ -98,39 +103,44 @@
   // non-rendered elements.
   function countMatches(query) {
     if (!query) return 0;
-    var q = query.toLowerCase();
-    var count = 0;
-    var walker;
+    const q = query.toLowerCase();
+    let count = 0;
+    let walker;
     try {
-      walker = document.createTreeWalker(document.body || document.documentElement,
-        NodeFilter.SHOW_TEXT, {
-          acceptNode: function (node) {
-            if (!node.nodeValue || node.nodeValue.toLowerCase().indexOf(q) === -1) {
-              return NodeFilter.FILTER_SKIP;
-            }
-            var parent = node.parentNode;
-            if (!parent) return NodeFilter.FILTER_REJECT;
-            var tag = parent.nodeName;
-            if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'NOSCRIPT' ||
-                tag === 'TEXTAREA' || tag === 'INPUT') {
-              return NodeFilter.FILTER_REJECT;
-            }
-            if (isUiNode(node)) return NodeFilter.FILTER_REJECT;
-            return NodeFilter.FILTER_ACCEPT;
+      walker = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_TEXT, {
+        acceptNode: (node) => {
+          if (!node.nodeValue || node.nodeValue.toLowerCase().indexOf(q) === -1) {
+            return NodeFilter.FILTER_SKIP;
           }
-        });
-    } catch (e) {
+          const parent = node.parentNode;
+          if (!parent) return NodeFilter.FILTER_REJECT;
+          const tag = parent.nodeName;
+          if (
+            tag === "SCRIPT" ||
+            tag === "STYLE" ||
+            tag === "NOSCRIPT" ||
+            tag === "TEXTAREA" ||
+            tag === "INPUT"
+          ) {
+            return NodeFilter.FILTER_REJECT;
+          }
+          if (isUiNode(node)) return NodeFilter.FILTER_REJECT;
+          return NodeFilter.FILTER_ACCEPT;
+        },
+      });
+    } catch (_e) {
       return 0;
     }
-    var guard = 0;
+    let guard = 0;
     while (walker.nextNode()) {
-      var text = walker.currentNode.nodeValue.toLowerCase();
-      var from = 0;
-      var at;
-      while ((at = text.indexOf(q, from)) !== -1) {
+      const text = walker.currentNode.nodeValue.toLowerCase();
+      let from = 0;
+      let at = text.indexOf(q, from);
+      while (at !== -1) {
         count++;
         from = at + q.length;
         if (++guard > 20000) return count; // pathological pages: cap the walk
+        at = text.indexOf(q, from);
       }
       if (++guard > 20000) break;
     }
@@ -142,66 +152,83 @@
   function highlightAll(query) {
     try {
       clearHighlight();
-      if (!query || !('highlights' in CSS) || typeof Highlight === 'undefined' ||
-          typeof Range === 'undefined') {
+      if (
+        !query ||
+        !("highlights" in CSS) ||
+        typeof Highlight === "undefined" ||
+        typeof Range === "undefined"
+      ) {
         return;
       }
-      var q = query.toLowerCase();
-      var walker = document.createTreeWalker(document.body || document.documentElement,
-        NodeFilter.SHOW_TEXT, {
-          acceptNode: function (node) {
+      const q = query.toLowerCase();
+      const walker = document.createTreeWalker(
+        document.body || document.documentElement,
+        NodeFilter.SHOW_TEXT,
+        {
+          acceptNode: (node) => {
             if (!node.nodeValue || node.nodeValue.toLowerCase().indexOf(q) === -1) {
               return NodeFilter.FILTER_SKIP;
             }
-            var parent = node.parentNode;
+            const parent = node.parentNode;
             if (!parent) return NodeFilter.FILTER_REJECT;
-            var tag = parent.nodeName;
-            if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'NOSCRIPT' ||
-                tag === 'TEXTAREA' || tag === 'INPUT') {
+            const tag = parent.nodeName;
+            if (
+              tag === "SCRIPT" ||
+              tag === "STYLE" ||
+              tag === "NOSCRIPT" ||
+              tag === "TEXTAREA" ||
+              tag === "INPUT"
+            ) {
               return NodeFilter.FILTER_REJECT;
             }
             if (isUiNode(node)) return NodeFilter.FILTER_REJECT;
             return NodeFilter.FILTER_ACCEPT;
-          }
-        });
-      var ranges = [];
-      var guard = 0;
+          },
+        },
+      );
+      const ranges = [];
+      let guard = 0;
       while (walker.nextNode() && ranges.length < 1000) {
-        var node = walker.currentNode;
-        var text = node.nodeValue.toLowerCase();
-        var from = 0;
-        var at;
-        while ((at = text.indexOf(q, from)) !== -1 && ranges.length < 1000) {
-          var r = new Range();
+        const node = walker.currentNode;
+        const text = node.nodeValue.toLowerCase();
+        let from = 0;
+        let at = text.indexOf(q, from);
+        while (at !== -1 && ranges.length < 1000) {
+          const r = new Range();
           r.setStart(node, at);
           r.setEnd(node, at + q.length);
           ranges.push(r);
           from = at + q.length;
           if (++guard > 20000) break;
+          at = text.indexOf(q, from);
         }
         if (guard > 20000) break;
       }
-      if (ranges.length) CSS.highlights.set('dsh-find', new Highlight.apply(null, ranges));
-    } catch (e) { /* highlight is decorative; navigation still works */ }
+      if (ranges.length) CSS.highlights.set("dsh-find", new Highlight.apply(null, ranges));
+    } catch (_e) {
+      /* highlight is decorative; navigation still works */
+    }
   }
 
   function clearHighlight() {
     try {
-      if ('highlights' in CSS) CSS.highlights.delete('dsh-find');
-    } catch (e) { /* ignore */ }
+      if ("highlights" in CSS) CSS.highlights.delete("dsh-find");
+    } catch (_e) {
+      /* ignore */
+    }
   }
 
   function updateCount() {
-    var bar = uiRoot();
+    const bar = uiRoot();
     if (!bar) return;
-    var label = bar.querySelector('#dsh-fz-count');
+    const label = bar.querySelector("#dsh-fz-count");
     if (!label) return;
     if (!lastQuery) {
-      label.textContent = '';
+      label.textContent = "";
       return;
     }
-    if (totalMatches === 0) label.textContent = 'No results';
-    else label.textContent = Math.min(lastIndex, totalMatches) + ' of ' + totalMatches;
+    if (totalMatches === 0) label.textContent = "No results";
+    else label.textContent = `${Math.min(lastIndex, totalMatches)} of ${totalMatches}`;
   }
 
   // Navigate with the platform-native find (selection + scroll into view),
@@ -210,7 +237,7 @@
   function nativeFind(query, backwards) {
     try {
       return window.find(query, false, !!backwards, true, false, false, false);
-    } catch (e) {
+    } catch (_e) {
       return false;
     }
   }
@@ -221,24 +248,30 @@
       // Advance the "n of m" indicator in navigation order (wraps around).
       if (totalMatches > 0) {
         lastIndex = backwards
-          ? (lastIndex <= 1 ? totalMatches : lastIndex - 1)
-          : (lastIndex >= totalMatches ? 1 : lastIndex + 1);
+          ? lastIndex <= 1
+            ? totalMatches
+            : lastIndex - 1
+          : lastIndex >= totalMatches
+            ? 1
+            : lastIndex + 1;
       }
     }
     updateCount();
   }
 
   function runSearch() {
-    var bar = uiRoot();
+    const bar = uiRoot();
     if (!bar) return;
-    var input = bar.querySelector('#dsh-fz-input');
-    var query = input ? input.value : '';
+    const input = bar.querySelector("#dsh-fz-input");
+    const query = input ? input.value : "";
     lastQuery = query;
     totalMatches = countMatches(query);
     highlightAll(query);
     try {
       if (window.getSelection) window.getSelection().removeAllRanges();
-    } catch (e) { /* ignore */ }
+    } catch (_e) {
+      /* ignore */
+    }
     if (query && totalMatches > 0) {
       // Fresh search always lands on the first match (selection was cleared).
       lastIndex = 1;
@@ -255,43 +288,45 @@
   // out of the field mid-search: put it back while the bar is still open.
   // Focus on our own buttons (prev/next/close) is left alone.
   function guardFocus() {
-    var bar = uiRoot();
-    if (!bar || !bar.classList.contains('open')) return;
-    var field = bar.querySelector('#dsh-fz-input');
+    const bar = uiRoot();
+    if (!bar?.classList.contains("open")) return;
+    const field = bar.querySelector("#dsh-fz-input");
     if (!field) return;
-    var active = null;
+    let active = null;
     try {
       active = document.activeElement;
-    } catch (e) {
+    } catch (_e) {
       active = null;
     }
     if (active !== field && !isUiNode(active)) {
       try {
         field.focus();
-      } catch (e) { /* element may be gone */ }
+      } catch (_e) {
+        /* element may be gone */
+      }
     }
   }
 
   function scheduleSearch() {
     if (debounceTimer) clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(function () {
+    debounceTimer = setTimeout(() => {
       debounceTimer = null;
       runSearch();
     }, 150);
   }
 
   function openFind() {
-    var bar = uiRoot();
+    const bar = uiRoot();
     if (!bar) return;
-    if (!bar.classList.contains('open')) {
+    if (!bar.classList.contains("open")) {
       try {
         savedFocus = document.activeElement;
-      } catch (e) {
+      } catch (_e) {
         savedFocus = null;
       }
-      bar.classList.add('open');
+      bar.classList.add("open");
     }
-    var input = bar.querySelector('#dsh-fz-input');
+    const input = bar.querySelector("#dsh-fz-input");
     if (input) {
       input.focus();
       input.select();
@@ -302,46 +337,52 @@
   }
 
   function closeFind() {
-    var bar = uiRoot();
+    const bar = uiRoot();
     if (!bar) return;
-    bar.classList.remove('open');
-    lastQuery = '';
+    bar.classList.remove("open");
+    lastQuery = "";
     searchedQuery = null;
     totalMatches = 0;
     lastIndex = 0;
     clearHighlight();
     try {
       if (window.getSelection) window.getSelection().removeAllRanges();
-    } catch (e) { /* ignore */ }
+    } catch (_e) {
+      /* ignore */
+    }
     updateCount();
-    if (savedFocus && savedFocus.focus) {
+    if (savedFocus?.focus) {
       try {
         savedFocus.focus();
-      } catch (e) { /* element may be gone */ }
+      } catch (_e) {
+        /* element may be gone */
+      }
       savedFocus = null;
     }
     // Never leave focus on the now-hidden field: further keystrokes would go
     // nowhere visible, and Cmd+F would reselect instead of reopening.
     try {
-      var field = bar.querySelector('#dsh-fz-input');
+      const field = bar.querySelector("#dsh-fz-input");
       if (field && document.activeElement === field) {
-        if (document.body && typeof document.body.focus === 'function') {
+        if (document.body && typeof document.body.focus === "function") {
           document.body.focus();
-        } else if (typeof field.blur === 'function') {
+        } else if (typeof field.blur === "function") {
           field.blur();
         }
       }
-    } catch (e) { /* ignore */ }
+    } catch (_e) {
+      /* ignore */
+    }
   }
 
   function buildBar() {
     if (uiRoot()) return;
-    var root = document.body || document.documentElement;
+    const root = document.body || document.documentElement;
     if (!root) return;
-    var bar = document.createElement('div');
+    const bar = document.createElement("div");
     bar.id = FIND_BAR_ID;
-    bar.setAttribute('role', 'search');
-    bar.setAttribute('aria-label', 'Find in page');
+    bar.setAttribute("role", "search");
+    bar.setAttribute("aria-label", "Find in page");
     // Hidden until opened (Cmd/Ctrl+F); the `hidden`-like default keeps it out
     // of the tab order and out of assistive-tech browse mode when closed.
     bar.innerHTML =
@@ -352,35 +393,59 @@
       '<button id="dsh-fz-close" aria-label="Close find bar" title="Close (Esc)">&#10005;</button>';
     (document.body || root).appendChild(bar);
 
-    var input = bar.querySelector('#dsh-fz-input');
-    input.addEventListener('input', scheduleSearch);
+    const input = bar.querySelector("#dsh-fz-input");
+    input.addEventListener("input", scheduleSearch);
     // Swallow key events that must not reach the page (keypress/keyup have no
     // behavior of their own here; blocking them starves page-level thieves).
-    input.addEventListener('keypress', function (e) { e.stopPropagation(); });
-    input.addEventListener('keyup', function (e) { e.stopPropagation(); });
-    input.addEventListener('keydown', function (e) {
-      var mod = e.metaKey || e.ctrlKey;
-      var key = e.key;
+    input.addEventListener("keypress", (e) => {
+      e.stopPropagation();
+    });
+    input.addEventListener("keyup", (e) => {
+      e.stopPropagation();
+    });
+    input.addEventListener("keydown", (e) => {
+      const mod = e.metaKey || e.ctrlKey;
+      const key = e.key;
       // Modified keys other than our own shortcuts (copy/paste, etc.) keep
       // their default behavior and are page-irrelevant: let them through.
-      if (mod && key !== 'f' && key !== 'F' && key !== '+' && key !== '=' &&
-          key !== '-' && key !== '_' && key !== '0') {
+      if (
+        mod &&
+        key !== "f" &&
+        key !== "F" &&
+        key !== "+" &&
+        key !== "=" &&
+        key !== "-" &&
+        key !== "_" &&
+        key !== "0"
+      ) {
         return;
       }
       // Anything else typed here belongs to the find UI. Keep it from
       // bubbling to page listeners: web apps that refocus their composer on
       // any keydown would otherwise steal the field on every keystroke.
       e.stopPropagation();
-      if (mod && (key === 'f' || key === 'F')) {
+      if (mod && (key === "f" || key === "F")) {
         e.preventDefault();
         input.select();
         return;
       }
       // Zoom stays available while the find field has focus (as in browsers).
-      if (mod && (key === '+' || key === '=')) { e.preventDefault(); zoomBy(ZOOM_STEP); return; }
-      if (mod && (key === '-' || key === '_')) { e.preventDefault(); zoomBy(-ZOOM_STEP); return; }
-      if (mod && key === '0') { e.preventDefault(); zoomReset(); return; }
-      if (key === 'Enter') {
+      if (mod && (key === "+" || key === "=")) {
+        e.preventDefault();
+        zoomBy(ZOOM_STEP);
+        return;
+      }
+      if (mod && (key === "-" || key === "_")) {
+        e.preventDefault();
+        zoomBy(-ZOOM_STEP);
+        return;
+      }
+      if (mod && key === "0") {
+        e.preventDefault();
+        zoomReset();
+        return;
+      }
+      if (key === "Enter") {
         e.preventDefault();
         if (debounceTimer) {
           // Keystrokes still pending: flush the search first so Enter lands
@@ -393,58 +458,78 @@
         } else {
           findNavigate(!!e.shiftKey);
         }
-      } else if (e.key === 'Escape') {
+      } else if (e.key === "Escape") {
         e.preventDefault();
         closeFind();
       }
     });
-    bar.querySelector('#dsh-fz-prev').addEventListener('click', function () { findNavigate(true); });
-    bar.querySelector('#dsh-fz-next').addEventListener('click', function () { findNavigate(false); });
-    bar.querySelector('#dsh-fz-close').addEventListener('click', closeFind);
+    bar.querySelector("#dsh-fz-prev").addEventListener("click", () => {
+      findNavigate(true);
+    });
+    bar.querySelector("#dsh-fz-next").addEventListener("click", () => {
+      findNavigate(false);
+    });
+    bar.querySelector("#dsh-fz-close").addEventListener("click", closeFind);
   }
 
   function injectStyles() {
-    if (document.getElementById('dsh-fz-style')) return;
-    var head = document.head || document.documentElement;
+    if (document.getElementById("dsh-fz-style")) return;
+    const head = document.head || document.documentElement;
     if (!head) return;
-    var style = document.createElement('style');
-    style.id = 'dsh-fz-style';
+    const style = document.createElement("style");
+    style.id = "dsh-fz-style";
     style.textContent =
-      '#' + FIND_BAR_ID + ' { all: initial; display: none; position: fixed; top: 12px; right: 12px;' +
-      ' z-index: 2147483646; align-items: center; gap: 6px;' +
+      "#" +
+      FIND_BAR_ID +
+      " { all: initial; display: none; position: fixed; top: 12px; right: 12px;" +
+      " z-index: 2147483646; align-items: center; gap: 6px;" +
       ' font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;' +
-      ' font-size: 13px; color: #e6edf3; background: rgba(15, 23, 42, 0.95);' +
-      ' border: 1px solid #334155; border-radius: 8px; padding: 6px 8px;' +
-      ' box-shadow: 0 8px 28px rgba(0,0,0,0.45); }' +
-      '#' + FIND_BAR_ID + '.open { display: flex; }' +
-      '#' + FIND_BAR_ID + ' * { box-sizing: border-box; }' +
-      '#dsh-fz-input { background: #0f172a; color: #e6edf3; border: 1px solid #475569;' +
-      ' border-radius: 6px; padding: 5px 8px; font-size: 13px; width: 200px; outline: none; }' +
-      '#dsh-fz-input:focus { border-color: #60a5fa; }' +
-      '#dsh-fz-count { color: #94a3b8; font-size: 12px; min-width: 64px; text-align: right;' +
-      ' white-space: nowrap; }' +
-      '#' + FIND_BAR_ID + ' button { background: transparent; border: 1px solid transparent;' +
-      ' color: #cbd5e1; border-radius: 6px; padding: 4px 8px; font-size: 12px; cursor: pointer; }' +
-      '#' + FIND_BAR_ID + ' button:hover { background: #1e293b; }' +
-      '#' + FIND_BAR_ID + ' button:focus-visible { outline: 2px solid #60a5fa; outline-offset: 1px; }' +
-      '#' + ZOOM_BADGE_ID + ' { all: initial; display: none; position: fixed; right: 16px; bottom: 16px;' +
+      " font-size: 13px; color: #e6edf3; background: rgba(15, 23, 42, 0.95);" +
+      " border: 1px solid #334155; border-radius: 8px; padding: 6px 8px;" +
+      " box-shadow: 0 8px 28px rgba(0,0,0,0.45); }" +
+      "#" +
+      FIND_BAR_ID +
+      ".open { display: flex; }" +
+      "#" +
+      FIND_BAR_ID +
+      " * { box-sizing: border-box; }" +
+      "#dsh-fz-input { background: #0f172a; color: #e6edf3; border: 1px solid #475569;" +
+      " border-radius: 6px; padding: 5px 8px; font-size: 13px; width: 200px; outline: none; }" +
+      "#dsh-fz-input:focus { border-color: #60a5fa; }" +
+      "#dsh-fz-count { color: #94a3b8; font-size: 12px; min-width: 64px; text-align: right;" +
+      " white-space: nowrap; }" +
+      "#" +
+      FIND_BAR_ID +
+      " button { background: transparent; border: 1px solid transparent;" +
+      " color: #cbd5e1; border-radius: 6px; padding: 4px 8px; font-size: 12px; cursor: pointer; }" +
+      "#" +
+      FIND_BAR_ID +
+      " button:hover { background: #1e293b; }" +
+      "#" +
+      FIND_BAR_ID +
+      " button:focus-visible { outline: 2px solid #60a5fa; outline-offset: 1px; }" +
+      "#" +
+      ZOOM_BADGE_ID +
+      " { all: initial; display: none; position: fixed; right: 16px; bottom: 16px;" +
       ' z-index: 2147483646; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;' +
-      ' font-size: 13px; color: #e6edf3; background: rgba(15, 23, 42, 0.92);' +
-      ' border: 1px solid #334155; border-radius: 999px; padding: 6px 12px; }' +
-      '#' + ZOOM_BADGE_ID + '.on { display: block; }' +
-      '::highlight(dsh-find) { background: rgba(250, 204, 21, 0.55); color: inherit; }';
+      " font-size: 13px; color: #e6edf3; background: rgba(15, 23, 42, 0.92);" +
+      " border: 1px solid #334155; border-radius: 999px; padding: 6px 12px; }" +
+      "#" +
+      ZOOM_BADGE_ID +
+      ".on { display: block; }" +
+      "::highlight(dsh-find) { background: rgba(250, 204, 21, 0.55); color: inherit; }";
     head.appendChild(style);
   }
 
   function buildBadge() {
     if (document.getElementById(ZOOM_BADGE_ID)) return;
-    var badge = document.createElement('div');
+    const badge = document.createElement("div");
     badge.id = ZOOM_BADGE_ID;
-    badge.setAttribute('aria-live', 'polite');
+    badge.setAttribute("aria-live", "polite");
     (document.body || document.documentElement).appendChild(badge);
   }
 
-  onReady(function () {
+  onReady(() => {
     injectStyles();
     buildBar();
     buildBadge();
@@ -455,29 +540,29 @@
   // level in the bubble phase so page inputs keep working, except our own bar
   // input (its key handler stops propagation, so these never double-fire).
   // Consumed shortcuts never reach the page (browsers reserve them too).
-  window.addEventListener('keydown', function (e) {
-    var mod = e.metaKey || e.ctrlKey;
+  window.addEventListener("keydown", (e) => {
+    const mod = e.metaKey || e.ctrlKey;
     if (!mod || e.altKey) return;
-    var inFindInput = e.target && e.target.id === 'dsh-fz-input';
-    var key = e.key;
-    var code = e.code || '';
+    const inFindInput = e.target && e.target.id === "dsh-fz-input";
+    const key = e.key;
+    const code = e.code || "";
 
-    if ((key === 'f' || key === 'F') && !e.shiftKey) {
+    if ((key === "f" || key === "F") && !e.shiftKey) {
       e.preventDefault();
       e.stopPropagation();
       openFind();
       return;
     }
     if (inFindInput) return; // let the bar's own key handler own other keys
-    if (key === '+' || key === '=' || code === 'NumpadAdd') {
+    if (key === "+" || key === "=" || code === "NumpadAdd") {
       e.preventDefault();
       e.stopPropagation();
       zoomBy(ZOOM_STEP);
-    } else if (key === '-' || key === '_' || code === 'NumpadSubtract') {
+    } else if (key === "-" || key === "_" || code === "NumpadSubtract") {
       e.preventDefault();
       e.stopPropagation();
       zoomBy(-ZOOM_STEP);
-    } else if (key === '0' || code === 'Numpad0') {
+    } else if (key === "0" || code === "Numpad0") {
       e.preventDefault();
       e.stopPropagation();
       zoomReset();
@@ -485,10 +570,10 @@
   });
 
   // Escape outside the input also closes the bar (same as browsers).
-  window.addEventListener('keydown', function (e) {
-    if (e.key !== 'Escape') return;
-    if (e.target && e.target.id === 'dsh-fz-input') return; // handled above
-    var bar = uiRoot();
-    if (bar && bar.classList.contains('open')) closeFind();
+  window.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    if (e.target && e.target.id === "dsh-fz-input") return; // handled above
+    const bar = uiRoot();
+    if (bar?.classList.contains("open")) closeFind();
   });
 })();
