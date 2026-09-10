@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.1.95 — Rust edition 2024, clippy/fmt gates green
+- Toolchain modernized: Rust edition 2021 → 2024, MSRV 1.77 → 1.85; `cargo fmt` applied across the tree and all `cargo clippy` warnings in our crate fixed (unit bindings, `next_back`, `&Path` params, derived `Default`, type alias, doc formatting, test-module placement). Vendored `muda` fork warnings left untouched. All 63 Rust tests + Node contract suites stay green.
+
 ## v0.1.94 — Engine-stopped splash speaks five languages
 - The no-engine splash now renders in the saved UI language (En | 繁 | 簡 | 日 | Es, default En): same locale table as the Control Panel, painted from get_status.language with English fallback, polling so a Control Panel switch repaints the open splash. Visual style unchanged; backend log lines stay English.
 

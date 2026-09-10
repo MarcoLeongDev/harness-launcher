@@ -6,8 +6,8 @@ use std::time::Duration;
 use semver::Version;
 use tauri::AppHandle;
 use tauri::Manager;
-use tauri_plugin_shell::process::CommandEvent;
 use tauri_plugin_shell::ShellExt;
+use tauri_plugin_shell::process::CommandEvent;
 
 use crate::mcp_env;
 
@@ -22,6 +22,10 @@ pub const PACKAGE: &str = "@deepseek-ai/dsh";
 /// The harness tree is a pinned, first-party, isolated prefix, so every
 /// harness install/rebuild explicitly opts back into scripts. The flag is
 /// logged to the operation console at each use so the allowance is visible.
+/// Streaming console sink for npm operations: (stream, line), where stream is
+/// either stdout or stderr text.
+pub type ProgressSink<'a> = Option<&'a mut dyn FnMut(&str, &str)>;
+
 pub const ALLOW_SCRIPTS_FLAG: &str = "--dangerously-allow-all-scripts";
 
 pub fn npm_cli_path(app: &AppHandle) -> Result<PathBuf, String> {
@@ -29,7 +33,11 @@ pub fn npm_cli_path(app: &AppHandle) -> Result<PathBuf, String> {
         .path()
         .resource_dir()
         .map_err(|e| format!("resource dir unavailable: {e}"))?;
-    let cli = res.join("resources").join("npm").join("bin").join("npm-cli.js");
+    let cli = res
+        .join("resources")
+        .join("npm")
+        .join("bin")
+        .join("npm-cli.js");
     if !cli.exists() {
         return Err(format!(
             "vendored npm not found at {} (run the prepare step / rebuild the app)",
@@ -44,7 +52,7 @@ pub fn run_npm(
     runtime_dir: &Path,
     npm_args: &[&str],
     timeout: Duration,
-    mut sink: Option<&mut dyn FnMut(&str, &str)>,
+    mut sink: ProgressSink<'_>,
 ) -> Result<(String, String), String> {
     let cli = npm_cli_path(app)?;
     let cache = runtime_dir.join("npm-cache");
@@ -70,7 +78,12 @@ pub fn run_npm(
             }
             Err(e) => {
                 if let Some(s) = sink.as_mut() {
-                    s("err", &format!("node shim unavailable ({e}); lifecycle scripts may build for the wrong node"));
+                    s(
+                        "err",
+                        &format!(
+                            "node shim unavailable ({e}); lifecycle scripts may build for the wrong node"
+                        ),
+                    );
                 }
             }
         }
@@ -179,7 +192,7 @@ pub fn latest_dist_tag(app: &AppHandle, runtime_dir: &Path) -> Result<String, St
         serde_json::Value::Array(items) => items
             .iter()
             .filter_map(|i| i.as_str().map(|s| s.to_string()))
-            .last()
+            .next_back()
             .ok_or_else(|| format!("unexpected dist-tags.latest value: {display}")),
         _ => Err(format!("unexpected dist-tags.latest value: {display}")),
     }
@@ -306,7 +319,12 @@ mod name_tests {
         use super::version_dir;
         let base = std::path::Path::new("/tmp/rd");
         let parent = base.join("versions");
-        for good in ["0.1.29", "0.1.2-alpha.3", "0.1.0-rc.7", "v1.2.3+build.4_meta~x"] {
+        for good in [
+            "0.1.29",
+            "0.1.2-alpha.3",
+            "0.1.0-rc.7",
+            "v1.2.3+build.4_meta~x",
+        ] {
             assert!(is_valid_version_name(good));
             assert!(version_dir(base, good).starts_with(&parent), "{good}");
         }
@@ -343,7 +361,14 @@ pub fn install_version(
     let spec = format!("{PACKAGE}@{version}");
     crate::progress::reset_console(app, op);
     crate::progress::push_console(app, op, "info", &format!("$ npm install {spec}"));
-    crate::progress::emit(app, op, Some(version), "installing", &format!("Installing {spec}…"), None);
+    crate::progress::emit(
+        app,
+        op,
+        Some(version),
+        "installing",
+        &format!("Installing {spec}…"),
+        None,
+    );
     let app_sink = app.clone();
     let op_sink = op.to_string();
     let ver_sink = version.to_string();
@@ -359,7 +384,8 @@ pub fn install_version(
         if is_fetch {
             fetched += 1;
         }
-        let is_summary = line.starts_with("added ") || line.starts_with("changed ")
+        let is_summary = line.starts_with("added ")
+            || line.starts_with("changed ")
             || line.starts_with("removed ");
         let now = std::time::Instant::now();
         // Terminal: surface every line (light throttle) with its stream.
@@ -379,7 +405,14 @@ pub fn install_version(
                 String::new()
             };
             if !preview.is_empty() {
-                crate::progress::emit(&app_sink, &op_sink, Some(&ver_sink), "installing", &preview, None);
+                crate::progress::emit(
+                    &app_sink,
+                    &op_sink,
+                    Some(&ver_sink),
+                    "installing",
+                    &preview,
+                    None,
+                );
             }
         }
     };
@@ -418,7 +451,14 @@ pub fn install_version(
         ensure_peer_completion(app, runtime_dir, version, op)?;
     }
     crate::progress::push_console(app, op, "info", "Install finished — verifying…");
-    crate::progress::emit(app, op, Some(version), "verifying", "Verifying installation…", Some(85));
+    crate::progress::emit(
+        app,
+        op,
+        Some(version),
+        "verifying",
+        "Verifying installation…",
+        Some(85),
+    );
     if !is_installed(runtime_dir, version) {
         std::thread::sleep(Duration::from_millis(800));
     }
@@ -436,7 +476,10 @@ pub fn install_version(
                 marker.display()
             )
         } else {
-            format!("the harness package at {} is present but incomplete", marker.display())
+            format!(
+                "the harness package at {} is present but incomplete",
+                marker.display()
+            )
         };
         return Err(format!(
             "install of {spec} did not produce a usable harness\n{hint}\nstdout: {out}\nstderr: {err}"
@@ -467,11 +510,19 @@ fn missing_peer_specs(runtime_dir: &Path, version: &str) -> Result<Vec<String>, 
     for entry in entries {
         let entry = entry.map_err(|e| format!("read dir entry: {e}"))?;
         let pkg_bin = entry.path();
-        if !pkg_bin.is_dir() { continue; }
+        if !pkg_bin.is_dir() {
+            continue;
+        }
         let manifest = pkg_bin.join("package.json");
-        if !manifest.exists() { continue; }
-        let Ok(text) = std::fs::read_to_string(&manifest) else { continue; };
-        let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) else { continue; };
+        if !manifest.exists() {
+            continue;
+        }
+        let Ok(text) = std::fs::read_to_string(&manifest) else {
+            continue;
+        };
+        let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) else {
+            continue;
+        };
         if let Some(peers_map) = json.get("peerDependencies").and_then(|v| v.as_object()) {
             for (name, range) in peers_map {
                 let name = name.to_string();
@@ -484,8 +535,9 @@ fn missing_peer_specs(runtime_dir: &Path, version: &str) -> Result<Vec<String>, 
                             .as_str()
                             .map(|s| s.to_string())
                             .unwrap_or_else(|| range.to_string());
-                        peers.entry(name.clone())
-                             .or_insert_with(|| format!("{}@{}", name, range_str));
+                        peers
+                            .entry(name.clone())
+                            .or_insert_with(|| format!("{}@{}", name, range_str));
                     }
                 }
             }
@@ -550,17 +602,38 @@ pub fn ensure_peer_completion(
     let mut sink = |stream: &str, line: &str| {
         let line = line.trim();
         if !line.is_empty() {
-            crate::progress::push_console(app, op, stream, &line.chars().take(600).collect::<String>());
+            crate::progress::push_console(
+                app,
+                op,
+                stream,
+                &line.chars().take(600).collect::<String>(),
+            );
         }
     };
-    run_npm(app, runtime_dir, &npm_args, Duration::from_secs(120), Some(&mut sink))?;
+    run_npm(
+        app,
+        runtime_dir,
+        &npm_args,
+        Duration::from_secs(120),
+        Some(&mut sink),
+    )?;
     crate::progress::push_console(app, op, "info", "Peer packages complete - verifying...");
-    crate::progress::emit(app, op, Some(version), "verifying", "Verifying installation...", Some(95));
+    crate::progress::emit(
+        app,
+        op,
+        Some(version),
+        "verifying",
+        "Verifying installation...",
+        Some(95),
+    );
     if !is_installed(runtime_dir, version) {
         std::thread::sleep(Duration::from_millis(800));
     }
     if !is_installed(runtime_dir, version) {
-        return Err(format!("peer completion did not leave a usable harness for {}", version));
+        return Err(format!(
+            "peer completion did not leave a usable harness for {}",
+            version
+        ));
     }
     Ok(())
 }
@@ -577,9 +650,7 @@ fn ensure_node_gyp_exec(npm_cli: &Path) {
     {
         let helper = npm_cli
             .parent()
-            .map(|bin| {
-                bin.join("../node_modules/@npmcli/run-script/lib/node-gyp-bin/node-gyp")
-            });
+            .map(|bin| bin.join("../node_modules/@npmcli/run-script/lib/node-gyp-bin/node-gyp"));
         if let Some(path) = helper {
             use std::os::unix::fs::PermissionsExt;
             if let Ok(meta) = std::fs::metadata(&path) {
@@ -692,7 +763,10 @@ fn node_shim_dir(app: &AppHandle, runtime_dir: &Path) -> Result<PathBuf, String>
     let link = dir.join("node");
     #[cfg(unix)]
     {
-        let stale = std::fs::read_link(&link).ok().map(|p| p != target).unwrap_or(true);
+        let stale = std::fs::read_link(&link)
+            .ok()
+            .map(|p| p != target)
+            .unwrap_or(true);
         // A regular file (not a symlink) at the link path is never touched.
         let is_link = std::fs::symlink_metadata(&link)
             .map(|m| m.file_type().is_symlink())
@@ -756,6 +830,7 @@ pub fn native_binding_error(version: &str, detail: &str) -> String {
 ///  2. when `fs-ext` is in the tree, requires its native binding to exist
 ///     AND load under the bundled node (catches blocked scripts as well as
 ///     ABI mismatches from building with a system node).
+///
 /// Writes only to the operation console; never touches `~/.dsh`.
 pub fn verify_harness_tree(
     app: &AppHandle,
@@ -767,7 +842,10 @@ pub fn verify_harness_tree(
         .ok_or_else(|| format!("harness {version} is not installed (missing bin.js)"))?;
     let (code, out, err) = run_node_capture(
         app,
-        vec![entry.to_string_lossy().into_owned(), "--version".to_string()],
+        vec![
+            entry.to_string_lossy().into_owned(),
+            "--version".to_string(),
+        ],
         runtime_dir,
         Duration::from_secs(20),
     )?;
@@ -782,7 +860,9 @@ pub fn verify_harness_tree(
             detail.trim().chars().take(300).collect::<String>()
         ));
     }
-    let fs_ext_dir = version_dir(runtime_dir, version).join("node_modules").join("fs-ext");
+    let fs_ext_dir = version_dir(runtime_dir, version)
+        .join("node_modules")
+        .join("fs-ext");
     if fs_ext_dir.is_dir() {
         let binding = fs_ext_dir.join("build").join("Release").join("fs_ext.node");
         if !binding.is_file() {
@@ -813,7 +893,10 @@ pub fn verify_harness_tree(
         app,
         op,
         "info",
-        &format!("Verified harness {version} boots (bin.js --version: {})", out.trim()),
+        &format!(
+            "Verified harness {version} boots (bin.js --version: {})",
+            out.trim()
+        ),
     );
     Ok(())
 }
@@ -853,7 +936,12 @@ pub fn repair_native_bindings(
     let mut sink = |stream: &str, line: &str| {
         let line = line.trim();
         if !line.is_empty() {
-            crate::progress::push_console(app, op, stream, &line.chars().take(600).collect::<String>());
+            crate::progress::push_console(
+                app,
+                op,
+                stream,
+                &line.chars().take(600).collect::<String>(),
+            );
         }
     };
     run_npm(
@@ -876,7 +964,7 @@ pub fn repair_native_bindings(
 
 #[cfg(test)]
 mod native_tests {
-    use super::{is_native_binding_failure, native_binding_error, ALLOW_SCRIPTS_FLAG};
+    use super::{ALLOW_SCRIPTS_FLAG, is_native_binding_failure, native_binding_error};
 
     #[test]
     fn scripts_flag_is_the_documented_opt_in() {
@@ -894,7 +982,9 @@ mod native_tests {
         assert!(is_native_binding_failure(
             "was compiled against a different Node.js version using NODE_MODULE_VERSION 147"
         ));
-        assert!(is_native_binding_failure("ERR_DLOPEN_FAILED NODE_MODULE_VERSION mismatch"));
+        assert!(is_native_binding_failure(
+            "ERR_DLOPEN_FAILED NODE_MODULE_VERSION mismatch"
+        ));
     }
 
     #[test]
@@ -902,20 +992,22 @@ mod native_tests {
         assert!(!is_native_binding_failure(
             "dsh web: http://127.0.0.1:3081/?token=[CENSORED]"
         ));
-        assert!(!is_native_binding_failure("[launcher] starting harness 0.1.2-rc.1 on 127.0.0.1:3081"));
+        assert!(!is_native_binding_failure(
+            "[launcher] starting harness 0.1.2-rc.1 on 127.0.0.1:3081"
+        ));
         assert!(!is_native_binding_failure("Engine running"));
         assert!(!is_native_binding_failure(""));
     }
 
     #[test]
     fn error_names_repair_and_data_safety() {
-        let msg = native_binding_error("0.1.3-alpha.2", "Cannot find module './build/Release/fs_ext.node'");
+        let msg = native_binding_error(
+            "0.1.3-alpha.2",
+            "Cannot find module './build/Release/fs_ext.node'",
+        );
         assert!(msg.contains("0.1.3-alpha.2"), "{msg}");
         assert!(msg.contains("fs_ext.node"), "{msg}");
         assert!(msg.contains("roll back"), "{msg}");
         assert!(msg.contains("~/.dsh"), "{msg}");
     }
 }
-
-
-

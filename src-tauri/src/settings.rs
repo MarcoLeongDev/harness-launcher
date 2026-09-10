@@ -1,7 +1,7 @@
 //! Persisted launcher settings. Atomic JSON write on change.
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub const DEFAULT_PORT: u16 = 3080;
 
@@ -56,15 +56,18 @@ impl Default for Settings {
     }
 }
 
-pub fn settings_path(data_dir: &PathBuf) -> PathBuf {
+pub fn settings_path(data_dir: &Path) -> PathBuf {
     data_dir.join("settings.json")
 }
 
-pub fn load(data_dir: &PathBuf) -> Settings {
+pub fn load(data_dir: &Path) -> Settings {
     match fs::read_to_string(settings_path(data_dir)) {
         Ok(text) => {
             let mut s: Settings = serde_json::from_str(&text).unwrap_or_else(|e| {
-                log(data_dir, &format!("settings.json corrupt, using defaults: {e}"));
+                log(
+                    data_dir,
+                    &format!("settings.json corrupt, using defaults: {e}"),
+                );
                 Settings::default()
             });
             s.language = normalize_language(&s.language);
@@ -74,7 +77,7 @@ pub fn load(data_dir: &PathBuf) -> Settings {
     }
 }
 
-pub fn save(data_dir: &PathBuf, settings: &Settings) -> std::io::Result<()> {
+pub fn save(data_dir: &Path, settings: &Settings) -> std::io::Result<()> {
     let path = settings_path(data_dir);
     let json = serde_json::to_string_pretty(settings)?;
     let tmp = path.with_extension("json.tmp");
@@ -83,7 +86,7 @@ pub fn save(data_dir: &PathBuf, settings: &Settings) -> std::io::Result<()> {
     Ok(())
 }
 
-pub fn log(data_dir: &PathBuf, line: &str) {
+pub fn log(data_dir: &Path, line: &str) {
     let dir = data_dir.join("logs");
     let _ = fs::create_dir_all(&dir);
     let path = dir.join("launcher.log");
@@ -132,15 +135,17 @@ mod tests {
     fn language_roundtrips_and_old_files_default_to_english() {
         let dir = std::env::temp_dir().join(format!("dsh-settings-lang-{}", std::process::id()));
         let _ = std::fs::create_dir_all(&dir);
-        let mut s = Settings::default();
-        s.language = "ja".into();
+        let s = Settings {
+            language: "ja".into(),
+            ..Default::default()
+        };
         save(&dir, &s).unwrap();
         assert_eq!(load(&dir).language, "ja");
         // Pre-language file (no `language` key): serde default + normalize.
-        let _ = std::fs::write(settings_path(&dir), r#"{"port": 3080}"#).unwrap();
+        std::fs::write(settings_path(&dir), r#"{"port": 3080}"#).unwrap();
         assert_eq!(load(&dir).language, "en");
         // Hand-edited bogus value falls back to English.
-        let _ = std::fs::write(settings_path(&dir), r#"{"language": "xx"}"#).unwrap();
+        std::fs::write(settings_path(&dir), r#"{"language": "xx"}"#).unwrap();
         assert_eq!(load(&dir).language, "en");
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -149,10 +154,12 @@ mod tests {
     fn roundtrip_preserves_fields() {
         let dir = std::env::temp_dir().join(format!("dsh-settings-test-{}", std::process::id()));
         let _ = std::fs::create_dir_all(&dir);
-        let mut s = Settings::default();
-        s.port = 4101;
-        s.current_version = Some("1.2.3".into());
-        s.start_on_launch = false;
+        let s = Settings {
+            port: 4101,
+            current_version: Some("1.2.3".into()),
+            start_on_launch: false,
+            ..Default::default()
+        };
         save(&dir, &s).unwrap();
 
         let loaded = load(&dir);
@@ -160,17 +167,17 @@ mod tests {
         assert_eq!(loaded.current_version.as_deref(), Some("1.2.3"));
         assert!(!loaded.start_on_launch);
 
-        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::remove_dir_all(&dir).ok();
     }
 
     #[test]
     fn corrupt_file_falls_back() {
         let dir = std::env::temp_dir().join(format!("dsh-settings-corrupt-{}", std::process::id()));
-        let _ = std::fs::create_dir_all(&dir);
-        let _ = std::fs::write(settings_path(&dir), "{ not json !!!").unwrap();
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(settings_path(&dir), "{ not json !!!").unwrap();
         let s = load(&dir);
         assert_eq!(s.port, DEFAULT_PORT);
-        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::remove_dir_all(&dir).ok();
     }
 
     #[test]
@@ -185,6 +192,6 @@ mod tests {
         let cur = std::fs::read_to_string(dir.join("logs").join("launcher.log")).unwrap();
         assert!(cur.contains("after rotation"), "{cur}");
         assert!((cur.len() as u64) < LAUNCHER_LOG_MAX_BYTES);
-        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::remove_dir_all(&dir).ok();
     }
 }

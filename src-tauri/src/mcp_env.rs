@@ -66,7 +66,9 @@ fn collect_from_text(text: &str, out: &mut Vec<String>) {
                     if j < bytes.len() {
                         let name = &text[start..j];
                         if !name.is_empty()
-                            && name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+                            && name
+                                .bytes()
+                                .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
                             && !out.iter().any(|n| n == name)
                         {
                             out.push(name.to_string());
@@ -109,9 +111,7 @@ fn strip_quotes(s: &str) -> String {
     let t = s.trim();
     if t.len() >= 2 {
         let b = t.as_bytes();
-        if (b[0] == b'"' && b[t.len() - 1] == b'"')
-            || (b[0] == b'\'' && b[t.len() - 1] == b'\'')
-        {
+        if (b[0] == b'"' && b[t.len() - 1] == b'"') || (b[0] == b'\'' && b[t.len() - 1] == b'\'') {
             return t[1..t.len() - 1].to_string();
         }
     }
@@ -169,7 +169,10 @@ fn lookup_agentqueue_config(home: &Path) -> Option<String> {
         .join("config.json");
     let text = std::fs::read_to_string(path).ok()?;
     let v: serde_json::Value = serde_json::from_str(&text).ok()?;
-    v.get("apiKey")?.as_str().filter(|s| !s.is_empty()).map(|s| s.to_string())
+    v.get("apiKey")?
+        .as_str()
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
 }
 
 fn resolve_secret(home: &Path, name: &str) -> Option<(String, &'static str)> {
@@ -249,7 +252,10 @@ mod tests {
         let _ = std::fs::remove_dir_all(&base);
         std::fs::create_dir_all(base.join(".dsh").join("profiles").join("web")).unwrap();
         std::fs::write(
-            base.join(".dsh").join("profiles").join("web").join("cordis.patch.yml"),
+            base.join(".dsh")
+                .join("profiles")
+                .join("web")
+                .join("cordis.patch.yml"),
             "headers:\n  x-api-key: !!js process.env.AGENTQUEUE_API_KEY\n",
         )
         .unwrap();
@@ -281,7 +287,11 @@ mod tests {
         let base = std::env::temp_dir().join(format!("dsh-mcpaq-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&base);
         let home = base.join(".dsh");
-        let cfg = base.join("projects").join("agentqueue").join("source").join("data");
+        let cfg = base
+            .join("projects")
+            .join("agentqueue")
+            .join("source")
+            .join("data");
         std::fs::create_dir_all(&cfg).unwrap();
         std::fs::create_dir_all(&home).unwrap();
         std::fs::write(cfg.join("config.json"), "{\"apiKey\": \"ke-dev-abc\"}").unwrap();
@@ -298,7 +308,9 @@ mod tests {
             "failed to apply loader entry mcp-agentqueue (@deepseek-ai/dsh-mcp-client): invalid config"
         ));
         assert!(!is_mcp_config_failure("dsh web: http://127.0.0.1:3081"));
-        assert!(!is_mcp_config_failure("Cannot find module './build/Release/fs_ext.node'"));
+        assert!(!is_mcp_config_failure(
+            "Cannot find module './build/Release/fs_ext.node'"
+        ));
     }
 
     #[test]

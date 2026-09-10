@@ -98,7 +98,11 @@ fn ensure_runtime_dirs(app: &AppHandle) -> std::io::Result<()> {
 /// Run a blocking operation, clearing that operation's in-flight record on
 /// error so UIs never stay stuck in a "busy" state after a failure. Other
 /// concurrently running operations (parallel downloads) are untouched.
-fn with_progress_cleanup<T>(app: &AppHandle, op: &str, f: impl FnOnce() -> Result<T, String>) -> Result<T, String> {
+fn with_progress_cleanup<T>(
+    app: &AppHandle,
+    op: &str,
+    f: impl FnOnce() -> Result<T, String>,
+) -> Result<T, String> {
     match f() {
         Ok(v) => Ok(v),
         Err(e) => {
@@ -128,7 +132,9 @@ fn serve_failure_message(app: &AppHandle, version: &str, port: u16) -> String {
     } else {
         format!(
             "harness did not answer on 127.0.0.1:{port} within 30s{}",
-            port::holder_hint(port).map(|h| format!(" ({h})")).unwrap_or_default()
+            port::holder_hint(port)
+                .map(|h| format!(" ({h})"))
+                .unwrap_or_default()
         )
     }
 }
@@ -140,12 +146,26 @@ fn serve_failure_message(app: &AppHandle, version: &str, port: u16) -> String {
 fn repair_and_restart(app: &AppHandle, op: &str, version: &str, port: u16) -> Result<u16, String> {
     let st = app.state::<AppState>();
     let rd = state::runtime_dir(app);
-    progress::emit(app, op, Some(version), "repairing", "Engine is missing a native module — rebuilding it…", None);
+    progress::emit(
+        app,
+        op,
+        Some(version),
+        "repairing",
+        "Engine is missing a native module — rebuilding it…",
+        None,
+    );
     versions::repair_native_bindings(app, &rd, version, op)?;
     runtime::start(app, &st.runtime, &rd, version, port)?;
     if port::wait_until_serving(port, Duration::from_secs(30)) {
         st.runtime.mark_phase(runtime::PHASE_RUNNING);
-        progress::emit(app, op, Some(version), "running", "Engine running", Some(100));
+        progress::emit(
+            app,
+            op,
+            Some(version),
+            "running",
+            "Engine running",
+            Some(100),
+        );
         crate::tray::refresh(app);
         Ok(port)
     } else {
@@ -167,11 +187,18 @@ fn start_engine(app: &AppHandle, op: &str) -> Result<u16, String> {
     let actual = *st.effective_port.lock().unwrap();
 
     if st.runtime.is_running() {
-        let _ = st.runtime.mark_phase(runtime::PHASE_RUNNING);
+        st.runtime.mark_phase(runtime::PHASE_RUNNING);
         return Ok(actual);
     }
 
-    progress::emit(app, op, Some(&version), "starting", &format!("Starting engine on 127.0.0.1:{actual}…"), None);
+    progress::emit(
+        app,
+        op,
+        Some(&version),
+        "starting",
+        &format!("Starting engine on 127.0.0.1:{actual}…"),
+        None,
+    );
     runtime::start(app, &st.runtime, &rd, &version, actual)?;
     versions::ensure_peer_completion(app, &rd, &version, op)?;
     let served = port::wait_until_serving(actual, Duration::from_secs(30));
@@ -194,7 +221,14 @@ fn start_engine(app: &AppHandle, op: &str) -> Result<u16, String> {
         return Err(msg);
     }
     st.runtime.mark_phase(runtime::PHASE_RUNNING);
-    progress::emit(app, op, Some(&version), "running", "Engine running", Some(100));
+    progress::emit(
+        app,
+        op,
+        Some(&version),
+        "running",
+        "Engine running",
+        Some(100),
+    );
     crate::tray::refresh(app);
     Ok(actual)
 }
@@ -206,7 +240,8 @@ fn restart_engine(app: &AppHandle, op: &str, version: Option<&str>) -> Result<u1
     let rd = state::runtime_dir(app);
     let version = match version {
         Some(v) => v.to_string(),
-        None => state::active_version(app).ok_or_else(|| "no active harness version installed".to_string())?,
+        None => state::active_version(app)
+            .ok_or_else(|| "no active harness version installed".to_string())?,
     };
     let actual = *st.effective_port.lock().unwrap();
 
@@ -214,11 +249,25 @@ fn restart_engine(app: &AppHandle, op: &str, version: Option<&str>) -> Result<u1
     // A port held by any other process is REPORTED, never killed: the error
     // names the holder so the user can free the port or pick another one.
     let had_child = {
-        progress::emit(app, op, Some(&version), "restarting", "Restarting engine…", Some(60));
+        progress::emit(
+            app,
+            op,
+            Some(&version),
+            "restarting",
+            "Restarting engine…",
+            Some(60),
+        );
         runtime::stop(&st.runtime, &rd)
     };
     if !had_child {
-        progress::emit(app, op, Some(&version), "starting", &format!("Starting engine on 127.0.0.1:{actual}…"), None);
+        progress::emit(
+            app,
+            op,
+            Some(&version),
+            "starting",
+            &format!("Starting engine on 127.0.0.1:{actual}…"),
+            None,
+        );
     }
 
     versions::ensure_peer_completion(app, &rd, &version, op)?;
@@ -243,7 +292,14 @@ fn restart_engine(app: &AppHandle, op: &str, version: Option<&str>) -> Result<u1
         return Err(msg);
     }
     st.runtime.mark_phase(runtime::PHASE_RUNNING);
-    progress::emit(app, op, Some(&version), "running", "Engine running", Some(100));
+    progress::emit(
+        app,
+        op,
+        Some(&version),
+        "running",
+        "Engine running",
+        Some(100),
+    );
     crate::tray::refresh(app);
     Ok(actual)
 }
@@ -316,7 +372,10 @@ fn switch_version_inner(app: &AppHandle, version: &str, op: &str) -> Result<Stri
     if was_running {
         match restart_engine(app, op, Some(version)) {
             Ok(actual) => {
-                let _ = window::navigate(app, &harness_web_url(app, actual, Some(Duration::from_secs(10))));
+                let _ = window::navigate(
+                    app,
+                    &harness_web_url(app, actual, Some(Duration::from_secs(10))),
+                );
                 let msg = switch_running_feedback(version, actual);
                 progress::finish(app, op, Some(version), &msg);
                 return Ok(msg);
@@ -339,7 +398,14 @@ fn switch_version_inner(app: &AppHandle, version: &str, op: &str) -> Result<Stri
                             crate::tray::refresh(app);
                             match restart_engine(app, op, Some(&prev)) {
                                 Ok(actual2) => {
-                                    let _ = window::navigate(app, &harness_web_url(app, actual2, Some(Duration::from_secs(10))));
+                                    let _ = window::navigate(
+                                        app,
+                                        &harness_web_url(
+                                            app,
+                                            actual2,
+                                            Some(Duration::from_secs(10)),
+                                        ),
+                                    );
                                     let msg = format!(
                                         "v{version} failed to start ({e}); rolled back to v{prev} on port {actual2}"
                                     );
@@ -413,88 +479,92 @@ pub async fn get_status(app: AppHandle) -> Result<StatusPayload, String> {
     // must never block the main thread, or every window freezes for seconds
     // (panel shows no data and button clicks are dropped).
     tauri::async_runtime::spawn_blocking(move || {
-    let st = app.state::<AppState>();
-    let settings = state::read_settings(&app);
-    let status = st.runtime.status();
-    let actual = *st.effective_port.lock().unwrap();
-    let rd = state::runtime_dir(&app);
+        let st = app.state::<AppState>();
+        let settings = state::read_settings(&app);
+        let status = st.runtime.status();
+        let actual = *st.effective_port.lock().unwrap();
+        let rd = state::runtime_dir(&app);
 
-    let mut installed: Vec<String> = std::fs::read_dir(rd.join("versions"))
-        .map(|entries| {
-            entries
-                .filter_map(|e| e.ok())
-                .filter(|e| e.path().is_dir())
-                .filter_map(|e| e.file_name().to_str().map(|s| s.to_string()))
-                .filter(|v| versions::is_installed(&rd, v))
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
-    installed.sort();
+        let mut installed: Vec<String> = std::fs::read_dir(rd.join("versions"))
+            .map(|entries| {
+                entries
+                    .filter_map(|e| e.ok())
+                    .filter(|e| e.path().is_dir())
+                    .filter_map(|e| e.file_name().to_str().map(|s| s.to_string()))
+                    .filter(|v| versions::is_installed(&rd, v))
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        installed.sort();
 
-    let remote = st.latest_remote.lock().unwrap().clone();
-    let update_available = remote
-        .as_ref()
-        .zip(settings.current_version.as_ref())
-        .map(|(latest, active)| update::is_newer(active, latest))
-        .unwrap_or(false);
+        let remote = st.latest_remote.lock().unwrap().clone();
+        let update_available = remote
+            .as_ref()
+            .zip(settings.current_version.as_ref())
+            .map(|(latest, active)| update::is_newer(active, latest))
+            .unwrap_or(false);
 
-    // Use cached version list to avoid spawning an npm process every 3 s.
-    // Refresh is triggered explicitly after installs/updates or on a 60 s TTL.
-    let version_list = {
-        let mut vc = st.version_cache.lock().unwrap();
-        let stale = vc
-            .fetched_at
-            .map(|t| t.elapsed().as_secs() >= 60)
-            .unwrap_or(true);
-        if stale || vc.include_prerelease != settings.include_prerelease {
-            match versions::list_versions(&app, &rd, settings.include_prerelease) {
-                Ok(v) => {
-                    vc.versions = v.clone();
-                    vc.include_prerelease = settings.include_prerelease;
-                    vc.fetched_at = Some(std::time::Instant::now());
-                    v
+        // Use cached version list to avoid spawning an npm process every 3 s.
+        // Refresh is triggered explicitly after installs/updates or on a 60 s TTL.
+        let version_list = {
+            let mut vc = st.version_cache.lock().unwrap();
+            let stale = vc
+                .fetched_at
+                .map(|t| t.elapsed().as_secs() >= 60)
+                .unwrap_or(true);
+            if stale || vc.include_prerelease != settings.include_prerelease {
+                match versions::list_versions(&app, &rd, settings.include_prerelease) {
+                    Ok(v) => {
+                        vc.versions = v.clone();
+                        vc.include_prerelease = settings.include_prerelease;
+                        vc.fetched_at = Some(std::time::Instant::now());
+                        v
+                    }
+                    Err(_) => vc.versions.clone(),
                 }
-                Err(_) => vc.versions.clone(),
+            } else {
+                vc.versions.clone()
             }
-        } else {
-            vc.versions.clone()
-        }
-    };
+        };
 
-    let boot_error = st.boot_error.lock().unwrap().clone();
-    let current_op = st.current_op.lock().unwrap().clone();
-    let current_ops = progress::current_ops(&app);
-    let console = progress::console_snapshot(&app);
+        let boot_error = st.boot_error.lock().unwrap().clone();
+        let current_op = st.current_op.lock().unwrap().clone();
+        let current_ops = progress::current_ops(&app);
+        let console = progress::console_snapshot(&app);
 
-    Ok(StatusPayload {
-        launcher_version: env!("CARGO_PKG_VERSION").to_string(),
-        running: status.running,
-        engine_phase: status.phase,
-        active_version: settings.current_version.clone(),
-        previous_version: settings.previous_version.clone(),
-        port: settings.port,
-        actual_port: actual,
-        port_changed: actual != settings.port,
-        versions: version_list,
-        installed_versions: installed,
-        latest_remote: remote,
-        update_available,
-        include_prerelease: settings.include_prerelease,
-        language: settings.language.clone(),
-        start_on_launch: settings.start_on_launch,
-        boot_error,
-        current_op,
-        current_ops,
-        console,
-        web_url: st.runtime.captured_web_url(),
-    })
+        Ok(StatusPayload {
+            launcher_version: env!("CARGO_PKG_VERSION").to_string(),
+            running: status.running,
+            engine_phase: status.phase,
+            active_version: settings.current_version.clone(),
+            previous_version: settings.previous_version.clone(),
+            port: settings.port,
+            actual_port: actual,
+            port_changed: actual != settings.port,
+            versions: version_list,
+            installed_versions: installed,
+            latest_remote: remote,
+            update_available,
+            include_prerelease: settings.include_prerelease,
+            language: settings.language.clone(),
+            start_on_launch: settings.start_on_launch,
+            boot_error,
+            current_op,
+            current_ops,
+            console,
+            web_url: st.runtime.captured_web_url(),
+        })
     })
     .await
     .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-pub async fn install_and_switch(app: AppHandle, window: tauri::Window, version: String) -> Result<String, String> {
+pub async fn install_and_switch(
+    app: AppHandle,
+    window: tauri::Window,
+    version: String,
+) -> Result<String, String> {
     require_panel(&window)?;
     if !versions::is_valid_version_name(&version) {
         return Err(format!("invalid version name: {version}"));
@@ -518,7 +588,11 @@ pub async fn install_and_switch(app: AppHandle, window: tauri::Window, version: 
 /// npm installs into this version's own directory and only the shared
 /// (concurrency-safe) npm cache is touched.
 #[tauri::command]
-pub async fn download_version(app: AppHandle, window: tauri::Window, version: String) -> Result<String, String> {
+pub async fn download_version(
+    app: AppHandle,
+    window: tauri::Window,
+    version: String,
+) -> Result<String, String> {
     require_panel(&window)?;
     let op = progress::op_key("download", Some(&version));
     tauri::async_runtime::spawn_blocking(move || {
@@ -537,9 +611,7 @@ pub async fn download_version(app: AppHandle, window: tauri::Window, version: St
             }
             versions::install_version(&app, &rd, &version, &op)?;
             invalidate_version_cache(&app);
-            let msg = format!(
-                "installed v{version} — set it as the default to run it"
-            );
+            let msg = format!("installed v{version} — set it as the default to run it");
             progress::finish(&app, &op, Some(&version), &msg);
             Ok(msg)
         })
@@ -556,11 +628,23 @@ pub async fn update_to_latest(app: AppHandle, window: tauri::Window) -> Result<S
         let _mutation = _state.version_mutation.lock().unwrap();
         with_progress_cleanup(&app, "update", || {
             let rd = state::runtime_dir(&app);
-            progress::emit(&app, "update", None, "registry", "Checking npm registry for latest version…", Some(5));
+            progress::emit(
+                &app,
+                "update",
+                None,
+                "registry",
+                "Checking npm registry for latest version…",
+                Some(5),
+            );
             let latest = versions::latest_dist_tag(&app, &rd)?;
             *app.state::<AppState>().latest_remote.lock().unwrap() = Some(latest.clone());
             if state::active_version(&app).as_deref() == Some(latest.as_str()) {
-                progress::finish(&app, "update", None, &format!("already on latest ({latest})"));
+                progress::finish(
+                    &app,
+                    "update",
+                    None,
+                    &format!("already on latest ({latest})"),
+                );
                 return Ok(format!("already on latest ({latest})"));
             }
             // Keep the whole update under the one "update" op key: the
@@ -600,7 +684,14 @@ pub async fn rollback(app: AppHandle, window: tauri::Window) -> Result<String, S
                 s.current_version = Some(previous.clone());
                 s.previous_version = current;
             });
-            progress::emit(&app, &op, Some(&previous), "switching", "Switching active version…", Some(90));
+            progress::emit(
+                &app,
+                &op,
+                Some(&previous),
+                "switching",
+                "Switching active version…",
+                Some(90),
+            );
             let actual = restart_engine(&app, &op, Some(&previous))?;
             let _ = window::navigate(&app, &harness_url(actual));
             let msg = format!("rolled back to {previous} on port {actual}");
@@ -620,51 +711,83 @@ pub async fn set_port(app: AppHandle, window: tauri::Window, port: u16) -> Resul
     }
     tauri::async_runtime::spawn_blocking(move || {
         with_progress_cleanup(&app, "port", || {
-        let st = app.state::<AppState>();
-        let running = st.runtime.is_running();
-        let previous_effective = *st.effective_port.lock().unwrap();
-        let previous_desired = state::read_settings(&app).port;
+            let st = app.state::<AppState>();
+            let running = st.runtime.is_running();
+            let previous_effective = *st.effective_port.lock().unwrap();
+            let previous_desired = state::read_settings(&app).port;
 
-        progress::emit(&app, "port", None, "resolving", &format!("Checking port {port}…"), Some(10));
-        let (actual, changed) = port::resolve(port)?;
-
-        state::update_settings(&app, |s| s.port = port);
-        *st.effective_port.lock().unwrap() = actual;
-
-        // When the engine is stopped, only persist the port — do NOT auto-start.
-        if !running {
-            let msg = format!(
-                "port set to {port}{} — applies when you start the engine",
-                if changed { format!(" (busy, will use {actual})") } else { String::new() }
+            progress::emit(
+                &app,
+                "port",
+                None,
+                "resolving",
+                &format!("Checking port {port}…"),
+                Some(10),
             );
-            progress::finish(&app, "port", None, &msg);
-            return Ok(msg);
-        }
+            let (actual, changed) = port::resolve(port)?;
 
-        progress::emit(&app, "port", None, "restarting", &format!("Restarting engine on port {actual}…"), Some(40));
-        match restart_engine(&app, "port", None) {
-            Ok(actual2) => {
-                let _ = window::navigate(&app, &harness_web_url(&app, actual2, Some(Duration::from_secs(10))));
+            state::update_settings(&app, |s| s.port = port);
+            *st.effective_port.lock().unwrap() = actual;
+
+            // When the engine is stopped, only persist the port — do NOT auto-start.
+            if !running {
                 let msg = format!(
-                    "port set to {port}{} — harness on {actual2}",
-                    if changed { format!(" (busy, using {actual2})") } else { String::new() }
+                    "port set to {port}{} — applies when you start the engine",
+                    if changed {
+                        format!(" (busy, will use {actual})")
+                    } else {
+                        String::new()
+                    }
                 );
                 progress::finish(&app, "port", None, &msg);
-                Ok(msg)
+                return Ok(msg);
             }
-            Err(e) => {
-                // Revert the persisted selection and effective port, then try
-                // to bring the engine back on the previous effective port.
-                state::update_settings(&app, |s| s.port = previous_desired);
-                *st.effective_port.lock().unwrap() = previous_effective;
-                if let Err(revert_err) = restart_engine(&app, "port", None) {
-                    progress::emit(&app, "port", None, "failed", &format!("{e}; revert also failed: {revert_err}"), Some(0));
-                    return Err(format!("{e}; revert also failed: {revert_err}"));
+
+            progress::emit(
+                &app,
+                "port",
+                None,
+                "restarting",
+                &format!("Restarting engine on port {actual}…"),
+                Some(40),
+            );
+            match restart_engine(&app, "port", None) {
+                Ok(actual2) => {
+                    let _ = window::navigate(
+                        &app,
+                        &harness_web_url(&app, actual2, Some(Duration::from_secs(10))),
+                    );
+                    let msg = format!(
+                        "port set to {port}{} — harness on {actual2}",
+                        if changed {
+                            format!(" (busy, using {actual2})")
+                        } else {
+                            String::new()
+                        }
+                    );
+                    progress::finish(&app, "port", None, &msg);
+                    Ok(msg)
                 }
-                progress::emit(&app, "port", None, "failed", &e, Some(0));
-                Err(format!("{e} — reverted to port {previous_effective}"))
+                Err(e) => {
+                    // Revert the persisted selection and effective port, then try
+                    // to bring the engine back on the previous effective port.
+                    state::update_settings(&app, |s| s.port = previous_desired);
+                    *st.effective_port.lock().unwrap() = previous_effective;
+                    if let Err(revert_err) = restart_engine(&app, "port", None) {
+                        progress::emit(
+                            &app,
+                            "port",
+                            None,
+                            "failed",
+                            &format!("{e}; revert also failed: {revert_err}"),
+                            Some(0),
+                        );
+                        return Err(format!("{e}; revert also failed: {revert_err}"));
+                    }
+                    progress::emit(&app, "port", None, "failed", &e, Some(0));
+                    Err(format!("{e} — reverted to port {previous_effective}"))
+                }
             }
-        }
         })
     })
     .await
@@ -674,14 +797,21 @@ pub async fn set_port(app: AppHandle, window: tauri::Window, port: u16) -> Resul
 #[tauri::command]
 pub async fn set_prerelease(app: AppHandle, include: bool) -> Result<String, String> {
     state::update_settings(&app, |s| s.include_prerelease = include);
-    Ok(format!("pre-release versions {}", if include { "shown" } else { "hidden" }))
+    Ok(format!(
+        "pre-release versions {}",
+        if include { "shown" } else { "hidden" }
+    ))
 }
 
 /// Persist the UI language (Control Panel + tray menu) and re-label the
 /// tray immediately. The code is allowlisted, so unknown values settle on
 /// English instead of persisting garbage. Control Panel only.
 #[tauri::command]
-pub async fn set_language(app: AppHandle, window: tauri::Window, language: String) -> Result<String, String> {
+pub async fn set_language(
+    app: AppHandle,
+    window: tauri::Window,
+    language: String,
+) -> Result<String, String> {
     require_panel(&window)?;
     let lang = crate::settings::normalize_language(&language);
     state::update_settings(&app, |s| s.language = lang.clone());
@@ -703,7 +833,9 @@ pub async fn check_updates(app: AppHandle) -> Result<String, String> {
                 if update::is_newer(&active, &latest) {
                     parts.push(format!("Harness update available: {active} → {latest}"));
                 } else {
-                    parts.push(format!("Harness is current at version {active} — no update needed"));
+                    parts.push(format!(
+                        "Harness is current at version {active} — no update needed"
+                    ));
                 }
             }
             Err(e) => parts.push(format!("harness check failed: {e}")),
@@ -721,7 +853,10 @@ pub async fn check_updates(app: AppHandle) -> Result<String, String> {
             Err(e) => parts.push(format!("app check failed: {e}")),
         }
     } else {
-        parts.push(format!("App self-update not configured — enable in settings to auto-check for updates"));
+        parts.push(
+            "App self-update not configured — enable in settings to auto-check for updates"
+                .to_string(),
+        );
     }
     Ok(parts.join(" "))
 }
@@ -731,13 +866,18 @@ async fn app_updater_check(app: &AppHandle, endpoint: &str) -> Result<Option<Str
     // endpoint (signed artifacts required for macOS). Off by default.
     let updater = app
         .updater_builder()
-        .endpoints(vec![endpoint
-            .parse()
-            .map_err(|e: url::ParseError| format!("invalid endpoint: {e}"))?])
+        .endpoints(vec![
+            endpoint
+                .parse()
+                .map_err(|e: url::ParseError| format!("invalid endpoint: {e}"))?,
+        ])
         .map_err(|e| format!("updater endpoints: {e}"))?
         .build()
         .map_err(|e| format!("updater build: {e}"))?;
-    let update = updater.check().await.map_err(|e| format!("update check failed: {e}"))?;
+    let update = updater
+        .check()
+        .await
+        .map_err(|e| format!("update check failed: {e}"))?;
     Ok(update.map(|u| u.version.to_string()))
 }
 
@@ -780,7 +920,10 @@ pub async fn restart_harness(app: AppHandle, window: tauri::Window) -> Result<St
     tauri::async_runtime::spawn_blocking(move || {
         with_progress_cleanup(&app, "engine", || {
             let actual = restart_engine(&app, "engine", None)?;
-            let _ = window::navigate(&app, &harness_web_url(&app, actual, Some(Duration::from_secs(10))));
+            let _ = window::navigate(
+                &app,
+                &harness_web_url(&app, actual, Some(Duration::from_secs(10))),
+            );
             progress::clear_op(&app, "engine");
             Ok(format!("harness restarted on port {actual}"))
         })
@@ -800,7 +943,10 @@ pub async fn engine_start(app: AppHandle) -> Result<String, String> {
             }
             let actual = start_engine(&app, "engine")?;
             state::update_settings(&app, |s| s.start_on_launch = true);
-            let _ = window::navigate(&app, &harness_web_url(&app, actual, Some(Duration::from_secs(10))));
+            let _ = window::navigate(
+                &app,
+                &harness_web_url(&app, actual, Some(Duration::from_secs(10))),
+            );
             progress::clear_op(&app, "engine");
             Ok(format!("engine started on port {actual}"))
         })
@@ -823,7 +969,14 @@ pub fn stop_engine_now(app: &AppHandle) -> Result<String, String> {
     if !st.runtime.is_running() {
         return Ok("engine already stopped".into());
     }
-    progress::emit(app, "engine", None, "stopping", "Stopping engine…", Some(10));
+    progress::emit(
+        app,
+        "engine",
+        None,
+        "stopping",
+        "Stopping engine…",
+        Some(10),
+    );
     runtime::stop(&st.runtime, &rd);
     state::update_settings(app, |s| s.start_on_launch = false);
     // Identical strings for the progress event and the command result so the
@@ -846,7 +999,10 @@ pub async fn restart_engine_now(app: AppHandle) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
         with_progress_cleanup(&app, "engine", || {
             let actual = restart_engine(&app, "engine", None)?;
-            let _ = window::navigate(&app, &harness_web_url(&app, actual, Some(Duration::from_secs(10))));
+            let _ = window::navigate(
+                &app,
+                &harness_web_url(&app, actual, Some(Duration::from_secs(10))),
+            );
             progress::clear_op(&app, "engine");
             Ok(format!("engine restarted on port {actual}"))
         })
@@ -866,7 +1022,11 @@ pub fn open_settings(app: AppHandle) -> Result<String, String> {
 /// next Start (or auto-launch) runs it. Used by the stopped-state version
 /// dropdown so picking a version persists the choice instead of auto-launching.
 #[tauri::command]
-pub async fn set_version(app: AppHandle, window: tauri::Window, version: String) -> Result<String, String> {
+pub async fn set_version(
+    app: AppHandle,
+    window: tauri::Window,
+    version: String,
+) -> Result<String, String> {
     require_panel(&window)?;
     // Async: selecting a version that is not installed yet shells out to npm
     // (install) and must never block the main thread.
@@ -886,7 +1046,12 @@ pub async fn set_version(app: AppHandle, window: tauri::Window, version: String)
         if !versions::is_installed(&rd, &version) {
             versions::install_version(&app, &rd, &version, &op)?;
         }
-        progress::finish(&app, &op, Some(&version), &format!("active version set to {version}"));
+        progress::finish(
+            &app,
+            &op,
+            Some(&version),
+            &format!("active version set to {version}"),
+        );
         let previous = state::read_settings(&app).current_version.clone();
         state::update_settings(&app, |s| {
             s.previous_version = previous;
@@ -908,7 +1073,11 @@ pub fn open_harness_window(app: AppHandle) -> Result<String, String> {
 /// Delete an installed harness version directory. Refuses to remove the
 /// version that is currently active or running in the engine.
 #[tauri::command]
-pub async fn delete_version(app: AppHandle, window: tauri::Window, version: String) -> Result<String, String> {
+pub async fn delete_version(
+    app: AppHandle,
+    window: tauri::Window,
+    version: String,
+) -> Result<String, String> {
     require_panel(&window)?;
     // Validate BEFORE resolving the path: this ends in remove_dir_all, so a
     // traversal name must never reach version_dir.
@@ -928,7 +1097,9 @@ pub async fn delete_version(app: AppHandle, window: tauri::Window, version: Stri
             let proc = st.runtime.process.lock().unwrap();
             if let Some(state) = proc.as_ref() {
                 if state.version == version {
-                    return Err(format!("cannot delete {version}: the engine is currently running it"));
+                    return Err(format!(
+                        "cannot delete {version}: the engine is currently running it"
+                    ));
                 }
             }
         }
@@ -941,17 +1112,27 @@ pub async fn delete_version(app: AppHandle, window: tauri::Window, version: Stri
         if settings.previous_version.as_deref() == Some(version.as_str()) {
             state::update_settings(&app, |s| s.previous_version = None);
         }
-        progress::push_console(&app, "", "info", &format!("Removed installed version {version}"));
+        progress::push_console(
+            &app,
+            "",
+            "info",
+            &format!("Removed installed version {version}"),
+        );
         Ok(format!("deleted version {version}"))
     })
     .await
-    .map_err(|e| e.to_string())?}
+    .map_err(|e| e.to_string())?
+}
 
 /// Open the installation directory of an installed harness version in the
 /// system file manager (Finder). The version name is validated first so it
 /// can never escape the versions directory.
 #[tauri::command]
-pub fn open_version_dir(app: AppHandle, window: tauri::Window, version: String) -> Result<String, String> {
+pub fn open_version_dir(
+    app: AppHandle,
+    window: tauri::Window,
+    version: String,
+) -> Result<String, String> {
     require_panel(&window)?;
     if !versions::is_valid_version_name(&version) {
         return Err(format!("invalid version name: {version}"));

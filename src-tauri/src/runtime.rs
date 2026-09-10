@@ -10,8 +10,8 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use tauri::{AppHandle, Emitter};
-use tauri_plugin_shell::process::CommandEvent;
 use tauri_plugin_shell::ShellExt;
+use tauri_plugin_shell::process::CommandEvent;
 
 use crate::mcp_env;
 use crate::presets;
@@ -71,7 +71,9 @@ pub fn redact_token(line: &str) -> String {
             // prose word): the value must be non-empty up to a delimiter.
             let val_start = i + token_start + "token=".len();
             let val_end = line[val_start..]
-                .find(|c: char| c.is_whitespace() || matches!(c, '&' | '"' | '\'' | ')' | ']' | '<' | '>'))
+                .find(|c: char| {
+                    c.is_whitespace() || matches!(c, '&' | '"' | '\'' | ')' | ']' | '<' | '>')
+                })
                 .map(|e| val_start + e)
                 .unwrap_or(line.len());
             if val_end > val_start {
@@ -86,7 +88,9 @@ pub fn redact_token(line: &str) -> String {
         if let Some(bearer_start) = lower.find("bearer ") {
             let val_start = i + bearer_start + "bearer ".len();
             let val_end = line[val_start..]
-                .find(|c: char| c.is_whitespace() || matches!(c, '"' | '\'' | ')' | ']' | '<' | '>'))
+                .find(|c: char| {
+                    c.is_whitespace() || matches!(c, '"' | '\'' | ')' | ']' | '<' | '>')
+                })
                 .map(|e| val_start + e)
                 .unwrap_or(line.len());
             if val_end > val_start {
@@ -183,11 +187,16 @@ impl HarnessRuntime {
             .lock()
             .unwrap()
             .iter()
-            .rev()
-            .next()
+            .next_back()
             .cloned()
             .unwrap_or_default();
-        HarnessStatus { running, phase, version, port, last_log }
+        HarnessStatus {
+            running,
+            phase,
+            version,
+            port,
+            last_log,
+        }
     }
 
     pub fn is_running(&self) -> bool {
@@ -261,9 +270,8 @@ pub fn start(
     version: &str,
     port: u16,
 ) -> Result<(), String> {
-    let entry = versions::harness_entry(runtime_dir, version).ok_or_else(|| {
-        format!("harness {version} is not installed (missing bin.js)")
-    })?;
+    let entry = versions::harness_entry(runtime_dir, version)
+        .ok_or_else(|| format!("harness {version} is not installed (missing bin.js)"))?;
 
     // Reconcile the shared harness home with the presets THIS engine ships
     // before it spawns: a default recorded by another version (rc "code" vs
@@ -272,10 +280,13 @@ pub fn start(
     {
         let log_dir = runtime_dir.to_path_buf();
         let app_sink = app.clone();
-        presets::repair_preset_compatibility(&versions::version_dir(runtime_dir, version), move |line| {
-            append_log(&log_dir, &format!("[launcher] {line}"));
-            crate::progress::push_console(&app_sink, "", "info", &format!("[launcher] {line}"));
-        });
+        presets::repair_preset_compatibility(
+            &versions::version_dir(runtime_dir, version),
+            move |line| {
+                append_log(&log_dir, &format!("[launcher] {line}"));
+                crate::progress::push_console(&app_sink, "", "info", &format!("[launcher] {line}"));
+            },
+        );
     }
 
     // Bridge MCP secrets referenced as process.env.NAME in user patch layers
@@ -286,16 +297,25 @@ pub fn start(
     let bridged = mcp_env::bridge_missing_env(&crate::presets::dsh_home());
     for (name, _, source) in &bridged {
         let line = if *source == "empty-fallback" {
-            format!("[launcher] env {name} is unset and has no stored value -- passing empty string so MCP validation passes; set {name} to enable the entry")
+            format!(
+                "[launcher] env {name} is unset and has no stored value -- passing empty string so MCP validation passes; set {name} to enable the entry"
+            )
         } else {
-            format!("[launcher] bridged env {name} from {source} so user MCP patch validates (value redacted)")
+            format!(
+                "[launcher] bridged env {name} from {source} so user MCP patch validates (value redacted)"
+            )
         };
         append_log(runtime_dir, &line);
     }
     let bridged_for_child = bridged.clone();
     let app_for_console = app.clone();
     for (name, _, source) in &bridged {
-        crate::progress::push_console(&app_for_console, "", "info", &format!("[launcher] bridged env {name} from {source} (value redacted)"));
+        crate::progress::push_console(
+            &app_for_console,
+            "",
+            "info",
+            &format!("[launcher] bridged env {name} from {source} (value redacted)"),
+        );
     }
     let mut cmd = app
         .shell()
@@ -343,7 +363,10 @@ pub fn start(
         port: port_n,
         id,
     });
-    append_log(runtime_dir, &format!("[launcher] starting harness {version} on 127.0.0.1:{port}"));
+    append_log(
+        runtime_dir,
+        &format!("[launcher] starting harness {version} on 127.0.0.1:{port}"),
+    );
 
     let runtime_dir_buf = runtime_dir.to_path_buf();
     let tail = Arc::clone(&runtime.log_tail);
@@ -367,13 +390,16 @@ pub fn start(
                     // stored or broadcast uses the redacted form (SN9).
                     if let Some(url) = parse_web_url_line(&trimmed) {
                         *web_url.lock().unwrap() = Some(url.clone());
-                        let _ = app_handle.emit("launcher://status", HarnessStatus {
-                            running: true,
-                            phase: PHASE_RUNNING.to_string(),
-                            version: Some(version_display.clone()),
-                            port: Some(port_n),
-                            last_log: redact_token(&trimmed),
-                        });
+                        let _ = app_handle.emit(
+                            "launcher://status",
+                            HarnessStatus {
+                                running: true,
+                                phase: PHASE_RUNNING.to_string(),
+                                version: Some(version_display.clone()),
+                                port: Some(port_n),
+                                last_log: redact_token(&trimmed),
+                            },
+                        );
                     }
                     let stored = redact_token(&trimmed);
                     append_log(&runtime_dir_buf, &stored);
@@ -384,8 +410,14 @@ pub fn start(
                     }
                 }
                 Ok(CommandEvent::Terminated(payload)) => {
-                    let code = payload.code.map(|c| c.to_string()).unwrap_or_else(|| "?".into());
-                    append_log(&runtime_dir_buf, &format!("[harness] exited with code {code}"));
+                    let code = payload
+                        .code
+                        .map(|c| c.to_string())
+                        .unwrap_or_else(|| "?".into());
+                    append_log(
+                        &runtime_dir_buf,
+                        &format!("[harness] exited with code {code}"),
+                    );
                     // Only clear the slot if this event belongs to the current child.
                     let mut guard = proc.lock().unwrap();
                     let matches = matches!(guard.as_ref(), Some(s) if s.id == id);
@@ -418,22 +450,25 @@ pub fn start(
                 *phase.lock().unwrap() = PHASE_STOPPED.to_string();
             }
         }
-        let _ = app_handle.emit("launcher://status", HarnessStatus {
-            running: false,
-            phase: PHASE_STOPPED.to_string(),
-            version: Some(version_display),
-            port: Some(port_n),
-            last_log: String::new(),
-        });
+        let _ = app_handle.emit(
+            "launcher://status",
+            HarnessStatus {
+                running: false,
+                phase: PHASE_STOPPED.to_string(),
+                version: Some(version_display),
+                port: Some(port_n),
+                last_log: String::new(),
+            },
+        );
     });
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
+    use super::HarnessRuntime;
     use super::parse_web_url_line;
     use super::redact_token;
-    use super::HarnessRuntime;
 
     #[test]
     fn tail_text_returns_the_most_recent_lines() {
@@ -449,15 +484,22 @@ mod tests {
     #[test]
     fn parses_token_url_line() {
         assert_eq!(
-            parse_web_url_line("dsh web: http://127.0.0.1:3081/?token=test-token-0123456789abcdefghijklmnopqrstuvwxyz"),
-            Some("http://127.0.0.1:3081/?token=test-token-0123456789abcdefghijklmnopqrstuvwxyz".to_string())
+            parse_web_url_line(
+                "dsh web: http://127.0.0.1:3081/?token=test-token-0123456789abcdefghijklmnopqrstuvwxyz"
+            ),
+            Some(
+                "http://127.0.0.1:3081/?token=test-token-0123456789abcdefghijklmnopqrstuvwxyz"
+                    .to_string()
+            )
         );
     }
 
     #[test]
     fn parses_token_url_line_with_lan_suffix() {
         assert_eq!(
-            parse_web_url_line("dsh web: http://127.0.0.1:3081/?token=abc_DEF-123 (LAN: http://192.168.1.5:3081/?token=abc_DEF-123)"),
+            parse_web_url_line(
+                "dsh web: http://127.0.0.1:3081/?token=abc_DEF-123 (LAN: http://192.168.1.5:3081/?token=abc_DEF-123)"
+            ),
             Some("http://127.0.0.1:3081/?token=abc_DEF-123".to_string())
         );
     }
@@ -475,14 +517,23 @@ mod tests {
     #[test]
     fn lan_url_line_yields_none() {
         // A LAN-prefixed line alone (never our bind shape) must not be used.
-        assert_eq!(parse_web_url_line("dsh web: http://192.168.1.5:3081/?token=abc"), None);
+        assert_eq!(
+            parse_web_url_line("dsh web: http://192.168.1.5:3081/?token=abc"),
+            None
+        );
     }
 
     #[test]
     fn ignores_unrelated_lines() {
-        assert_eq!(parse_web_url_line("[launcher] starting harness 0.1.2-alpha.3 on 127.0.0.1:3081"), None);
+        assert_eq!(
+            parse_web_url_line("[launcher] starting harness 0.1.2-alpha.3 on 127.0.0.1:3081"),
+            None
+        );
         assert_eq!(parse_web_url_line(""), None);
-        assert_eq!(parse_web_url_line("listening on http://127.0.0.1:3081"), None);
+        assert_eq!(
+            parse_web_url_line("listening on http://127.0.0.1:3081"),
+            None
+        );
     }
 
     #[test]
@@ -500,7 +551,9 @@ mod tests {
             "dsh web: http://127.0.0.1:3081/?token=[CENSORED]"
         );
         assert_eq!(
-            redact_token("dsh web: http://127.0.0.1:3081/?token=abc (LAN: http://1.2.3.4:3081/?token=abc)"),
+            redact_token(
+                "dsh web: http://127.0.0.1:3081/?token=abc (LAN: http://1.2.3.4:3081/?token=abc)"
+            ),
             "dsh web: http://127.0.0.1:3081/?token=[CENSORED] (LAN: http://1.2.3.4:3081/?token=[CENSORED])"
         );
     }
@@ -515,7 +568,10 @@ mod tests {
 
     #[test]
     fn leaves_plain_lines_untouched() {
-        assert_eq!(redact_token("[launcher] starting harness 0.1.2 on 127.0.0.1:3081"), "[launcher] starting harness 0.1.2 on 127.0.0.1:3081");
+        assert_eq!(
+            redact_token("[launcher] starting harness 0.1.2 on 127.0.0.1:3081"),
+            "[launcher] starting harness 0.1.2 on 127.0.0.1:3081"
+        );
         assert_eq!(redact_token("token="), "token=");
         assert_eq!(redact_token("no tokens here"), "no tokens here");
     }

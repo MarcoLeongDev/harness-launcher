@@ -147,8 +147,12 @@ fn fix_default_preset(
     let Some((value_start, value_len, value)) = find_default_entry(&text) else {
         return Ok(false);
     };
-    let value = value.trim().trim_matches('"').trim_matches('\'').to_string();
-    if available.iter().any(|p| *p == value) {
+    let value = value
+        .trim()
+        .trim_matches('"')
+        .trim_matches('\'')
+        .to_string();
+    if available.contains(&value) {
         return Ok(false);
     }
     let Some(replacement) = successor_preset(&value, available) else {
@@ -226,8 +230,8 @@ fn ensure_legacy_code_shim(
     }
     let composition = available_composition_dir(version_dir, STANDARD_PRESET)
         .ok_or_else(|| format!("preset {STANDARD_PRESET} has no {COMPOSITION_FILE}"))?;
-    let shipped = std::fs::read(&composition)
-        .map_err(|e| format!("read {}: {e}", composition.display()))?;
+    let shipped =
+        std::fs::read(&composition).map_err(|e| format!("read {}: {e}", composition.display()))?;
     let shim = home.join(USER_PRESET_DIR).join(LEGACY_CODE_PRESET);
     let target = shim.join(COMPOSITION_FILE);
     let marker = shim.join(SHIM_MARKER);
@@ -253,7 +257,9 @@ fn ensure_legacy_code_shim(
     // launcher-managed: either the marker still matches its bytes (installed
     // by the launcher and untouched since), or there is no marker yet but the
     // bytes open with the copied "standard" header (a pre-marker install).
-    let marker_hash = std::fs::read_to_string(&marker).ok().map(|s| s.trim().to_string());
+    let marker_hash = std::fs::read_to_string(&marker)
+        .ok()
+        .map(|s| s.trim().to_string());
     let managed = marker_hash.as_deref() == Some(&fnv1a64_hex(&current))
         || (!marker.is_file() && current.starts_with(SHIM_COPIED_HEADER));
     if !managed {
@@ -313,7 +319,8 @@ mod tests {
     struct TempDir(PathBuf);
     impl TempDir {
         fn new(tag: &str) -> Self {
-            let dir = std::env::temp_dir().join(format!("dsh-launcher-presets-{tag}-{}", std::process::id()));
+            let dir = std::env::temp_dir()
+                .join(format!("dsh-launcher-presets-{tag}-{}", std::process::id()));
             let _ = std::fs::remove_dir_all(&dir);
             std::fs::create_dir_all(&dir).unwrap();
             TempDir(dir)
@@ -355,8 +362,14 @@ mod tests {
         let tmp = TempDir::new("enumerate");
         let alpha = alpha_style_version(&tmp.0.join("alpha"));
         let rc = rc_style_version(&tmp.0.join("rc"));
-        assert_eq!(available_presets(&alpha), vec!["cordis", "minimal", "ptc", "standard"]);
-        assert_eq!(available_presets(&rc), vec!["code", "cordis", "minimal", "standard"]);
+        assert_eq!(
+            available_presets(&alpha),
+            vec!["cordis", "minimal", "ptc", "standard"]
+        );
+        assert_eq!(
+            available_presets(&rc),
+            vec!["code", "cordis", "minimal", "standard"]
+        );
     }
 
     #[test]
@@ -375,7 +388,8 @@ mod tests {
             "standard".to_string(),
         ];
         let mut lines = Vec::new();
-        let changed = fix_default_preset(&tmp.0, &available, &mut |l| lines.push(l.to_string())).unwrap();
+        let changed =
+            fix_default_preset(&tmp.0, &available, &mut |l| lines.push(l.to_string())).unwrap();
         assert!(changed);
         let text = std::fs::read_to_string(&settings).unwrap();
         assert!(text.contains("default: standard"), "{text}");
@@ -387,13 +401,19 @@ mod tests {
     #[test]
     fn keeps_default_when_engine_ships_it() {
         let tmp = TempDir::new("keep");
-        std::fs::write(tmp.0.join(SETTINGS_FILE), "agent-presets:\n  default: code\n").unwrap();
+        std::fs::write(
+            tmp.0.join(SETTINGS_FILE),
+            "agent-presets:\n  default: code\n",
+        )
+        .unwrap();
         let available = vec!["code".to_string(), "standard".to_string()];
         let changed = fix_default_preset(&tmp.0, &available, &mut |_| {}).unwrap();
         assert!(!changed);
-        assert!(std::fs::read_to_string(tmp.0.join(SETTINGS_FILE))
-            .unwrap()
-            .contains("default: code"));
+        assert!(
+            std::fs::read_to_string(tmp.0.join(SETTINGS_FILE))
+                .unwrap()
+                .contains("default: code")
+        );
     }
 
     #[test]
@@ -403,7 +423,11 @@ mod tests {
         let changed = fix_default_preset(&tmp.0, &["standard".to_string()], &mut |_| {}).unwrap();
         assert!(!changed);
         // File without an agent-presets block.
-        std::fs::write(tmp.0.join(SETTINGS_FILE), "ui-theme:\n  preference: system\n").unwrap();
+        std::fs::write(
+            tmp.0.join(SETTINGS_FILE),
+            "ui-theme:\n  preference: system\n",
+        )
+        .unwrap();
         let changed = fix_default_preset(&tmp.0, &["standard".to_string()], &mut |_| {}).unwrap();
         assert!(!changed);
     }
@@ -411,7 +435,11 @@ mod tests {
     #[test]
     fn repair_rewrites_quoted_values() {
         let tmp = TempDir::new("quoted");
-        std::fs::write(tmp.0.join(SETTINGS_FILE), "agent-presets:\n  default: \"code\"\n").unwrap();
+        std::fs::write(
+            tmp.0.join(SETTINGS_FILE),
+            "agent-presets:\n  default: \"code\"\n",
+        )
+        .unwrap();
         let available = vec!["standard".to_string()];
         let changed = fix_default_preset(&tmp.0, &available, &mut |_| {}).unwrap();
         assert!(changed);
@@ -426,16 +454,27 @@ mod tests {
         let version = alpha_style_version(&tmp.0);
         let available = available_presets(&version);
         let mut lines = Vec::new();
-        let made = ensure_legacy_code_shim(&home.0, &version, &available, &mut |l| lines.push(l.to_string())).unwrap();
+        let made = ensure_legacy_code_shim(&home.0, &version, &available, &mut |l| {
+            lines.push(l.to_string())
+        })
+        .unwrap();
         assert!(made);
-        let shim = home.0.join(USER_PRESET_DIR).join(LEGACY_CODE_PRESET).join(COMPOSITION_FILE);
+        let shim = home
+            .0
+            .join(USER_PRESET_DIR)
+            .join(LEGACY_CODE_PRESET)
+            .join(COMPOSITION_FILE);
         assert!(shim.is_file());
         assert_eq!(std::fs::read_to_string(&shim).unwrap(), "# standard");
         // A second run must not clobber (even a user-edited) shim.
         std::fs::write(&shim, "# user edited").unwrap();
         let again = ensure_legacy_code_shim(&home.0, &version, &available, &mut |_| {}).unwrap();
         assert!(!again);
-        assert!(std::fs::read_to_string(&shim).unwrap().contains("user edited"));
+        assert!(
+            std::fs::read_to_string(&shim)
+                .unwrap()
+                .contains("user edited")
+        );
     }
 
     fn engine_with_standard(root: &Path, contents: &str) -> PathBuf {
@@ -447,7 +486,11 @@ mod tests {
 
     fn shim_files(home: &Path) -> (PathBuf, PathBuf, PathBuf) {
         let dir = home.join(USER_PRESET_DIR).join(LEGACY_CODE_PRESET);
-        (dir.join(COMPOSITION_FILE), dir.join(SHIM_MARKER), dir.join(SHIM_BACKUP))
+        (
+            dir.join(COMPOSITION_FILE),
+            dir.join(SHIM_MARKER),
+            dir.join(SHIM_BACKUP),
+        )
     }
 
     #[test]
@@ -461,7 +504,10 @@ mod tests {
         );
         let available = available_presets(&v1);
         let mut lines = Vec::new();
-        assert!(ensure_legacy_code_shim(&home.0, &v1, &available, &mut |l| lines.push(l.to_string())).unwrap());
+        assert!(
+            ensure_legacy_code_shim(&home.0, &v1, &available, &mut |l| lines.push(l.to_string()))
+                .unwrap()
+        );
         // v2 changes the composition (persona `text` -> required `prefix`).
         let v2 = engine_with_standard(
             &tmp.0.join("v2"),
@@ -469,12 +515,22 @@ mod tests {
         );
         let available2 = available_presets(&v2);
         let mut lines2 = Vec::new();
-        let refreshed =
-            ensure_legacy_code_shim(&home.0, &v2, &available2, &mut |l| lines2.push(l.to_string())).unwrap();
+        let refreshed = ensure_legacy_code_shim(&home.0, &v2, &available2, &mut |l| {
+            lines2.push(l.to_string())
+        })
+        .unwrap();
         assert!(refreshed);
         let (target, _, backup) = shim_files(&home.0);
-        assert!(std::fs::read_to_string(&target).unwrap().contains("prefix: new"));
-        assert!(std::fs::read_to_string(&backup).unwrap().contains("text: old"));
+        assert!(
+            std::fs::read_to_string(&target)
+                .unwrap()
+                .contains("prefix: new")
+        );
+        assert!(
+            std::fs::read_to_string(&backup)
+                .unwrap()
+                .contains("text: old")
+        );
         assert!(lines2.iter().any(|l| l.contains("refreshed")));
         // A third run is a no-op once in sync.
         let again = ensure_legacy_code_shim(&home.0, &v2, &available2, &mut |_| {}).unwrap();
@@ -485,18 +541,30 @@ mod tests {
     fn shim_preserves_user_edits_after_install() {
         let tmp = TempDir::new("shim-edited");
         let home = TempDir::new("shim-edited-home");
-        let v1 = engine_with_standard(&tmp.0.join("v1"), "# The `standard` agent preset\n    prefix: v1\n");
+        let v1 = engine_with_standard(
+            &tmp.0.join("v1"),
+            "# The `standard` agent preset\n    prefix: v1\n",
+        );
         let available = available_presets(&v1);
         assert!(ensure_legacy_code_shim(&home.0, &v1, &available, &mut |_| {}).unwrap());
         let (target, _, backup) = shim_files(&home.0);
         std::fs::write(&target, "# my custom code preset\n    prefix: mine\n").unwrap();
-        let v2 = engine_with_standard(&tmp.0.join("v2"), "# The `standard` agent preset\n    prefix: v2\n");
+        let v2 = engine_with_standard(
+            &tmp.0.join("v2"),
+            "# The `standard` agent preset\n    prefix: v2\n",
+        );
         let available2 = available_presets(&v2);
         let mut lines = Vec::new();
-        let changed =
-            ensure_legacy_code_shim(&home.0, &v2, &available2, &mut |l| lines.push(l.to_string())).unwrap();
+        let changed = ensure_legacy_code_shim(&home.0, &v2, &available2, &mut |l| {
+            lines.push(l.to_string())
+        })
+        .unwrap();
         assert!(!changed);
-        assert!(std::fs::read_to_string(&target).unwrap().contains("prefix: mine"));
+        assert!(
+            std::fs::read_to_string(&target)
+                .unwrap()
+                .contains("prefix: mine")
+        );
         assert!(!backup.is_file());
         assert!(lines.iter().any(|l| l.contains("leaving it alone")));
     }
@@ -519,8 +587,10 @@ mod tests {
         )
         .unwrap();
         let mut lines = Vec::new();
-        let changed =
-            ensure_legacy_code_shim(&home.0, &version, &available, &mut |l| lines.push(l.to_string())).unwrap();
+        let changed = ensure_legacy_code_shim(&home.0, &version, &available, &mut |l| {
+            lines.push(l.to_string())
+        })
+        .unwrap();
         assert!(!changed);
         let (_, marker, _) = shim_files(&home.0);
         assert!(marker.is_file());
@@ -534,19 +604,33 @@ mod tests {
         // Pre-marker shim: stale bytes with the copied header, no marker.
         let shim = home.0.join(USER_PRESET_DIR).join(LEGACY_CODE_PRESET);
         std::fs::create_dir_all(&shim).unwrap();
-        std::fs::write(shim.join(COMPOSITION_FILE), "# The `standard` agent preset\n    text: old\n").unwrap();
+        std::fs::write(
+            shim.join(COMPOSITION_FILE),
+            "# The `standard` agent preset\n    text: old\n",
+        )
+        .unwrap();
         let version = engine_with_standard(
             &tmp.0.join("v"),
             "# The `standard` agent preset\n    prefix: new\n",
         );
         let available = available_presets(&version);
         let mut lines = Vec::new();
-        let changed =
-            ensure_legacy_code_shim(&home.0, &version, &available, &mut |l| lines.push(l.to_string())).unwrap();
+        let changed = ensure_legacy_code_shim(&home.0, &version, &available, &mut |l| {
+            lines.push(l.to_string())
+        })
+        .unwrap();
         assert!(changed);
         let (target, marker, backup) = shim_files(&home.0);
-        assert!(std::fs::read_to_string(&target).unwrap().contains("prefix: new"));
-        assert!(std::fs::read_to_string(&backup).unwrap().contains("text: old"));
+        assert!(
+            std::fs::read_to_string(&target)
+                .unwrap()
+                .contains("prefix: new")
+        );
+        assert!(
+            std::fs::read_to_string(&backup)
+                .unwrap()
+                .contains("text: old")
+        );
         assert!(marker.is_file());
         assert!(lines.iter().any(|l| l.contains("refreshed")));
     }
@@ -558,7 +642,11 @@ mod tests {
         // No marker, and the bytes do not look like a launcher copy.
         let shim = home.0.join(USER_PRESET_DIR).join(LEGACY_CODE_PRESET);
         std::fs::create_dir_all(&shim).unwrap();
-        std::fs::write(shim.join(COMPOSITION_FILE), "# my own code preset\n- id: persona\n").unwrap();
+        std::fs::write(
+            shim.join(COMPOSITION_FILE),
+            "# my own code preset\n- id: persona\n",
+        )
+        .unwrap();
         let version = engine_with_standard(
             &tmp.0.join("v"),
             "# The `standard` agent preset\n    prefix: new\n",
@@ -567,7 +655,11 @@ mod tests {
         let changed = ensure_legacy_code_shim(&home.0, &version, &available, &mut |_| {}).unwrap();
         assert!(!changed);
         let (target, _, backup) = shim_files(&home.0);
-        assert!(std::fs::read_to_string(&target).unwrap().contains("my own code preset"));
+        assert!(
+            std::fs::read_to_string(&target)
+                .unwrap()
+                .contains("my own code preset")
+        );
         assert!(!backup.is_file());
     }
 
@@ -579,6 +671,12 @@ mod tests {
         let available = available_presets(&version);
         let made = ensure_legacy_code_shim(&home.0, &version, &available, &mut |_| {}).unwrap();
         assert!(!made);
-        assert!(!home.0.join(USER_PRESET_DIR).join(LEGACY_CODE_PRESET).exists());
+        assert!(
+            !home
+                .0
+                .join(USER_PRESET_DIR)
+                .join(LEGACY_CODE_PRESET)
+                .exists()
+        );
     }
 }

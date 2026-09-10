@@ -78,7 +78,13 @@ pub fn push_console(app: &AppHandle, op: &str, stream: &str, text: &str) {
 
 /// Snapshot of the recent console lines (for windows that open mid-operation).
 pub fn console_snapshot(app: &AppHandle) -> Vec<ConsoleLine> {
-    app.state::<AppState>().console.lock().unwrap().iter().cloned().collect()
+    app.state::<AppState>()
+        .console
+        .lock()
+        .unwrap()
+        .iter()
+        .cloned()
+        .collect()
 }
 
 /// Drop the console lines of one operation (or every line when the key is
@@ -96,7 +102,14 @@ pub fn reset_console(app: &AppHandle, op: &str) {
 /// Emit a progress update and record it as the current state of that
 /// operation. The legacy single-slot `current_op` keeps mirroring the
 /// first (deterministic) in-flight operation for older UIs (overlay).
-pub fn emit(app: &AppHandle, op: &str, version: Option<&str>, phase: &str, message: &str, percent: Option<u8>) {
+pub fn emit(
+    app: &AppHandle,
+    op: &str,
+    version: Option<&str>,
+    phase: &str,
+    message: &str,
+    percent: Option<u8>,
+) {
     let payload = ProgressPayload {
         op: op.to_string(),
         version: version.map(|s| s.to_string()),
@@ -144,7 +157,13 @@ pub fn clear(app: &AppHandle) {
 
 /// All in-flight operations, ordered by key.
 pub fn current_ops(app: &AppHandle) -> Vec<ProgressPayload> {
-    app.state::<AppState>().current_ops.lock().unwrap().values().cloned().collect()
+    app.state::<AppState>()
+        .current_ops
+        .lock()
+        .unwrap()
+        .values()
+        .cloned()
+        .collect()
 }
 
 /// Convenience: emit a "done" phase for an operation and drop its in-flight

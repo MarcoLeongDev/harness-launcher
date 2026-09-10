@@ -1,8 +1,8 @@
 //! Shared application state + path helpers.
 use std::collections::{BTreeMap, VecDeque};
 use std::path::PathBuf;
-use std::sync::atomic::AtomicBool;
 use std::sync::Mutex;
+use std::sync::atomic::AtomicBool;
 
 use tauri::Manager;
 
@@ -40,20 +40,11 @@ pub struct AppState {
     pub version_mutation: Mutex<()>,
 }
 
+#[derive(Default)]
 pub struct VersionCache {
     pub versions: Vec<String>,
     pub include_prerelease: bool,
     pub fetched_at: Option<std::time::Instant>,
-}
-
-impl Default for VersionCache {
-    fn default() -> Self {
-        Self {
-            versions: Vec::new(),
-            include_prerelease: false,
-            fetched_at: None,
-        }
-    }
 }
 
 impl Default for AppState {
@@ -68,17 +59,17 @@ impl Default for AppState {
             current_op: Mutex::new(None),
             current_ops: Mutex::new(BTreeMap::new()),
             console: Mutex::new(VecDeque::new()),
-                tray_state: Mutex::new(None),
+            tray_state: Mutex::new(None),
             version_cache: Mutex::new(VersionCache::default()),
             version_mutation: Mutex::new(()),
         }
     }
 }
 
-
-
 pub fn data_dir(app: &tauri::AppHandle) -> PathBuf {
-    app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."))
+    app.path()
+        .app_data_dir()
+        .unwrap_or_else(|_| PathBuf::from("."))
 }
 
 pub fn runtime_dir(app: &tauri::AppHandle) -> PathBuf {

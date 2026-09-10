@@ -68,12 +68,20 @@ pub fn run() {
                 "/stopped" => tauri::http::Response::builder()
                     .header("Content-Type", "text/html; charset=utf-8")
                     .header("Content-Security-Policy", DSH_UI_CSP)
-                    .body(include_str!("../resources/stopped.html").as_bytes().to_vec())
+                    .body(
+                        include_str!("../resources/stopped.html")
+                            .as_bytes()
+                            .to_vec(),
+                    )
                     .unwrap(),
                 _ => tauri::http::Response::builder()
                     .header("Content-Type", "text/html; charset=utf-8")
                     .header("Content-Security-Policy", DSH_UI_CSP)
-                    .body(include_str!("../resources/settings.html").as_bytes().to_vec())
+                    .body(
+                        include_str!("../resources/settings.html")
+                            .as_bytes()
+                            .to_vec(),
+                    )
                     .unwrap(),
             }
         })
@@ -101,7 +109,7 @@ pub fn run() {
             commands::set_version,
             commands::open_settings,
             commands::open_harness_window,
-                    commands::delete_version,
+            commands::delete_version,
             commands::open_version_dir,
             commands::quit_app
         ])
@@ -134,7 +142,9 @@ pub fn run() {
 fn boot(app: AppHandle) {
     std::thread::spawn(move || match boot_inner(&app) {
         Ok(actual_port) => {
-            app.state::<AppState>().booted.store(true, Ordering::Relaxed);
+            app.state::<AppState>()
+                .booted
+                .store(true, Ordering::Relaxed);
             // Token engines (0.1.2-alpha.2+) print their authenticated URL
             // right after binding — wait briefly for it so the first window
             // open already carries the launch token. Blocking here is safe:
@@ -160,7 +170,8 @@ fn boot(app: AppHandle) {
         Err(e) => {
             *app.state::<AppState>().boot_error.lock().unwrap() = Some(e.clone());
             settings::log(&state::data_dir(&app), &format!("boot failed: {e}"));
-            let _ = app.notification()
+            let _ = app
+                .notification()
                 .builder()
                 .title("Harness Launcher - boot failed")
                 .body(&e)
@@ -201,7 +212,9 @@ fn boot_inner(app: &AppHandle) -> Result<u16, String> {
     if !settings_snapshot.start_on_launch {
         settings::log(
             &state::data_dir(app),
-            &format!("engine start disabled on launch (start_on_launch=false); stopped on {actual}"),
+            &format!(
+                "engine start disabled on launch (start_on_launch=false); stopped on {actual}"
+            ),
         );
         return Ok(actual);
     }
@@ -226,15 +239,26 @@ fn boot_inner(app: &AppHandle) -> Result<u16, String> {
             runtime::start(app, &st.runtime, &rd, &version, actual)?;
             if port::wait_until_serving(actual, Duration::from_secs(30)) {
                 st.runtime.mark_phase(runtime::PHASE_RUNNING);
-                settings::log(&state::data_dir(app), &format!("harness {version} repaired + serving on 127.0.0.1:{actual}"));
+                settings::log(
+                    &state::data_dir(app),
+                    &format!("harness {version} repaired + serving on 127.0.0.1:{actual}"),
+                );
                 return Ok(actual);
             }
             runtime::stop(&st.runtime, &state::runtime_dir(app));
-            return Err(versions::native_binding_error(&version, &st.runtime.tail_text(40)));
+            return Err(versions::native_binding_error(
+                &version,
+                &st.runtime.tail_text(40),
+            ));
         }
-        return Err(format!("harness {version} did not answer on 127.0.0.1:{actual} within 30s"));
+        return Err(format!(
+            "harness {version} did not answer on 127.0.0.1:{actual} within 30s"
+        ));
     }
     st.runtime.mark_phase(runtime::PHASE_RUNNING);
-    settings::log(&state::data_dir(app), &format!("harness {version} serving on 127.0.0.1:{actual}"));
+    settings::log(
+        &state::data_dir(app),
+        &format!("harness {version} serving on 127.0.0.1:{actual}"),
+    );
     Ok(actual)
 }

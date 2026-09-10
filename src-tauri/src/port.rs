@@ -119,6 +119,9 @@ mod tests {
         if let Some(hint) = holder_hint(busy) {
             assert!(hint.contains(&format!("port {busy}")), "{hint}");
         }
-        assert!(listener.local_addr().is_ok(), "hint must not disturb the holder");
+        assert!(
+            listener.local_addr().is_ok(),
+            "hint must not disturb the holder"
+        );
     }
 }
