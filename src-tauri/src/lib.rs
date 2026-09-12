@@ -121,7 +121,6 @@ pub fn run() {
             commands::update_to_latest,
             commands::rollback,
             commands::set_port,
-            commands::set_prerelease,
             commands::set_language,
             commands::check_updates,
             commands::refresh_versions,

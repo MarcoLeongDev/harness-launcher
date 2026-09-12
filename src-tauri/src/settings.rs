@@ -28,7 +28,6 @@ pub const LAUNCHER_LOG_MAX_BYTES: u64 = 1024 * 1024;
 #[serde(default)]
 pub struct Settings {
     pub port: u16,
-    pub include_prerelease: bool,
     /// Reserved for a future app self-update endpoint. Parsed and preserved,
     /// but the manual update check deliberately does not report app
     /// self-update state (no configuration UI; see update-service spec).
@@ -48,7 +47,6 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             port: DEFAULT_PORT,
-            include_prerelease: false,
             update_endpoint: None,
             current_version: None,
             previous_version: None,
@@ -121,7 +119,7 @@ mod tests {
         let s = Settings::default();
         assert_eq!(s.port, DEFAULT_PORT);
         assert!(s.start_on_launch);
-        assert!(!s.include_prerelease);
+        assert!(s.update_endpoint.is_none());
         assert!(s.current_version.is_none());
         assert_eq!(s.language, "en");
     }
@@ -132,6 +130,24 @@ mod tests {
         assert_eq!(normalize_language(" zh-Hant "), "zh-Hant");
         assert_eq!(normalize_language("fr"), "en");
         assert_eq!(normalize_language(""), "en");
+    }
+
+    #[test]
+    fn retired_prerelease_key_still_loads() {
+        // The pre-release toggle was removed: files written by older builds
+        // still carry `include_prerelease`, which serde ignores (no
+        // deny_unknown_fields), so user settings survive redeployment.
+        let dir = std::env::temp_dir().join(format!("dsh-settings-pre-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        std::fs::write(
+            settings_path(&dir),
+            r#"{"port": 4101, "include_prerelease": true}"#,
+        )
+        .unwrap();
+        let s = load(&dir);
+        assert_eq!(s.port, 4101);
+        assert_eq!(s.language, "en");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

@@ -28,7 +28,6 @@ pub struct StatusPayload {
     pub installed_versions: Vec<String>,
     pub latest_remote: Option<String>,
     pub update_available: bool,
-    pub include_prerelease: bool,
     pub language: String,
     pub start_on_launch: bool,
     pub boot_error: Option<String>,
@@ -51,8 +50,7 @@ pub struct StatusPayload {
 /// ports, settings, app exit) requires the launcher-owned Control Panel
 /// (`settings`) window. POLICY: allow = get_status, tail_logs, engine_start
 /// (stopped page), open_in_browser, open_repo_page, open_settings,
-/// open_harness_window, set_prerelease (view filter), check_updates
-/// (read-only + notify).
+/// open_harness_window, check_updates (read-only + notify).
 fn require_panel(window: &tauri::Window) -> Result<(), String> {
     if window.label() == crate::window::LABEL {
         return Err("not permitted from the harness window — use the Control Panel".into());
@@ -502,11 +500,10 @@ pub async fn get_status(app: AppHandle) -> Result<StatusPayload, String> {
                 .fetched_at
                 .map(|t| t.elapsed().as_secs() >= 60)
                 .unwrap_or(true);
-            if stale || vc.include_prerelease != settings.include_prerelease {
-                match versions::list_versions(&app, &rd, settings.include_prerelease) {
+            if stale {
+                match versions::list_versions(&app, &rd) {
                     Ok(v) => {
                         vc.versions = v.clone();
-                        vc.include_prerelease = settings.include_prerelease;
                         vc.fetched_at = Some(std::time::Instant::now());
                         v
                     }
@@ -547,7 +544,6 @@ pub async fn get_status(app: AppHandle) -> Result<StatusPayload, String> {
             installed_versions: installed,
             latest_remote,
             update_available,
-            include_prerelease: settings.include_prerelease,
             language: settings.language.clone(),
             start_on_launch: settings.start_on_launch,
             boot_error,
@@ -791,15 +787,6 @@ pub async fn set_port(app: AppHandle, window: tauri::Window, port: u16) -> Resul
     })
     .await
     .map_err(|e| e.to_string())?
-}
-
-#[tauri::command]
-pub async fn set_prerelease(app: AppHandle, include: bool) -> Result<String, String> {
-    state::update_settings(&app, |s| s.include_prerelease = include);
-    Ok(format!(
-        "pre-release versions {}",
-        if include { "shown" } else { "hidden" }
-    ))
 }
 
 /// Persist the UI language (Control Panel + tray menu) and re-label the
@@ -1155,19 +1142,17 @@ pub async fn refresh_versions(app: AppHandle, window: tauri::Window) -> Result<S
     // Async + spawn_blocking: the listing shells out to npm and must never
     // block the main thread (same reason as get_status).
     tauri::async_runtime::spawn_blocking(move || {
-        let settings = state::read_settings(&app);
         let rd = state::runtime_dir(&app);
         // Drop the cached list first so the fetch below cannot serve stale
         // data even if listing falls back; then refresh through the same
-        // choke point get_status uses, so filtering/sorting stay identical.
+        // choke point get_status uses, so sorting stays identical.
         invalidate_version_cache(&app);
-        match versions::list_versions(&app, &rd, settings.include_prerelease) {
+        match versions::list_versions(&app, &rd) {
             Ok(v) => {
                 let n = v.len();
                 let st = app.state::<AppState>();
                 let mut vc = crate::state::mutex_lock(&st.version_cache);
                 vc.versions = v;
-                vc.include_prerelease = settings.include_prerelease;
                 vc.fetched_at = Some(std::time::Instant::now());
                 Ok(format!("version list refreshed ({n} versions)"))
             }

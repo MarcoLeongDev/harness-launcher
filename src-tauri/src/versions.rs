@@ -169,11 +169,10 @@ pub fn run_npm(
     }
     Ok((stdout, stderr))
 }
-pub fn list_versions(
-    app: &AppHandle,
-    runtime_dir: &Path,
-    include_prerelease: bool,
-) -> Result<Vec<String>, String> {
+/// Every published harness version, ascending by semver — pre-releases
+/// included, no filter. The pre-release toggle was removed: the panel always
+/// shows everything by default.
+pub fn list_versions(app: &AppHandle, runtime_dir: &Path) -> Result<Vec<String>, String> {
     let (out, err) = run_npm(
         app,
         runtime_dir,
@@ -204,17 +203,7 @@ pub fn list_versions(
     }
     parsed.sort_by(|a, b| a.0.cmp(&b.0));
     parsed.dedup_by(|a, b| a.0 == b.0);
-
-    let stable: Vec<String> = parsed
-        .iter()
-        .filter(|(v, _)| v.pre.is_empty())
-        .map(|(_, s)| s.clone())
-        .collect();
-    if include_prerelease || stable.is_empty() {
-        Ok(parsed.into_iter().map(|(_, s)| s).collect())
-    } else {
-        Ok(stable)
-    }
+    Ok(parsed.into_iter().map(|(_, s)| s).collect())
 }
 
 /// Newest version of a published-version list: the maximum by semver order.
@@ -239,7 +228,7 @@ pub fn newest_published(versions: &[String]) -> Option<String> {
 /// dist-tag, which can lag the actual newest release (e.g. while newer
 /// pre-releases exist).
 pub fn fetch_newest(app: &AppHandle, runtime_dir: &Path) -> Result<String, String> {
-    let all = list_versions(app, runtime_dir, true)?;
+    let all = list_versions(app, runtime_dir)?;
     newest_published(&all).ok_or_else(|| "npm registry returned no usable versions".to_string())
 }
 

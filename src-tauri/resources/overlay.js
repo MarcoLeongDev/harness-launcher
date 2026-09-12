@@ -120,9 +120,6 @@
       <div class="row">
         <button id="lc-update" class="ghost">Update to latest</button>
         <button id="lc-rollback" class="ghost">Rollback</button>
-        <label class="hint" style="display:flex;align-items:center;gap:4px">
-          <input type="checkbox" id="lc-prerelease"> Pre-release
-        </label>
       </div>
       <h3>Port (localhost)</h3>
       <div class="row">
@@ -293,7 +290,6 @@
       }
       fillVersions(s);
       fillSettings(s);
-      populatePreRelease(s.includePrerelease);
       const rb = $("lc-rollback");
       rb.disabled = !s.previousVersion;
       rb.title = s.previousVersion ? `Rollback to v${s.previousVersion}` : "No previous version installed";
@@ -307,9 +303,6 @@
 
   function fillSettings(s) {
     if ($("lc-port").value === "" && s.port) $("lc-port").value = String(s.port);
-  }
-  function populatePreRelease(on) {
-    $("lc-prerelease").checked = !!on;
   }
 
   // Track the selected version so the Delete button is only usable on an
@@ -434,14 +427,6 @@
     const port = parseInt($("lc-port").value, 10);
     if (!port || port < 1 || port > 65535) return setMsg("invalid port", true);
     withBusy(this, () => invoke("set_port", { port: port }));
-  });
-
-  $("lc-prerelease").addEventListener("change", function () {
-    invoke("set_prerelease", { include: this.checked })
-      .then(refreshStatus)
-      .catch((e) => {
-        setMsg(String(e.message || e), true);
-      });
   });
 
   $("lc-check").addEventListener("click", function () {
