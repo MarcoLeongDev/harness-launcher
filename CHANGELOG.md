@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.1.105 — Auto-update section removed
+- The overlay's standalone Updates section is gone (its "Moved…" pointer with it): manual update discovery lives only in the Version section's Get Latest cell, and the check result carries harness state only — no app self-update notes, no auto-check wording anywhere in the UI.
+
 ## v0.1.104 — Get Latest cell in the Version section
 - The overlay's update check moved into the Version section as one cell: a "Get Latest" button plus an inline latest-version result (was "Check for updates now" in the standalone Updates section, whose result never rendered). Clicking it busy-disables the button with a spinner and reports the newest-version state — available, downloaded-with-switch-hint, or up to date — right inside the cell.
 

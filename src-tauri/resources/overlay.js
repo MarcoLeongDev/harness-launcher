@@ -131,8 +131,6 @@
         <button id="lc-apply-port" class="ghost">Apply</button>
         <span id="lc-actual" class="hint"></span>
       </div>
-      <h3>Updates</h3>
-      <div class="row"><span class="hint">Moved to the Version section above.</span></div>
       <h3>Logs</h3>
       <div class="row"><button id="lc-logrefresh" class="ghost">Refresh tail</button>
         <button id="lc-logtoggle" class="ghost">Show/Hide</button></div>
