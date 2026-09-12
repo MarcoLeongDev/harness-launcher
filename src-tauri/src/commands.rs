@@ -3,7 +3,6 @@ use std::time::Duration;
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
-use tauri_plugin_updater::UpdaterExt;
 
 use crate::port;
 use crate::progress;
@@ -495,13 +494,6 @@ pub async fn get_status(app: AppHandle) -> Result<StatusPayload, String> {
             .unwrap_or_default();
         installed.sort();
 
-        let remote = crate::state::mutex_lock(&st.latest_remote).clone();
-        let update_available = remote
-            .as_ref()
-            .zip(settings.current_version.as_ref())
-            .map(|(latest, active)| update::is_newer(active, latest))
-            .unwrap_or(false);
-
         // Use cached version list to avoid spawning an npm process every 3 s.
         // Refresh is triggered explicitly after installs/updates or on a 60 s TTL.
         let version_list = {
@@ -530,6 +522,18 @@ pub async fn get_status(app: AppHandle) -> Result<StatusPayload, String> {
         let current_ops = progress::current_ops(&app);
         let console = progress::console_snapshot(&app);
 
+        // "Latest" is the newest published version we know: prefer the
+        // listed/cached registry list (it refreshes on its TTL), falling back
+        // to the last manual-check value when the list is unavailable — never
+        // a lagging dist-tag. Pure local compare, no extra registry traffic.
+        let stored_remote = crate::state::mutex_lock(&st.latest_remote).clone();
+        let latest_remote = versions::newest_published(&version_list).or(stored_remote);
+        let update_available = latest_remote
+            .as_ref()
+            .zip(settings.current_version.as_ref())
+            .map(|(latest, active)| update::is_newer(active, latest))
+            .unwrap_or(false);
+
         Ok(StatusPayload {
             launcher_version: env!("CARGO_PKG_VERSION").to_string(),
             running: status.running,
@@ -541,7 +545,7 @@ pub async fn get_status(app: AppHandle) -> Result<StatusPayload, String> {
             port_changed: actual != settings.port,
             versions: version_list,
             installed_versions: installed,
-            latest_remote: remote,
+            latest_remote,
             update_available,
             include_prerelease: settings.include_prerelease,
             language: settings.language.clone(),
@@ -630,24 +634,26 @@ pub async fn update_to_latest(app: AppHandle, window: tauri::Window) -> Result<S
                 "Checking npm registry for latest version…",
                 Some(5),
             );
-            let latest = versions::latest_dist_tag(&app, &rd)?;
+            // "Latest" is the newest published version across every release,
+            // never the lagging npm `latest` dist-tag.
+            let newest = versions::fetch_newest(&app, &rd)?;
             *crate::state::mutex_lock(&app.state::<AppState>().latest_remote) =
-                Some(latest.clone());
-            if state::active_version(&app).as_deref() == Some(latest.as_str()) {
+                Some(newest.clone());
+            if state::active_version(&app).as_deref() == Some(newest.as_str()) {
                 progress::finish(
                     &app,
                     "update",
                     None,
-                    &format!("already on latest ({latest})"),
+                    &format!("already on latest (v{newest})"),
                 );
-                return Ok(format!("already on latest ({latest})"));
+                return Ok(format!("already on latest (v{newest})"));
             }
             // Keep the whole update under the one "update" op key: the
             // registry phase already opened its terminal feed under this key,
             // and a mid-flight key switch would orphan that feed — it would
             // never see a terminal phase, linger as a stuck download in the
             // panel and its stop button would target nothing.
-            switch_version_inner(&app, &latest, "update")
+            switch_version_inner(&app, &newest, "update")
         })
     })
     .await
@@ -820,65 +826,28 @@ pub async fn set_language(
 
 #[tauri::command]
 pub async fn check_updates(app: AppHandle) -> Result<String, String> {
-    let s = state::read_settings(&app);
+    // Harness-only manual check: the newest PUBLISHED version (every release,
+    // never just the npm `latest` dist-tag) against the active version. A
+    // downloaded-but-inactive newest version is reported with a switch hint —
+    // the launcher never switches for the user. App self-update state is
+    // deliberately not reported: the endpoint has no configuration UI, so the
+    // note only confused (see update-service spec).
     let app2 = app.clone();
-    let harness_part = tauri::async_runtime::spawn_blocking(move || {
-        let mut parts = Vec::new();
+    tauri::async_runtime::spawn_blocking(move || {
         let rd = state::runtime_dir(&app2);
-        match versions::latest_dist_tag(&app2, &rd) {
-            Ok(latest) => {
+        match versions::fetch_newest(&app2, &rd) {
+            Ok(newest) => {
                 *crate::state::mutex_lock(&app2.state::<AppState>().latest_remote) =
-                    Some(latest.clone());
+                    Some(newest.clone());
                 let active = state::active_version(&app2).unwrap_or_default();
-                if update::is_newer(&active, &latest) {
-                    parts.push(format!("Harness update available: {active} → {latest}"));
-                } else {
-                    parts.push(format!(
-                        "Harness is current at version {active} — no update needed"
-                    ));
-                }
+                let installed = versions::is_installed(&rd, &newest);
+                Ok(update::update_check_message(&active, &newest, installed))
             }
-            Err(e) => parts.push(format!("harness check failed: {e}")),
+            Err(e) => Ok(format!("harness check failed: {e}")),
         }
-        parts
     })
     .await
-    .map_err(|e| e.to_string())?;
-
-    let mut parts = harness_part;
-    if let Some(endpoint) = s.update_endpoint.clone() {
-        match app_updater_check(&app, &endpoint).await {
-            Ok(Some(v)) => parts.push(format!("app update available: {v}")),
-            Ok(None) => parts.push("app up to date".into()),
-            Err(e) => parts.push(format!("app check failed: {e}")),
-        }
-    } else {
-        parts.push(
-            "App self-update not configured — enable in settings to auto-check for updates"
-                .to_string(),
-        );
-    }
-    Ok(parts.join(" "))
-}
-
-async fn app_updater_check(app: &AppHandle, endpoint: &str) -> Result<Option<String>, String> {
-    // Optional app self-update: official Tauri updater against the configured
-    // endpoint (signed artifacts required for macOS). Off by default.
-    let updater = app
-        .updater_builder()
-        .endpoints(vec![
-            endpoint
-                .parse()
-                .map_err(|e: url::ParseError| format!("invalid endpoint: {e}"))?,
-        ])
-        .map_err(|e| format!("updater endpoints: {e}"))?
-        .build()
-        .map_err(|e| format!("updater build: {e}"))?;
-    let update = updater
-        .check()
-        .await
-        .map_err(|e| format!("update check failed: {e}"))?;
-    Ok(update.map(|u| u.version.to_string()))
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]

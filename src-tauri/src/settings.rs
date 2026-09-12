@@ -29,6 +29,9 @@ pub const LAUNCHER_LOG_MAX_BYTES: u64 = 1024 * 1024;
 pub struct Settings {
     pub port: u16,
     pub include_prerelease: bool,
+    /// Reserved for a future app self-update endpoint. Parsed and preserved,
+    /// but the manual update check deliberately does not report app
+    /// self-update state (no configuration UI; see update-service spec).
     pub update_endpoint: Option<String>,
     pub current_version: Option<String>,
     pub previous_version: Option<String>,

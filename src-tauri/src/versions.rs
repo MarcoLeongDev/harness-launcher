@@ -169,35 +169,6 @@ pub fn run_npm(
     }
     Ok((stdout, stderr))
 }
-pub fn latest_dist_tag(app: &AppHandle, runtime_dir: &Path) -> Result<String, String> {
-    let (out, err) = run_npm(
-        app,
-        runtime_dir,
-        &["view", PACKAGE, "dist-tags.latest", "--json"],
-        Duration::from_secs(30),
-        None,
-    )?;
-    if err.trim().contains("E404") {
-        return Err(format!("{PACKAGE} not found on the npm registry"));
-    }
-    let trimmed = out.trim();
-    if trimmed.is_empty() {
-        return Err(format!("npm view returned nothing: {err}"));
-    }
-    let v: serde_json::Value = serde_json::from_str(trimmed)
-        .map_err(|e| format!("unexpected npm view output {trimmed:?}: {e}"))?;
-    let display = v.to_string();
-    match v {
-        serde_json::Value::String(s) => Ok(s),
-        serde_json::Value::Array(items) => items
-            .iter()
-            .filter_map(|i| i.as_str().map(|s| s.to_string()))
-            .next_back()
-            .ok_or_else(|| format!("unexpected dist-tags.latest value: {display}")),
-        _ => Err(format!("unexpected dist-tags.latest value: {display}")),
-    }
-}
-
 pub fn list_versions(
     app: &AppHandle,
     runtime_dir: &Path,
@@ -244,6 +215,32 @@ pub fn list_versions(
     } else {
         Ok(stable)
     }
+}
+
+/// Newest version of a published-version list: the maximum by semver order.
+/// Non-semver entries are ignored; empty (or unparseable) input yields None.
+/// The input is expected ascending (as `list_versions` returns), but the max
+/// is computed explicitly so unsorted callers stay correct.
+pub fn newest_published(versions: &[String]) -> Option<String> {
+    versions
+        .iter()
+        .filter_map(|v| {
+            Version::parse(v.trim_start_matches('v'))
+                .ok()
+                .map(|parsed| (parsed, v.clone()))
+        })
+        .max_by(|a, b| a.0.cmp(&b.0))
+        .map(|(_, raw)| raw)
+}
+
+/// Newest PUBLISHED harness version across every release (pre-releases
+/// included). Manual checks, update-to-latest, boot default and the status
+/// banner all resolve "latest" through here — never through the npm `latest`
+/// dist-tag, which can lag the actual newest release (e.g. while newer
+/// pre-releases exist).
+pub fn fetch_newest(app: &AppHandle, runtime_dir: &Path) -> Result<String, String> {
+    let all = list_versions(app, runtime_dir, true)?;
+    newest_published(&all).ok_or_else(|| "npm registry returned no usable versions".to_string())
 }
 
 pub fn is_installed(runtime_dir: &Path, version: &str) -> bool {
@@ -352,6 +349,39 @@ pub fn harness_entry(runtime_dir: &Path, version: &str) -> Option<PathBuf> {
         .join("lib")
         .join("bin.js");
     p.exists().then_some(p)
+}
+
+#[cfg(test)]
+mod newest_tests {
+    use super::newest_published;
+
+    fn names(v: &[&str]) -> Vec<String> {
+        v.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn picks_max_semver_including_prereleases() {
+        // A lagging stable must not shadow a newer pre-release: the dist-tag
+        // shape that motivated newest-published resolution.
+        assert_eq!(
+            newest_published(&names(&["0.1.1-rc.2", "0.1.1", "0.1.2-alpha.4"])).as_deref(),
+            Some("0.1.2-alpha.4")
+        );
+        assert_eq!(
+            newest_published(&names(&["0.1.9", "0.1.7", "0.1.10"])).as_deref(),
+            Some("0.1.10")
+        );
+    }
+
+    #[test]
+    fn ignores_unparseable_entries_and_empty_input() {
+        assert_eq!(
+            newest_published(&names(&["latest", "0.1.3", "next"])).as_deref(),
+            Some("0.1.3")
+        );
+        assert_eq!(newest_published(&[]), None);
+        assert_eq!(newest_published(&names(&["latest"])), None);
+    }
 }
 
 pub fn install_version(
