@@ -121,6 +121,10 @@
         <button id="lc-update" class="ghost">Update to latest</button>
         <button id="lc-rollback" class="ghost">Rollback</button>
       </div>
+      <div class="row">
+        <button id="lc-check" class="ghost">Get Latest</button>
+        <span id="lc-checkresult" class="hint"></span>
+      </div>
       <h3>Port (localhost)</h3>
       <div class="row">
         <input id="lc-port" type="number" min="1" max="65535" style="width:90px" title="Desired loopback port">
@@ -128,8 +132,7 @@
         <span id="lc-actual" class="hint"></span>
       </div>
       <h3>Updates</h3>
-      <div class="row"><button id="lc-check" class="ghost">Check for updates now</button>
-        <span id="lc-checkresult" class="hint"></span></div>
+      <div class="row"><span class="hint">Moved to the Version section above.</span></div>
       <h3>Logs</h3>
       <div class="row"><button id="lc-logrefresh" class="ghost">Refresh tail</button>
         <button id="lc-logtoggle" class="ghost">Show/Hide</button></div>
@@ -429,8 +432,32 @@
     withBusy(this, () => invoke("set_port", { port: port }));
   });
 
+  // Get Latest cell: the check button and its latest-version result live in
+  // the same Version-section row. In-place feedback from click to resolve:
+  // the button busy-disables with a spinner and the result (or error)
+  // renders inline in the cell, not in the generic message line.
   $("lc-check").addEventListener("click", function () {
-    withBusy(this, () => invoke("check_updates", {}));
+    const btn = this;
+    const out = $("lc-checkresult");
+    busy(btn, true);
+    out.classList.remove("err");
+    out.innerHTML = "";
+    const spin = document.createElement("span");
+    spin.className = "spin";
+    out.appendChild(spin);
+    out.appendChild(document.createTextNode(" Checking for the latest version…"));
+    invoke("check_updates", {})
+      .then((res) => {
+        out.textContent = res || "done";
+        return refreshStatus();
+      })
+      .catch((e) => {
+        out.textContent = String(e.message || e);
+        out.classList.add("err");
+      })
+      .finally(() => {
+        busy(btn, false);
+      });
   });
 
   $("lc-logrefresh").addEventListener("click", function () {

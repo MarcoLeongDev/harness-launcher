@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.1.104 — Get Latest cell in the Version section
+- The overlay's update check moved into the Version section as one cell: a "Get Latest" button plus an inline latest-version result (was "Check for updates now" in the standalone Updates section, whose result never rendered). Clicking it busy-disables the button with a spinner and reports the newest-version state — available, downloaded-with-switch-hint, or up to date — right inside the cell.
+
 ## v0.1.103 — Pre-release toggle removed
 - The overlay panel no longer offers a pre-release filter: the published version list always includes every release (stable + pre-release) by default. Retired the `set_prerelease` IPC command, the `include_prerelease` setting/status/cache fields, and the `list_versions` filter parameter (old `settings.json` files carrying the key still load — the field is ignored, user settings untouched). New unit test pins the retired-key tolerance.
 
