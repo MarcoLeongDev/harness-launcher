@@ -77,11 +77,11 @@ Or download the `.dmg` from the **Releases** page (GitHub or Gitee) and drag
 | | |
 |---|---|
 | 🚀 **Engine lifecycle** | Start / Stop / Restart the background harness right from the menu bar, the Control Panel window, or (Start only) the floating in-page panel. |
-| 📦 **Version management** | Install & switch between any published engine version with one click — the **Active** radio in the versions table picks the running version, **update to latest** and **roll back** to the previously installed version are one button each. Every version lives in its own isolated install, offline-safe. |
+| 📦 **Version management** | Install & switch between any published engine version with one click (stable + pre-release — everything is listed, no filter) — the **Active** radio in the versions table picks the running version, **update to latest** and **roll back** to the previously installed version are one button each. Every version lives in its own isolated install, offline-safe. |
 | 🖥️ **Live download terminal** | While a version is downloading you see the real `npm install` output in a terminal view — each in-flight operation gets its own terminal, streams live, and dismisses itself when done (no manual cleanup, no dead controls). |
 | 🗑️ **Delete versions** | Remove installed engine versions you no longer need (the active version is protected by a confirmation popover). |
 | 🌐 **Choose your port** | Set any loopback port — the harness restarts on it and the window follows automatically, with transparent fallback if the port is busy. |
-| 🔔 **Update checks** | Manual harness update checks from the panel or menubar ("Check now"); no background polling, no silent installs (optional app self-update via the Tauri updater). |
+| 🔔 **Update checks** | One manual **Get Latest** check in the floating panel's Version section (plus the update banner in the Control Panel) compares your active version against the newest published release — no background polling, no silent installs. A newest version that is downloaded but not active only hints you to switch; it never switches for you. |
 | 📋 **Logs** | Follow the live harness log tail straight from the Control Panel (toggleable bottom drawer). |
 | 🧰 **No browser needed** | The harness WebUI opens in its own app window; “Open in Browser” is available when you *do* want a tab. |
 

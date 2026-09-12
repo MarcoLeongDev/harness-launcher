@@ -11,7 +11,7 @@
   "stopped": {
     "title": "Motor detenido - Harness Launcher",
     "stoppedSub": "El motor Harness está detenido",
-    "stoppedDesc": "El motor en segundo plano de DeepSeek Harness no está en ejecución. Inícialo para abrir la interfaz de Harness o abre el panel de control para gestionar versiones, actualizaciones, puerto y registros.",
+    "stoppedDesc": "El motor de Harness Launcher no está en ejecución. Inícialo para abrir la interfaz de Harness o abre el panel de control para gestionar versiones, actualizaciones, puerto y registros.",
     "startEngine": "Iniciar motor",
     "openPanel": "Abrir panel de control",
     "brandGithub": "Abrir Harness Launcher en GitHub",

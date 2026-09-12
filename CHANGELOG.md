@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.1.106 — Harness Launcher rebrand finish + README refresh
+- The engine-stopped page body copy now names the app ("The Harness Launcher engine is not running…") in all five UI languages (JSON + `stopped.js` fallback table kept in sync, pinned by `test-i18n-sync`); package metadata (npm/Cargo) leads with the Harness Launcher product name while keeping the DeepSeek Harness engine attribution.
+- README refreshed GitHub-style for the new update UX: Get Latest semantics (newest-published compare, downloaded-switch-hint, never auto-switch), no pre-release filter, no auto-update section.
+
 ## v0.1.105 — Auto-update section removed
 - The overlay's standalone Updates section is gone (its "Moved…" pointer with it): manual update discovery lives only in the Version section's Get Latest cell, and the check result carries harness state only — no app self-update notes, no auto-check wording anywhere in the UI.
 
