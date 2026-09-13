@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.1.107 — Native page zoom + old-WebKit compat shims
+- Find/zoom now uses native webview page zoom through a new window-local `set_zoom` IPC (browser-style Cmd+/- semantics) instead of root CSS zoom, which mixed scaled and unscaled units and pushed the engine's bottom-right model popup off-screen at any non-100% level; root CSS zoom remains only as the no-IPC fallback. Stale out-of-range persisted levels reset to 100% instead of clamping onto a layout-breaking floor.
+- New `compat.js` initialization script (injected first in both webviews) shims the modern JS the latest engine needs on older WKWebViews: the `Iterator` global (pdfjs-dist reads `Iterator.prototype.join` unguarded at import time, which bricked fresh installs on pre-18.4 Safari behind "Failed to load plugins"), plus `findLast`/`findLastIndex`, `Array.at`, `Object.hasOwn`, `Promise.withResolvers`, best-effort `structuredClone`, `URLSearchParams.size` and `ReadableStream` async iteration. Feature-detected, idempotent, never overwrites natives; pinned by `scripts/test-compat.mjs` and Rust `compat_tests`.
+
 ## v0.1.106 — Harness Launcher rebrand finish + README refresh
 - The engine-stopped page body copy now names the app ("The Harness Launcher engine is not running…") in all five UI languages (JSON + `stopped.js` fallback table kept in sync, pinned by `test-i18n-sync`); package metadata (npm/Cargo) leads with the Harness Launcher product name while keeping the DeepSeek Harness engine attribution.
 - README refreshed GitHub-style for the new update UX: Get Latest semantics (newest-published compare, downloaded-switch-hint, never auto-switch), no pre-release filter, no auto-update section.

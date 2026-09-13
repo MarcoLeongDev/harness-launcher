@@ -5,8 +5,10 @@
 //
 // Covered contract:
 //   1. boots once: re-evaluation never double-binds shortcuts or duplicates UI
-//   2. zoom: Cmd/Ctrl =/- /0 steps ±10% within 50–200%, resets to 100%,
-//      applies documentElement zoom, persists per origin, restores on load
+//   2. zoom: Cmd/Ctrl =/- /0 steps ±10% within 50–200%, resets to 100%;
+//      applied as native webview zoom via the `set_zoom` IPC (root CSS zoom
+//      is only the no-IPC fallback); persisted per origin, restored on load;
+//      stale out-of-range values reset to 100% instead of clamping
 //   3. find: Cmd/Ctrl+F opens + focuses the bar, typing counts matches,
 //      Enter/Shift+Enter navigates, Esc closes and clears the selection
 //
@@ -50,7 +52,7 @@ function makeClassList() {
   };
 }
 
-function makeContext({ storage = {}, bodyText = "", withHighlight = false } = {}) {
+function makeContext({ storage = {}, bodyText = "", withHighlight = false, tauri = null } = {}) {
   const byId = new Map();
   const store = new Map(Object.entries(storage));
   const listeners = { window: {}, doc: {} };
@@ -226,6 +228,9 @@ function makeContext({ storage = {}, bodyText = "", withHighlight = false } = {}
     setTimeout,
     clearTimeout,
   };
+  // Optional Tauri IPC stub: exercises the native webview-zoom path instead
+  // of the CSS fallback.
+  if (tauri) window.__TAURI__ = tauri;
   sandbox.window.window = sandbox.window;
   vm.createContext(sandbox);
   vm.runInContext(JS, sandbox, { filename: "findzoom.js" });
@@ -313,13 +318,66 @@ console.log("findzoom: zoom");
   check("numpad add zooms in", zoom() === "110%");
 }
 {
-  // Persisted level is restored + clamped on load.
+  // Persisted level is restored on load; stale out-of-range values reset to
+  // 100% (never clamp onto a 50% floor that breaks page layout).
   const lo = makeContext({ storage: { "dsh-zoom": "130" } });
   check("restores 130% on load", lo.document.documentElement.style.zoom === "130%");
   const hi = makeContext({ storage: { "dsh-zoom": "500" } });
-  check("clamps 500% to 200%", hi.document.documentElement.style.zoom === "200%");
+  check("stale 500% resets to 100%", hi.document.documentElement.style.zoom === "100%");
+  const stale = makeContext({ storage: { "dsh-zoom": "1" } });
+  check("stale 1 resets to 100%", stale.document.documentElement.style.zoom === "100%");
   const bad = makeContext({ storage: { "dsh-zoom": "junk" } });
   check("garbage falls back to 100%", bad.document.documentElement.style.zoom === "100%");
+}
+
+// ---- 2b. Native webview zoom via IPC -----------------------------------------
+console.log("findzoom: native webview zoom");
+{
+  // With Tauri IPC present, zoom goes through `set_zoom` and the root CSS
+  // zoom (the popup-breaking path) is left untouched.
+  const calls = [];
+  const ctx = makeContext({
+    tauri: {
+      core: {
+        invoke: (cmd, args) => {
+          calls.push([cmd, args]);
+          return Promise.resolve("ok");
+        },
+      },
+    },
+  });
+  await sleep(20); // boot-time restore settles (clears any CSS zoom)
+  const bootCalls = calls.length;
+  check(
+    "boot restore uses set_zoom IPC",
+    bootCalls === 1 && calls[0][0] === "set_zoom",
+    JSON.stringify(calls),
+  );
+  check("boot leaves root CSS zoom alone", ctx.document.documentElement.style.zoom === "");
+  ctx.keydown({ key: "=", metaKey: true });
+  await sleep(20);
+  const last = calls.at(-1);
+  check(
+    "Cmd+= zooms via set_zoom IPC",
+    calls.length === bootCalls + 1 && last[0] === "set_zoom" && last[1].scale === 1.1,
+    JSON.stringify(calls),
+  );
+  check("root CSS zoom still untouched after zoom", ctx.document.documentElement.style.zoom === "");
+  check("zoom still persisted", ctx.store.get("dsh-zoom") === "110");
+  check("badge shows 110%", ctx.document.getElementById("dsh-fz-zoom").textContent === "110%");
+}
+{
+  // A failing IPC falls back to CSS zoom so the feature keeps working.
+  const ctx = makeContext({
+    tauri: {
+      core: {
+        invoke: () => Promise.reject(new Error("ipc down")),
+      },
+    },
+  });
+  ctx.keydown({ key: "=", metaKey: true });
+  await sleep(20);
+  check("IPC failure falls back to CSS zoom", ctx.document.documentElement.style.zoom === "110%");
 }
 
 // ---- 3. Find -----------------------------------------------------------------

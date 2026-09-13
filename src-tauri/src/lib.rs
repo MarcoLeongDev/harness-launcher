@@ -127,6 +127,7 @@ pub fn run() {
             commands::tail_logs,
             commands::open_in_browser,
             commands::open_repo_page,
+            commands::set_zoom,
             commands::restart_harness,
             commands::engine_start,
             commands::engine_stop,

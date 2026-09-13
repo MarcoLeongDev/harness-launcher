@@ -1117,6 +1117,56 @@ pub fn open_repo_page() -> Result<String, String> {
     Ok(format!("opened {REPO_URL}"))
 }
 
+/// Clamp a requested page-zoom factor to the browser-style 50–200% range.
+/// Non-finite input settles on 100% instead of poisoning the webview.
+fn clamp_zoom_scale(scale: f64) -> f64 {
+    if !scale.is_finite() {
+        return 1.0;
+    }
+    scale.clamp(0.5, 2.0)
+}
+
+/// Set the calling webview's page zoom (native `pageZoom`, i.e. browser-style
+/// Cmd+/- semantics). Window-local and reversible — like `open_in_browser` it
+/// only affects the caller's own window, so it stays callable from the
+/// harness-content window without the Control Panel gate. Backs the findzoom
+/// injected script: native page zoom keeps `innerWidth`,
+/// `getBoundingClientRect` and `offsetWidth` in one coordinate space, while
+/// the previous CSS `zoom` on the document root mixed scaled and unscaled
+/// units and pushed the engine's bottom-right model popup off-screen at any
+/// non-100% level.
+#[tauri::command]
+pub fn set_zoom(window: tauri::WebviewWindow, scale: f64) -> Result<String, String> {
+    let clamped = clamp_zoom_scale(scale);
+    window
+        .set_zoom(clamped)
+        .map_err(|e| format!("failed to set zoom: {e}"))?;
+    Ok(format!("zoom set to {}%", (clamped * 100.0).round()))
+}
+
+#[cfg(test)]
+mod zoom_tests {
+    use super::clamp_zoom_scale;
+
+    #[test]
+    fn zoom_clamp_keeps_browser_range() {
+        assert_eq!(clamp_zoom_scale(1.0), 1.0);
+        assert_eq!(clamp_zoom_scale(1.1), 1.1);
+        assert_eq!(clamp_zoom_scale(0.5), 0.5);
+        assert_eq!(clamp_zoom_scale(2.0), 2.0);
+        assert_eq!(clamp_zoom_scale(0.1), 0.5);
+        assert_eq!(clamp_zoom_scale(5.0), 2.0);
+        assert_eq!(clamp_zoom_scale(-1.0), 0.5);
+    }
+
+    #[test]
+    fn zoom_clamp_rejects_non_finite() {
+        assert_eq!(clamp_zoom_scale(f64::NAN), 1.0);
+        assert_eq!(clamp_zoom_scale(f64::INFINITY), 1.0);
+        assert_eq!(clamp_zoom_scale(f64::NEG_INFINITY), 1.0);
+    }
+}
+
 #[cfg(test)]
 mod repo_tests {
     use super::REPO_URL;

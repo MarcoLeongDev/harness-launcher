@@ -2,12 +2,28 @@
 // Cmd/Ctrl +/−/0 for both webviews (harness window + Control Panel).
 // Injected at documentStart by the Rust shell (initialization_script), so it
 // runs on launcher-owned `dsh-ui:` pages AND on engine-served pages where the
-// overlay panel cannot rely on page cooperation. Fully self-contained: no IPC,
-// no network, no page-JS interaction — DOM reads/writes only, plus one
-// per-origin localStorage key for the zoom level.
+// overlay panel cannot rely on page cooperation. Self-contained except for one
+// benign IPC (`set_zoom`, window-local page zoom): no network, no page-JS
+// interaction — DOM reads/writes only, plus one per-origin localStorage key
+// for the zoom level.
 (() => {
   if (window.__DSH_FINDZOOM__) return;
   window.__DSH_FINDZOOM__ = true;
+
+  function invoke(cmd, args) {
+    const core = window.__TAURI__?.core;
+    if (core && typeof core.invoke === "function") return core.invoke(cmd, args || {});
+    if (window.__TAURI_INTERNALS__ && typeof window.__TAURI_INTERNALS__.invoke === "function")
+      return window.__TAURI_INTERNALS__.invoke(cmd, args || {}, undefined);
+    return Promise.reject(new Error("Tauri IPC unavailable in this context"));
+  }
+
+  function hasIpc() {
+    const core = window.__TAURI__?.core;
+    if (core && typeof core.invoke === "function") return true;
+    const internals = window.__TAURI_INTERNALS__;
+    return !!(internals && typeof internals.invoke === "function");
+  }
 
   const FIND_BAR_ID = "dsh-fz-bar";
   const ZOOM_BADGE_ID = "dsh-fz-zoom";
@@ -31,22 +47,51 @@
     } catch (_e) {
       /* storage unavailable: session-only zoom */
     }
-    if (Number.isNaN(z)) z = 100;
-    return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z));
+    // Strict range, never clamp: only levels this UI can write are honored,
+    // so stale values from older builds (e.g. "1") reset to 100% instead of
+    // landing on a 50% floor that breaks page layout.
+    if (!Number.isInteger(z) || z < MIN_ZOOM || z > MAX_ZOOM) z = 100;
+    return z;
   }
 
-  function applyZoom(z) {
-    z = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(z)));
+  // CSS-zoom fallback for contexts without Tauri IPC (tests, plain browsers).
+  // Never used inside the launcher: native page zoom keeps every page metric
+  // (innerWidth, getBoundingClientRect, offsetWidth) in one coordinate space,
+  // while root CSS zoom mixes scaled and unscaled units and misplaces
+  // fixed-anchored popups (e.g. the engine model menu drifting off-screen at
+  // any non-100% level).
+  function cssZoom(z) {
     try {
       if (document.documentElement) document.documentElement.style.zoom = `${z}%`;
     } catch (_e) {
       /* headless/shadow contexts */
     }
+  }
+
+  function applyZoom(z) {
+    z = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(z)));
     try {
       window.localStorage.setItem(ZOOM_KEY, String(z));
     } catch (_e) {
       /* ignore */
     }
+    // Native webview zoom first; clear any stale CSS zoom once it lands so
+    // the two never stack.
+    if (!hasIpc()) {
+      cssZoom(z);
+      return z;
+    }
+    invoke("set_zoom", { scale: z / 100 })
+      .then(() => {
+        try {
+          if (document.documentElement) document.documentElement.style.zoom = "";
+        } catch (_e) {
+          /* ignore */
+        }
+      })
+      .catch(() => {
+        cssZoom(z);
+      });
     return z;
   }
 
