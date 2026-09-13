@@ -121,13 +121,13 @@ pub fn run() {
             commands::update_to_latest,
             commands::rollback,
             commands::set_port,
-            commands::set_prerelease,
             commands::set_language,
             commands::check_updates,
             commands::refresh_versions,
             commands::tail_logs,
             commands::open_in_browser,
             commands::open_repo_page,
+            commands::set_zoom,
             commands::restart_harness,
             commands::engine_start,
             commands::engine_stop,
@@ -219,7 +219,8 @@ fn boot_inner(app: &AppHandle) -> Result<u16, String> {
     if !has_active {
         let data_dir = state::data_dir(app);
         settings::log(&data_dir, "installing default (latest) harness version…");
-        let latest = versions::latest_dist_tag(app, &rd)?;
+        // Newest published across every release, never the lagging dist-tag.
+        let latest = versions::fetch_newest(app, &rd)?;
         let op = crate::progress::op_key("install", Some(&latest));
         versions::install_version(app, &rd, &latest, &op)?;
         {

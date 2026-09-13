@@ -1,5 +1,26 @@
 # Changelog
 
+## v0.1.107 — Native page zoom + old-WebKit compat shims
+- Find/zoom now uses native webview page zoom through a new window-local `set_zoom` IPC (browser-style Cmd+/- semantics) instead of root CSS zoom, which mixed scaled and unscaled units and pushed the engine's bottom-right model popup off-screen at any non-100% level; root CSS zoom remains only as the no-IPC fallback. Stale out-of-range persisted levels reset to 100% instead of clamping onto a layout-breaking floor.
+- New `compat.js` initialization script (injected first in both webviews) shims the modern JS the latest engine needs on older WKWebViews: the `Iterator` global (pdfjs-dist reads `Iterator.prototype.join` unguarded at import time, which bricked fresh installs on pre-18.4 Safari behind "Failed to load plugins"), plus `findLast`/`findLastIndex`, `Array.at`, `Object.hasOwn`, `Promise.withResolvers`, best-effort `structuredClone`, `URLSearchParams.size` and `ReadableStream` async iteration. Feature-detected, idempotent, never overwrites natives; pinned by `scripts/test-compat.mjs` and Rust `compat_tests`.
+
+## v0.1.106 — Harness Launcher rebrand finish + README refresh
+- The engine-stopped page body copy now names the app ("The Harness Launcher engine is not running…") in all five UI languages (JSON + `stopped.js` fallback table kept in sync, pinned by `test-i18n-sync`); package metadata (npm/Cargo) leads with the Harness Launcher product name while keeping the DeepSeek Harness engine attribution.
+- README refreshed GitHub-style for the new update UX: Get Latest semantics (newest-published compare, downloaded-switch-hint, never auto-switch), no pre-release filter, no auto-update section.
+
+## v0.1.105 — Auto-update section removed
+- The overlay's standalone Updates section is gone (its "Moved…" pointer with it): manual update discovery lives only in the Version section's Get Latest cell, and the check result carries harness state only — no app self-update notes, no auto-check wording anywhere in the UI.
+
+## v0.1.104 — Get Latest cell in the Version section
+- The overlay's update check moved into the Version section as one cell: a "Get Latest" button plus an inline latest-version result (was "Check for updates now" in the standalone Updates section, whose result never rendered). Clicking it busy-disables the button with a spinner and reports the newest-version state — available, downloaded-with-switch-hint, or up to date — right inside the cell.
+
+## v0.1.103 — Pre-release toggle removed
+- The overlay panel no longer offers a pre-release filter: the published version list always includes every release (stable + pre-release) by default. Retired the `set_prerelease` IPC command, the `include_prerelease` setting/status/cache fields, and the `list_versions` filter parameter (old `settings.json` files carrying the key still load — the field is ignored, user settings untouched). New unit test pins the retired-key tolerance.
+
+## v0.1.102 — Update check reads newest published
+- Manual update checks ("Get Latest" path: `check_updates`, the status banner, `update_to_latest`, first-install default) now compare against the NEWEST published harness version across every release instead of the lagging npm `latest` dist-tag, so a downloaded-but-inactive newer version is no longer reported as "up to date".
+- Three-state result: newest not downloaded → "Harness update available: vX → vY"; newest downloaded but inactive → "vY is downloaded — switch to it…" hint (the launcher never switches for the user); active-is-newest → "Harness is up to date (vX)". The confusing "App self-update not configured" suffix is gone from the check result (`update_endpoint` stays parsed + reserved).
+
 ## v0.1.101 — Poison-safe shared state
 - New `state::mutex_lock` helper recovers with the guarded value instead of panicking on a poisoned mutex; all 58 production `.lock().unwrap()` sites across commands/lib/progress/runtime/state/tray now use it, so one poisoned lock can no longer crash the menubar app. New unit test proves recovery keeps the guarded value.
 

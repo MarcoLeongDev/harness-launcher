@@ -37,9 +37,23 @@ pub fn overlay_script() -> &'static str {
     include_str!("../resources/overlay.js")
 }
 
+/// WebKit-compat shims for older WKWebViews (Intel Macs on pre-18.4 Safari).
+/// Must run FIRST at documentStart, before overlay/findzoom and before any
+/// engine-served bundle: harness 0.1.5-rc.x's documentpreview bundle reads
+/// `Iterator.prototype.join` unguarded at import time, which throws
+/// ReferenceError on Safari < 18.4 and bricks the whole UI behind
+/// "Failed to load plugins". The script is feature-detected, idempotent and
+/// written in conservative syntax so it parses on the oldest supported
+/// WebKit. Safe for launcher-owned pages and untrusted engine content alike
+/// (pure polyfills, no IPC, no network).
+pub fn compat_script() -> &'static str {
+    include_str!("../resources/compat.js")
+}
+
 /// Browser-style find-in-page + zoom (Cmd/Ctrl+F, Cmd/Ctrl +/−/0), injected
-/// into every webview. Self-contained (no IPC): safe for both launcher-owned
-/// pages and untrusted engine-served content.
+/// into every webview. Zoom goes through the benign window-local `set_zoom`
+/// command (native page zoom); the find bar is DOM-only (no IPC): safe for
+/// both launcher-owned pages and untrusted engine-served content.
 pub fn findzoom_script() -> &'static str {
     include_str!("../resources/findzoom.js")
 }
@@ -69,6 +83,7 @@ pub fn ensure_window(app: &AppHandle, url: &str) -> Result<(), String> {
         .title("Harness Launcher - Harness")
         .inner_size(1280.0, 800.0)
         .min_inner_size(900.0, 600.0)
+        .initialization_script(compat_script())
         .initialization_script(overlay_script())
         .initialization_script(findzoom_script())
         .build()
@@ -98,6 +113,7 @@ pub fn open_settings_window(app: &AppHandle) -> Result<(), String> {
         .title("Harness Launcher - Control Panel")
         .inner_size(680.0, 800.0)
         .min_inner_size(560.0, 640.0)
+        .initialization_script(compat_script())
         .initialization_script(findzoom_script())
         .build()
         .map_err(|e| e.to_string())?;
@@ -143,6 +159,54 @@ mod fullscreen_tests {
         assert_eq!(Behavior::FullScreenPrimary.bits(), 1 << 7);
         assert_ne!(Behavior::FullScreenPrimary, Behavior::FullScreenAuxiliary);
         assert_ne!(Behavior::FullScreenPrimary, Behavior::FullScreenNone);
+    }
+}
+
+#[cfg(test)]
+mod compat_tests {
+    use super::compat_script;
+
+    #[test]
+    fn script_is_self_contained_and_guarded() {
+        let js = compat_script();
+        assert!(js.len() > 2000, "compat.js looks truncated");
+        // Single-install guard so re-navigation never redefines globals.
+        assert!(js.contains("__DSH_COMPAT__"), "missing install guard");
+    }
+
+    #[test]
+    fn script_covers_the_documentpreview_crashers() {
+        let js = compat_script();
+        // The exact import-time crasher: pdfjs-dist reads
+        // `Iterator.prototype.join` unguarded, which throws ReferenceError on
+        // Safari < 18.4. The shim must provide the Iterator global first.
+        assert!(js.contains("Iterator"), "missing Iterator shim");
+        assert!(
+            js.contains("prototype.join") || js.contains("prototype\", \"join\""),
+            "missing Iterator join shim"
+        );
+        // The plugin's own code uses findLast (Safari 15.4+).
+        assert!(js.contains("findLast"), "missing findLast shim");
+        assert!(js.contains("findLastIndex"), "missing findLastIndex shim");
+        // pdf.js runtime needs these on older WebKit as well.
+        assert!(js.contains("withResolvers"), "missing withResolvers shim");
+        assert!(js.contains("hasOwn"), "missing hasOwn shim");
+    }
+
+    #[test]
+    fn script_uses_conservative_syntax() {
+        let js = compat_script();
+        // This file must parse on the oldest supported WebKit (Safari 14), so
+        // it must not use syntax that old (or the harness-failure) WebViews
+        // cannot parse: optional chaining, nullish coalescing, classes.
+        assert!(
+            !js.contains("?."),
+            "compat.js must not use optional chaining (old WebKit parse)"
+        );
+        assert!(
+            !js.contains("??"),
+            "compat.js must not use nullish coalescing (old WebKit parse)"
+        );
     }
 }
 

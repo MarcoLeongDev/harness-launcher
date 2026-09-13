@@ -11,7 +11,7 @@
   "stopped": {
     "title": "エンジン停止中 - Harness Launcher",
     "stoppedSub": "Harness エンジンは停止しています",
-    "stoppedDesc": "DeepSeek Harness バックグラウンドエンジンは実行されていません。起動して Harness UI を開くか、コントロールパネルでバージョン・更新・ポート・ログを管理してください。",
+    "stoppedDesc": "Harness Launcher エンジンは実行されていません。起動して Harness UI を開くか、コントロールパネルでバージョン・更新・ポート・ログを管理してください。",
     "startEngine": "エンジンを起動",
     "openPanel": "コントロールパネルを開く",
     "brandGithub": "GitHub で Harness Launcher を開く",

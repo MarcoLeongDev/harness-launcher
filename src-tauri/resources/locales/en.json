@@ -11,7 +11,7 @@
   "stopped": {
     "title": "Engine Stopped - Harness Launcher",
     "stoppedSub": "The harness engine is stopped",
-    "stoppedDesc": "The DeepSeek Harness background engine is not running. Start it to open the harness UI, or open the Control Panel to manage versions, updates, port and logs.",
+    "stoppedDesc": "The Harness Launcher engine is not running. Start it to open the harness UI, or open the Control Panel to manage versions, updates, port and logs.",
     "startEngine": "Start Engine",
     "openPanel": "Open Control Panel",
     "brandGithub": "Open Harness Launcher on GitHub",

@@ -851,7 +851,7 @@ dependencies = [
 
 [[package]]
 name = "dsh-launcher"
-version = "0.1.101"
+version = "0.1.107"
 dependencies = [
  "objc2-app-kit",
  "semver",

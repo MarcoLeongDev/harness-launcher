@@ -11,7 +11,7 @@
   "stopped": {
     "title": "引擎已停止 - Harness Launcher",
     "stoppedSub": "Harness 引擎已停止",
-    "stoppedDesc": "DeepSeek Harness 背景引擎尚未執行。啟動以開啟 Harness 介面，或開啟控制面板以管理版本、更新、連接埠和日誌。",
+    "stoppedDesc": "Harness Launcher 引擎尚未執行。啟動以開啟 Harness 介面，或開啟控制面板以管理版本、更新、連接埠和日誌。",
     "startEngine": "啟動引擎",
     "openPanel": "開啟控制面板",
     "brandGithub": "在 GitHub 上開啟 Harness Launcher",

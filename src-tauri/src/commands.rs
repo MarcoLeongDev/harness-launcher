@@ -3,7 +3,6 @@ use std::time::Duration;
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
-use tauri_plugin_updater::UpdaterExt;
 
 use crate::port;
 use crate::progress;
@@ -29,7 +28,6 @@ pub struct StatusPayload {
     pub installed_versions: Vec<String>,
     pub latest_remote: Option<String>,
     pub update_available: bool,
-    pub include_prerelease: bool,
     pub language: String,
     pub start_on_launch: bool,
     pub boot_error: Option<String>,
@@ -52,8 +50,7 @@ pub struct StatusPayload {
 /// ports, settings, app exit) requires the launcher-owned Control Panel
 /// (`settings`) window. POLICY: allow = get_status, tail_logs, engine_start
 /// (stopped page), open_in_browser, open_repo_page, open_settings,
-/// open_harness_window, set_prerelease (view filter), check_updates
-/// (read-only + notify).
+/// open_harness_window, check_updates (read-only + notify).
 fn require_panel(window: &tauri::Window) -> Result<(), String> {
     if window.label() == crate::window::LABEL {
         return Err("not permitted from the harness window — use the Control Panel".into());
@@ -495,13 +492,6 @@ pub async fn get_status(app: AppHandle) -> Result<StatusPayload, String> {
             .unwrap_or_default();
         installed.sort();
 
-        let remote = crate::state::mutex_lock(&st.latest_remote).clone();
-        let update_available = remote
-            .as_ref()
-            .zip(settings.current_version.as_ref())
-            .map(|(latest, active)| update::is_newer(active, latest))
-            .unwrap_or(false);
-
         // Use cached version list to avoid spawning an npm process every 3 s.
         // Refresh is triggered explicitly after installs/updates or on a 60 s TTL.
         let version_list = {
@@ -510,11 +500,10 @@ pub async fn get_status(app: AppHandle) -> Result<StatusPayload, String> {
                 .fetched_at
                 .map(|t| t.elapsed().as_secs() >= 60)
                 .unwrap_or(true);
-            if stale || vc.include_prerelease != settings.include_prerelease {
-                match versions::list_versions(&app, &rd, settings.include_prerelease) {
+            if stale {
+                match versions::list_versions(&app, &rd) {
                     Ok(v) => {
                         vc.versions = v.clone();
-                        vc.include_prerelease = settings.include_prerelease;
                         vc.fetched_at = Some(std::time::Instant::now());
                         v
                     }
@@ -530,6 +519,18 @@ pub async fn get_status(app: AppHandle) -> Result<StatusPayload, String> {
         let current_ops = progress::current_ops(&app);
         let console = progress::console_snapshot(&app);
 
+        // "Latest" is the newest published version we know: prefer the
+        // listed/cached registry list (it refreshes on its TTL), falling back
+        // to the last manual-check value when the list is unavailable — never
+        // a lagging dist-tag. Pure local compare, no extra registry traffic.
+        let stored_remote = crate::state::mutex_lock(&st.latest_remote).clone();
+        let latest_remote = versions::newest_published(&version_list).or(stored_remote);
+        let update_available = latest_remote
+            .as_ref()
+            .zip(settings.current_version.as_ref())
+            .map(|(latest, active)| update::is_newer(active, latest))
+            .unwrap_or(false);
+
         Ok(StatusPayload {
             launcher_version: env!("CARGO_PKG_VERSION").to_string(),
             running: status.running,
@@ -541,9 +542,8 @@ pub async fn get_status(app: AppHandle) -> Result<StatusPayload, String> {
             port_changed: actual != settings.port,
             versions: version_list,
             installed_versions: installed,
-            latest_remote: remote,
+            latest_remote,
             update_available,
-            include_prerelease: settings.include_prerelease,
             language: settings.language.clone(),
             start_on_launch: settings.start_on_launch,
             boot_error,
@@ -630,24 +630,26 @@ pub async fn update_to_latest(app: AppHandle, window: tauri::Window) -> Result<S
                 "Checking npm registry for latest version…",
                 Some(5),
             );
-            let latest = versions::latest_dist_tag(&app, &rd)?;
+            // "Latest" is the newest published version across every release,
+            // never the lagging npm `latest` dist-tag.
+            let newest = versions::fetch_newest(&app, &rd)?;
             *crate::state::mutex_lock(&app.state::<AppState>().latest_remote) =
-                Some(latest.clone());
-            if state::active_version(&app).as_deref() == Some(latest.as_str()) {
+                Some(newest.clone());
+            if state::active_version(&app).as_deref() == Some(newest.as_str()) {
                 progress::finish(
                     &app,
                     "update",
                     None,
-                    &format!("already on latest ({latest})"),
+                    &format!("already on latest (v{newest})"),
                 );
-                return Ok(format!("already on latest ({latest})"));
+                return Ok(format!("already on latest (v{newest})"));
             }
             // Keep the whole update under the one "update" op key: the
             // registry phase already opened its terminal feed under this key,
             // and a mid-flight key switch would orphan that feed — it would
             // never see a terminal phase, linger as a stuck download in the
             // panel and its stop button would target nothing.
-            switch_version_inner(&app, &latest, "update")
+            switch_version_inner(&app, &newest, "update")
         })
     })
     .await
@@ -787,15 +789,6 @@ pub async fn set_port(app: AppHandle, window: tauri::Window, port: u16) -> Resul
     .map_err(|e| e.to_string())?
 }
 
-#[tauri::command]
-pub async fn set_prerelease(app: AppHandle, include: bool) -> Result<String, String> {
-    state::update_settings(&app, |s| s.include_prerelease = include);
-    Ok(format!(
-        "pre-release versions {}",
-        if include { "shown" } else { "hidden" }
-    ))
-}
-
 /// Persist the UI language (Control Panel + tray menu) and re-label the
 /// tray immediately. The code is allowlisted, so unknown values settle on
 /// English instead of persisting garbage. Control Panel only.
@@ -820,65 +813,28 @@ pub async fn set_language(
 
 #[tauri::command]
 pub async fn check_updates(app: AppHandle) -> Result<String, String> {
-    let s = state::read_settings(&app);
+    // Harness-only manual check: the newest PUBLISHED version (every release,
+    // never just the npm `latest` dist-tag) against the active version. A
+    // downloaded-but-inactive newest version is reported with a switch hint —
+    // the launcher never switches for the user. App self-update state is
+    // deliberately not reported: the endpoint has no configuration UI, so the
+    // note only confused (see update-service spec).
     let app2 = app.clone();
-    let harness_part = tauri::async_runtime::spawn_blocking(move || {
-        let mut parts = Vec::new();
+    tauri::async_runtime::spawn_blocking(move || {
         let rd = state::runtime_dir(&app2);
-        match versions::latest_dist_tag(&app2, &rd) {
-            Ok(latest) => {
+        match versions::fetch_newest(&app2, &rd) {
+            Ok(newest) => {
                 *crate::state::mutex_lock(&app2.state::<AppState>().latest_remote) =
-                    Some(latest.clone());
+                    Some(newest.clone());
                 let active = state::active_version(&app2).unwrap_or_default();
-                if update::is_newer(&active, &latest) {
-                    parts.push(format!("Harness update available: {active} → {latest}"));
-                } else {
-                    parts.push(format!(
-                        "Harness is current at version {active} — no update needed"
-                    ));
-                }
+                let installed = versions::is_installed(&rd, &newest);
+                Ok(update::update_check_message(&active, &newest, installed))
             }
-            Err(e) => parts.push(format!("harness check failed: {e}")),
+            Err(e) => Ok(format!("harness check failed: {e}")),
         }
-        parts
     })
     .await
-    .map_err(|e| e.to_string())?;
-
-    let mut parts = harness_part;
-    if let Some(endpoint) = s.update_endpoint.clone() {
-        match app_updater_check(&app, &endpoint).await {
-            Ok(Some(v)) => parts.push(format!("app update available: {v}")),
-            Ok(None) => parts.push("app up to date".into()),
-            Err(e) => parts.push(format!("app check failed: {e}")),
-        }
-    } else {
-        parts.push(
-            "App self-update not configured — enable in settings to auto-check for updates"
-                .to_string(),
-        );
-    }
-    Ok(parts.join(" "))
-}
-
-async fn app_updater_check(app: &AppHandle, endpoint: &str) -> Result<Option<String>, String> {
-    // Optional app self-update: official Tauri updater against the configured
-    // endpoint (signed artifacts required for macOS). Off by default.
-    let updater = app
-        .updater_builder()
-        .endpoints(vec![
-            endpoint
-                .parse()
-                .map_err(|e: url::ParseError| format!("invalid endpoint: {e}"))?,
-        ])
-        .map_err(|e| format!("updater endpoints: {e}"))?
-        .build()
-        .map_err(|e| format!("updater build: {e}"))?;
-    let update = updater
-        .check()
-        .await
-        .map_err(|e| format!("update check failed: {e}"))?;
-    Ok(update.map(|u| u.version.to_string()))
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -1161,6 +1117,56 @@ pub fn open_repo_page() -> Result<String, String> {
     Ok(format!("opened {REPO_URL}"))
 }
 
+/// Clamp a requested page-zoom factor to the browser-style 50–200% range.
+/// Non-finite input settles on 100% instead of poisoning the webview.
+fn clamp_zoom_scale(scale: f64) -> f64 {
+    if !scale.is_finite() {
+        return 1.0;
+    }
+    scale.clamp(0.5, 2.0)
+}
+
+/// Set the calling webview's page zoom (native `pageZoom`, i.e. browser-style
+/// Cmd+/- semantics). Window-local and reversible — like `open_in_browser` it
+/// only affects the caller's own window, so it stays callable from the
+/// harness-content window without the Control Panel gate. Backs the findzoom
+/// injected script: native page zoom keeps `innerWidth`,
+/// `getBoundingClientRect` and `offsetWidth` in one coordinate space, while
+/// the previous CSS `zoom` on the document root mixed scaled and unscaled
+/// units and pushed the engine's bottom-right model popup off-screen at any
+/// non-100% level.
+#[tauri::command]
+pub fn set_zoom(window: tauri::WebviewWindow, scale: f64) -> Result<String, String> {
+    let clamped = clamp_zoom_scale(scale);
+    window
+        .set_zoom(clamped)
+        .map_err(|e| format!("failed to set zoom: {e}"))?;
+    Ok(format!("zoom set to {}%", (clamped * 100.0).round()))
+}
+
+#[cfg(test)]
+mod zoom_tests {
+    use super::clamp_zoom_scale;
+
+    #[test]
+    fn zoom_clamp_keeps_browser_range() {
+        assert_eq!(clamp_zoom_scale(1.0), 1.0);
+        assert_eq!(clamp_zoom_scale(1.1), 1.1);
+        assert_eq!(clamp_zoom_scale(0.5), 0.5);
+        assert_eq!(clamp_zoom_scale(2.0), 2.0);
+        assert_eq!(clamp_zoom_scale(0.1), 0.5);
+        assert_eq!(clamp_zoom_scale(5.0), 2.0);
+        assert_eq!(clamp_zoom_scale(-1.0), 0.5);
+    }
+
+    #[test]
+    fn zoom_clamp_rejects_non_finite() {
+        assert_eq!(clamp_zoom_scale(f64::NAN), 1.0);
+        assert_eq!(clamp_zoom_scale(f64::INFINITY), 1.0);
+        assert_eq!(clamp_zoom_scale(f64::NEG_INFINITY), 1.0);
+    }
+}
+
 #[cfg(test)]
 mod repo_tests {
     use super::REPO_URL;
@@ -1186,19 +1192,17 @@ pub async fn refresh_versions(app: AppHandle, window: tauri::Window) -> Result<S
     // Async + spawn_blocking: the listing shells out to npm and must never
     // block the main thread (same reason as get_status).
     tauri::async_runtime::spawn_blocking(move || {
-        let settings = state::read_settings(&app);
         let rd = state::runtime_dir(&app);
         // Drop the cached list first so the fetch below cannot serve stale
         // data even if listing falls back; then refresh through the same
-        // choke point get_status uses, so filtering/sorting stay identical.
+        // choke point get_status uses, so sorting stays identical.
         invalidate_version_cache(&app);
-        match versions::list_versions(&app, &rd, settings.include_prerelease) {
+        match versions::list_versions(&app, &rd) {
             Ok(v) => {
                 let n = v.len();
                 let st = app.state::<AppState>();
                 let mut vc = crate::state::mutex_lock(&st.version_cache);
                 vc.versions = v;
-                vc.include_prerelease = settings.include_prerelease;
                 vc.fetched_at = Some(std::time::Instant::now());
                 Ok(format!("version list refreshed ({n} versions)"))
             }

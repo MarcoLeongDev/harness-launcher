@@ -54,7 +54,6 @@ pub struct AppState {
 #[derive(Default)]
 pub struct VersionCache {
     pub versions: Vec<String>,
-    pub include_prerelease: bool,
     pub fetched_at: Option<std::time::Instant>,
 }
 
