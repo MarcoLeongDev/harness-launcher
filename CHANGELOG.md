@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.1.114 — Esc drops the pending find recount
+- Closing the bar now clears any in-flight 150ms debounce, so a recount armed by the last keystroke can no longer fire after Esc and leave highlights painted over a closed find bar. Pinned by a behavioral test (highlight map must stay empty after close).
+
 ## v0.1.113 — Focus latch hardening (regression pass)
 - The latch can no longer stick in the wrong state: a rejected `text_field_focus` IPC (or another window flipping the app-global policy) forgets the latch, so the next boundary re-asserts instead of deduping into silence — the exact way typing could have been starved again.
 - Window activation boundaries now restore Accessory on blur and re-derive on focus (find bar open or editable focused → Regular), in the harness window, the Control Panel and the splash. Still latch-deduped, still no timers.

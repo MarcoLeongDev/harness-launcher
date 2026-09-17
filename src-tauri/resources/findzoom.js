@@ -430,6 +430,12 @@
     const bar = uiRoot();
     if (!bar) return;
     findOpen = false;
+    // Drop any pending recount: a debounce armed just before Esc would
+    // otherwise fire after close and re-apply highlights to a closed bar.
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+      debounceTimer = null;
+    }
     bar.classList.remove("open");
     lastQuery = "";
     searchedQuery = null;

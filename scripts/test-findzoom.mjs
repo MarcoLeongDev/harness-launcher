@@ -526,7 +526,8 @@ console.log("findzoom: latched activation");
 {
   check("policy sends go through a latch", JS.includes("function setPolicy") && JS.includes("focusPolicyOn"));
   check("find open latches TYPING", JS.includes("findOpen = true") && JS.includes("findOpen = false"));
-  check("no OFF sends while bar open", JS.includes("if (findOpen) return"));
+  check("no OFF sends from the focusout tick while open", JS.includes("if (findOpen) return"));
+  check("close drops any pending recount", JS.includes("Drop any pending recount"));
   check("covers page text fields", JS.includes("isContentEditable") && JS.includes("TEXTAREA"));
   const rs = JS.slice(JS.indexOf("function runSearch()"), JS.indexOf("function scheduleSearch()"));
   check("typing path never navigates", !rs.includes("nativeFind"), "runSearch calls nativeFind");
@@ -544,6 +545,7 @@ console.log("findzoom: latch sends");
   const calls = [];
   const ctx = makeContext({
     bodyText: "hello world, hello again",
+    withHighlight: true,
     tauri: {
       core: {
         invoke: (cmd, args) => {
@@ -579,10 +581,14 @@ console.log("findzoom: latch sends");
     JSON.stringify(calls),
   );
 
-  // Genuine exit: exactly one OFF.
+  // Genuine exit: exactly one OFF, and a recount armed just before Esc must
+  // not fire after close (it would re-highlight a closed bar).
+  input().value = "world";
+  input().dispatch("input"); // arm the 150ms debounce
   input().dispatch("keydown", { key: "Escape" });
-  await sleep(20);
+  await sleep(250); // let the debounce window pass after close
   check("close sends exactly one OFF", calls.slice(base).join(",") === "true,false", JSON.stringify(calls));
+  check("Esc drops the pending recount", !ctx.sandbox.CSS.highlights.has("dsh-find"));
 }
 
 // ---- 8. Activation boundaries re-derive the latch -----------------------------
