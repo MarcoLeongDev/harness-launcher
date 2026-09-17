@@ -16,6 +16,8 @@
       openPanel: "Open Control Panel",
       brandGithub: "Open Harness Launcher on GitHub",
       logoAlt: "Harness Launcher logo",
+      working: "Working…",
+      done: "Done",
     },
     "zh-Hant": {
       title: "引擎已停止 - Harness Launcher",
@@ -26,6 +28,8 @@
       openPanel: "開啟控制面板",
       brandGithub: "在 GitHub 上開啟 Harness Launcher",
       logoAlt: "Harness Launcher 標誌",
+      working: "處理中…",
+      done: "完成",
     },
     "zh-Hans": {
       title: "引擎已停止 - Harness Launcher",
@@ -36,6 +40,8 @@
       openPanel: "打开控制面板",
       brandGithub: "在 GitHub 上打开 Harness Launcher",
       logoAlt: "Harness Launcher 标志",
+      working: "处理中…",
+      done: "完成",
     },
     ja: {
       title: "エンジン停止中 - Harness Launcher",
@@ -46,6 +52,8 @@
       openPanel: "コントロールパネルを開く",
       brandGithub: "GitHub で Harness Launcher を開く",
       logoAlt: "Harness Launcher のロゴ",
+      working: "処理中…",
+      done: "完了",
     },
     es: {
       title: "Motor detenido - Harness Launcher",
@@ -56,6 +64,8 @@
       openPanel: "Abrir panel de control",
       brandGithub: "Abrir Harness Launcher en GitHub",
       logoAlt: "Logotipo de Harness Launcher",
+      working: "Trabajando…",
+      done: "Completado",
     },
   };
   let lang = "en";
@@ -93,10 +103,10 @@
   }
   const hint = document.getElementById("hint");
   function run(fn) {
-    hint.textContent = "...";
+    hint.textContent = t("working");
     fn()
       .then((r) => {
-        hint.textContent = r?.message || "done";
+        hint.textContent = r?.message || t("done");
         setTimeout(() => {
           hint.textContent = "";
         }, 4000);

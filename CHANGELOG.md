@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.1.110 — Stopped splash speaks every language, every message
+- The engine-stopped splash dynamic hints (`Working…` while starting/opening, `Done` on success) are now localized in all five UI languages (En | 繁 | 簡 | 日 | Es) via the shared `locales/*.json` source of truth mirrored in `stopped.js` (pinned by `test-i18n-sync` + extended `test-stopped-i18n` key contract). Static splash copy already matched the Control Panel; backend error lines stay English like panel terminals. User data untouched.
+
 ## v0.1.109 — Find bar scoped to engine content
 - `findzoom.js` now bails out early on launcher-owned `dsh-ui:` pages, so the find bar/zoom shortcuts never appear (unstyled) on the Control Panel or the engine-stopped splash; the Control Panel window no longer injects the script at all (compat shims retained). Harness-window behavior unchanged. Pinned by a new `dsh-ui` scope case in `scripts/test-findzoom.mjs` and a Rust `findzoom_tests` guard.
 - Release bookkeeping: `Cargo.lock` now tracks the current version (was one bump behind).

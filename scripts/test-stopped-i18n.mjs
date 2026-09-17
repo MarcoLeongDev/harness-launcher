@@ -32,7 +32,17 @@ for (i = 0; i < langs.length; i++) {
   const present = src.indexOf(`${langs[i]}: {`) !== -1 || src.indexOf(`"${langs[i]}": {`) !== -1;
   check(`locale ${langs[i]} present`, present);
 }
-const keys = ["title", "stoppedSub", "stoppedDesc", "startEngine", "openPanel", "brandGithub", "logoAlt"];
+const keys = [
+  "title",
+  "stoppedSub",
+  "stoppedDesc",
+  "startEngine",
+  "openPanel",
+  "brandGithub",
+  "logoAlt",
+  "working",
+  "done",
+];
 console.log("stopped-i18n: keys");
 for (i = 0; i < keys.length; i++) {
   const count = src.split(`${keys[i]}:`).length - 1;

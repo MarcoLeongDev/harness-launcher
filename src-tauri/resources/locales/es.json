@@ -15,7 +15,9 @@
     "startEngine": "Iniciar motor",
     "openPanel": "Abrir panel de control",
     "brandGithub": "Abrir Harness Launcher en GitHub",
-    "logoAlt": "Logotipo de Harness Launcher"
+    "logoAlt": "Logotipo de Harness Launcher",
+    "working": "Trabajando…",
+    "done": "Completado"
   },
   "panel": {
     "brandGithub": "Abrir Harness Launcher en GitHub",

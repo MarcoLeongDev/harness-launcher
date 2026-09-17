@@ -15,7 +15,9 @@
     "startEngine": "エンジンを起動",
     "openPanel": "コントロールパネルを開く",
     "brandGithub": "GitHub で Harness Launcher を開く",
-    "logoAlt": "Harness Launcher のロゴ"
+    "logoAlt": "Harness Launcher のロゴ",
+    "working": "処理中…",
+    "done": "完了"
   },
   "panel": {
     "brandGithub": "GitHub で Harness Launcher を開く",

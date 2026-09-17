@@ -15,7 +15,9 @@
     "startEngine": "啟動引擎",
     "openPanel": "開啟控制面板",
     "brandGithub": "在 GitHub 上開啟 Harness Launcher",
-    "logoAlt": "Harness Launcher 標誌"
+    "logoAlt": "Harness Launcher 標誌",
+    "working": "處理中…",
+    "done": "完成"
   },
   "panel": {
     "brandGithub": "在 GitHub 上開啟 Harness Launcher",
