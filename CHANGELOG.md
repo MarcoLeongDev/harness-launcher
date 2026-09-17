@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.1.108 — Seamless web auth token refresh
+- The main webview now silently follows the engine-printed `dsh web: http://127.0.0.1:<port>/?token=…` URL: every new capture repoints the existing window without changing visibility/focus, so a version switch/restart that rotates the launch token no longer strands users on "authentication required — reopen the URL printed by dsh web".
+- Fixed `rollback` navigating to the plain URL (401 on token engines): it now waits for the fresh authenticated URL like every other switch path. Raw tokens stay memory-only for navigation; logs/status remain redacted. User data (`~/.dsh`, sibling versions) untouched.
+
 ## v0.1.107 — Native page zoom + old-WebKit compat shims
 - Find/zoom now uses native webview page zoom through a new window-local `set_zoom` IPC (browser-style Cmd+/- semantics) instead of root CSS zoom, which mixed scaled and unscaled units and pushed the engine's bottom-right model popup off-screen at any non-100% level; root CSS zoom remains only as the no-IPC fallback. Stale out-of-range persisted levels reset to 100% instead of clamping onto a layout-breaking floor.
 - New `compat.js` initialization script (injected first in both webviews) shims the modern JS the latest engine needs on older WKWebViews: the `Iterator` global (pdfjs-dist reads `Iterator.prototype.join` unguarded at import time, which bricked fresh installs on pre-18.4 Safari behind "Failed to load plugins"), plus `findLast`/`findLastIndex`, `Array.at`, `Object.hasOwn`, `Promise.withResolvers`, best-effort `structuredClone`, `URLSearchParams.size` and `ReadableStream` async iteration. Feature-detected, idempotent, never overwrites natives; pinned by `scripts/test-compat.mjs` and Rust `compat_tests`.

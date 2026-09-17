@@ -385,8 +385,17 @@ pub fn start(
                     // at boot (token engines) and surface it to open windows.
                     // The raw URL is captured for navigation; everything
                     // stored or broadcast uses the redacted form (SN9).
+                    // Seamless auth: an existing main window is silently
+                    // repointed at the fresh token so users never see
+                    // "authentication required — reopen the URL printed by
+                    // dsh web" after a version switch/restart rotates it.
                     if let Some(url) = parse_web_url_line(&trimmed) {
+                        let changed =
+                            crate::state::mutex_lock(&web_url).clone().as_deref() != Some(url.as_str());
                         *crate::state::mutex_lock(&web_url) = Some(url.clone());
+                        if changed {
+                            let _ = crate::window::refresh_main_url(&app_handle, &url);
+                        }
                         let _ = app_handle.emit(
                             "launcher://status",
                             HarnessStatus {

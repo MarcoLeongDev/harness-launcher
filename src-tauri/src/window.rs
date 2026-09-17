@@ -149,6 +149,22 @@ pub fn navigate(app: &AppHandle, url: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Silently point an EXISTING main window at a freshly captured engine URL
+/// (e.g. a rotated `?token=…` after a version switch/restart) without
+/// changing visibility or focus. No window → no-op (the boot/start caller
+/// creates it with the authenticated URL itself). Skips when already there
+/// so duplicate engine log lines never reload the page.
+pub fn refresh_main_url(app: &AppHandle, url: &str) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window(LABEL) {
+        let target = parse_url(url)?;
+        let current = window.url().map(|u| u.to_string()).unwrap_or_default();
+        if current != target.to_string() {
+            let _ = window.navigate(target);
+        }
+    }
+    Ok(())
+}
+
 #[cfg(all(test, target_os = "macos"))]
 mod fullscreen_tests {
     // Guards the exact flag: Primary (green enters fullscreen) must not be

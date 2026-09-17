@@ -688,7 +688,10 @@ pub async fn rollback(app: AppHandle, window: tauri::Window) -> Result<String, S
                 Some(90),
             );
             let actual = restart_engine(&app, &op, Some(&previous))?;
-            let _ = window::navigate(&app, &harness_url(actual));
+            // Authenticated URL (waits for the fresh launch token): the plain
+            // URL 401s on token engines, stranding the webview on the
+            // "authentication required" page after a rollback.
+            let _ = window::navigate(&app, &harness_web_url(&app, actual, Some(Duration::from_secs(10))));
             let msg = format!("rolled back to {previous} on port {actual}");
             progress::finish(&app, &op, Some(&previous), &msg);
             Ok(msg)
