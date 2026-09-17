@@ -389,7 +389,10 @@ console.log("findzoom: native webview zoom");
   check("IPC failure falls back to CSS zoom", ctx.document.documentElement.style.zoom === "110%");
 }
 
-// ---- 3. Find -----------------------------------------------------------------
+// ---- 3. Find (passive typing, gesture navigation) -----------------------------
+// Typing only counts + highlights: it never moves the selection and never
+// touches focus, so mid-word interruptions are impossible by construction.
+// Navigation happens exactly once per explicit gesture (Enter / buttons).
 console.log("findzoom: find");
 {
   const ctx = makeContext({ bodyText: "hello world, hello again" });
@@ -404,12 +407,26 @@ console.log("findzoom: find");
 
   input().value = "hello";
   input().dispatch("input");
-  await sleep(250); // debounce (150ms) fires
-  check("counts 2 matches", count() === "1 of 2", `got "${count()}"`);
-  check("native find navigated", ctx.findCalls.at(-1) === "hello");
+  await sleep(250); // debounce (150ms) fires the passive recount
+  check("typing counts without navigating", count() === "2 matches", `got "${count()}"`);
+  check("typing never auto-navigates", ctx.findCalls.length === 0, `got ${ctx.findCalls.length}`);
+  check("typing never moves focus", ctx.document.activeElement === input());
 
   input().dispatch("keydown", { key: "Enter" });
-  check("Enter goes to next match", ctx.findCalls.length >= 2 && count() === "2 of 2", `got "${count()}"`);
+  check(
+    "Enter navigates exactly once",
+    ctx.findCalls.length === 1 && ctx.findCalls[0] === "hello",
+    `got ${JSON.stringify(ctx.findCalls)}`,
+  );
+  check("first Enter lands on match 1", count() === "1 of 2", `got "${count()}"`);
+  check("focus held in the field", ctx.document.activeElement === input());
+
+  input().dispatch("keydown", { key: "Enter" });
+  check(
+    "second Enter goes to next match",
+    ctx.findCalls.length === 2 && count() === "2 of 2",
+    `got "${count()}"`,
+  );
   input().dispatch("keydown", { key: "Enter", shiftKey: true });
   check("Shift+Enter wraps to previous", count() === "1 of 2", `got "${count()}"`);
 
@@ -464,12 +481,19 @@ console.log("findzoom: keeps focus against page thieves");
 
   input().value = "hello";
   input().dispatch("input");
-  await sleep(250); // debounce fires runSearch (nativeFind steals focus first)
+  await sleep(250); // debounce fires the passive recount (no selection move)
   check(
-    "search runs despite selection steal",
-    ctx.document.getElementById("dsh-fz-count").textContent === "1 of 2",
+    "typing never yields to selection steal",
+    ctx.document.getElementById("dsh-fz-count").textContent === "2 matches",
   );
-  check("focus restored to the field after search", ctx.document.activeElement === input());
+  check("typing never moves focus", ctx.document.activeElement === input());
+  check("typing never calls native find", ctx.findCalls.length === 0);
+
+  // Navigation is an explicit gesture: the selection thief fires inside
+  // window.find, and the gesture holds the field synchronously after.
+  input().dispatch("keydown", { key: "Enter" });
+  check("Enter navigates after passive typing", ctx.findCalls.length === 1);
+  check("focus held after gesture nav", ctx.document.activeElement === input());
 
   // Zoom shortcut from inside the field still works.
   ctx.keydown({ key: "=", metaKey: true, target: input() });
@@ -488,13 +512,20 @@ console.log("findzoom: dsh-ui scope");
   check("still no bar after Cmd+F", !ctx.document.getElementById("dsh-fz-bar"));
 }
 
-// ---- 6. Menubar focus policy -------------------------------------------------
-console.log("findzoom: focus-aware activation");
+// ---- 6. Latched focus policy -------------------------------------------------
+// One send on entering TYPING, silence while searching, one send on genuine
+// exit. No timer, poll, or search callback may touch focus or the policy.
+console.log("findzoom: latched activation");
 {
-  check("reports editable focusin", JS.includes("focusin") && JS.includes("text_field_focus"));
-  check("restores on focusout", JS.includes("focusout") && JS.includes("text_field_focus"));
+  check("policy sends go through a latch", JS.includes("function setPolicy") && JS.includes("focusPolicyOn"));
+  check("find open latches TYPING", JS.includes("findOpen = true") && JS.includes("findOpen = false"));
+  check("no OFF sends while bar open", JS.includes("if (findOpen) return"));
   check("covers page text fields", JS.includes("isContentEditable") && JS.includes("TEXTAREA"));
-  check("find open lifts focus first", JS.indexOf('text_field_focus", { focused: true }') !== -1);
+  const rs = JS.slice(JS.indexOf("function runSearch()"), JS.indexOf("function scheduleSearch()"));
+  check("typing path never navigates", !rs.includes("nativeFind"), "runSearch calls nativeFind");
+  check("typing path never touches focus", !rs.includes(".focus("), "runSearch touches focus");
+  check("timer yank is gone", !JS.includes("guardFocus"), "guardFocus still present");
+  check("navigation holds the field", JS.includes("function holdField"));
 }
 
 if (failures) {

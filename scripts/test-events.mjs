@@ -55,6 +55,10 @@ for (const [name, src] of [
 ]) {
   check(`${name} reports editable focusin`, src.includes("focusin") && src.includes("text_field_focus"));
   check(`${name} restores on focusout`, src.includes("focusout") && src.includes("text_field_focus"));
+  check(
+    `${name} dedupes policy sends through a latch`,
+    src.includes("function setPolicy") && src.includes("focusPolicyOn"),
+  );
 }
 if (failures > 0) {
   console.error(`test-events: ${failures} failures`);

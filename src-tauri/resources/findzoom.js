@@ -9,6 +9,13 @@
 // `text_field_focus` menubar focus policy): no network, no page-JS
 // interaction — DOM reads/writes only, plus one per-origin localStorage key
 // for the zoom level.
+//
+// Focus contract (latched, never timed): opening the bar latches TYPING and
+// lifts the menubar no-focus policy exactly once; typing only counts and
+// highlights (never moves selection, never calls focus()); navigation happens
+// only on explicit user gestures (Enter / Shift+Enter / prev-next buttons);
+// closing latches back exactly once. No timer, poll, or search callback ever
+// touches focus or the policy.
 (() => {
   if (window.__DSH_FINDZOOM__) return;
   window.__DSH_FINDZOOM__ = true;
@@ -132,11 +139,35 @@
 
   // ---- Find bar ------------------------------------------------------------
   let lastQuery = "";
-  let searchedQuery = null; // query currently reflected by selection/highlights
-  let lastIndex = 0; // 1-based index of the current match for the count label
+  let searchedQuery = null; // query currently reflected by count/highlights
+  let lastIndex = 0; // 0 = counted but not navigated; else 1-based current match
   let totalMatches = 0;
   let debounceTimer = null;
   let savedFocus = null;
+
+  // Latched focus-policy state. All `text_field_focus` sends go through
+  // setPolicy, which dedupes: one send on entering TYPING, silence while
+  // searching, one send on genuine exit. Transient blurs (e.g. selection
+  // changes from `window.find`) never flap the OS policy.
+  let focusPolicyOn = false;
+  let findOpen = false;
+  function setPolicy(on) {
+    on = !!on;
+    if (on === focusPolicyOn) return;
+    focusPolicyOn = on;
+    invoke("text_field_focus", { focused: on }).catch(() => {});
+  }
+  function isEditable(el) {
+    if (!el || el.nodeType !== 1) return false;
+    const tag = (el.tagName || el.nodeName || "").toUpperCase();
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+    try {
+      if (el.isContentEditable) return true;
+    } catch (_e) {
+      /* ignore */
+    }
+    return false;
+  }
 
   function uiRoot() {
     return document.getElementById(FIND_BAR_ID);
@@ -282,6 +313,7 @@
       return;
     }
     if (totalMatches === 0) label.textContent = "No results";
+    else if (lastIndex < 1) label.textContent = `${totalMatches} match${totalMatches === 1 ? "" : "es"}`;
     else label.textContent = `${Math.min(lastIndex, totalMatches)} of ${totalMatches}`;
   }
 
@@ -293,6 +325,20 @@
       return window.find(query, false, !!backwards, true, false, false, false);
     } catch (_e) {
       return false;
+    }
+  }
+
+  // Hold the field after a user-initiated navigation (Enter / prev-next).
+  // Gesture-only: called synchronously inside user-gesture handlers so a
+  // selection-stealing page cannot strand focus. Never called on timers,
+  // polls, debounces, or search callbacks.
+  function holdField() {
+    try {
+      const bar = uiRoot();
+      const field = bar ? bar.querySelector("#dsh-fz-input") : null;
+      if (field && document.activeElement !== field) field.focus();
+    } catch (_e) {
+      /* element may be gone */
     }
   }
 
@@ -309,10 +355,14 @@
             ? 1
             : lastIndex + 1;
       }
+      holdField();
     }
     updateCount();
   }
 
+  // Passive recount: count + highlight + label only. Never moves the
+  // selection, never clears it, never touches focus — safe to run on the
+  // typing debounce while the user is mid-word.
   function runSearch() {
     const bar = uiRoot();
     if (!bar) return;
@@ -321,44 +371,9 @@
     lastQuery = query;
     totalMatches = countMatches(query);
     highlightAll(query);
-    try {
-      if (window.getSelection) window.getSelection().removeAllRanges();
-    } catch (_e) {
-      /* ignore */
-    }
-    if (query && totalMatches > 0) {
-      // Fresh search always lands on the first match (selection was cleared).
-      lastIndex = 1;
-      nativeFind(query, false);
-    } else {
-      lastIndex = 0;
-    }
+    lastIndex = 0; // counted but not navigated; Enter navigates on gesture
     searchedQuery = query;
     updateCount();
-    guardFocus();
-  }
-
-  // Pages that move focus on selection changes (or on timers) can pull focus
-  // out of the field mid-search: put it back while the bar is still open.
-  // Focus on our own buttons (prev/next/close) is left alone.
-  function guardFocus() {
-    const bar = uiRoot();
-    if (!bar?.classList.contains("open")) return;
-    const field = bar.querySelector("#dsh-fz-input");
-    if (!field) return;
-    let active = null;
-    try {
-      active = document.activeElement;
-    } catch (_e) {
-      active = null;
-    }
-    if (active !== field && !isUiNode(active)) {
-      try {
-        field.focus();
-      } catch (_e) {
-        /* element may be gone */
-      }
-    }
   }
 
   function scheduleSearch() {
@@ -372,9 +387,10 @@
   function openFind() {
     const bar = uiRoot();
     if (!bar) return;
-    // Lift the menubar no-focus policy BEFORE focusing so the first keystroke
-    // already lands in the field (focusin below re-asserts it anyway).
-    invoke("text_field_focus", { focused: true }).catch(() => {});
+    // Latch TYPING exactly once, BEFORE focusing, so the first keystroke
+    // already lands in the field. Later focusin noise is deduped by setPolicy.
+    findOpen = true;
+    setPolicy(true);
     if (!bar.classList.contains("open")) {
       try {
         savedFocus = document.activeElement;
@@ -388,14 +404,15 @@
       input.focus();
       input.select();
     }
-    // Re-run when reopened with a (possibly page-changed) query; a no-op when
-    // the query and matches are unchanged.
+    // Passive recount when reopened with a (possibly page-changed) query;
+    // never navigates on its own.
     runSearch();
   }
 
   function closeFind() {
     const bar = uiRoot();
     if (!bar) return;
+    findOpen = false;
     bar.classList.remove("open");
     lastQuery = "";
     searchedQuery = null;
@@ -427,6 +444,20 @@
           field.blur();
         }
       }
+    } catch (_e) {
+      /* ignore */
+    }
+    // Latched exit: exactly one policy send based on where focus landed
+    // (saved element when restored, body otherwise). The focusout tick below
+    // will also fire but dedupes to a no-op.
+    try {
+      let editable = false;
+      try {
+        editable = isEditable(document.activeElement);
+      } catch (_e2) {
+        editable = false;
+      }
+      setPolicy(editable);
     } catch (_e) {
       /* ignore */
     }
@@ -504,17 +535,15 @@
       }
       if (key === "Enter") {
         e.preventDefault();
+        // Flush any pending keystrokes, recount passively, then navigate
+        // exactly once. The old path auto-navigated inside runSearch AND here,
+        // double-stepping past the first match.
         if (debounceTimer) {
-          // Keystrokes still pending: flush the search first so Enter lands
-          // on the first match of the final query instead of double-stepping.
           clearTimeout(debounceTimer);
           debounceTimer = null;
-          runSearch();
-        } else if (input.value !== searchedQuery) {
-          runSearch();
-        } else {
-          findNavigate(!!e.shiftKey);
         }
+        if (input.value !== searchedQuery) runSearch();
+        findNavigate(!!e.shiftKey);
       } else if (e.key === "Escape") {
         e.preventDefault();
         closeFind();
@@ -592,40 +621,27 @@
     buildBadge();
   });
 
-  // ---- Menubar focus policy -------------------------------------------------
-  // The app idles as a menubar Accessory (never steals focus) — but that
-  // starves text fields to one keystroke at a time. While ANY editable is
-  // focused (find field or page fields like the harness composer) lift to
-  // Regular so typing works normally; on blur restore Accessory so the
-  // menubar behavior returns. Tick-delayed blur check avoids flicker when
-  // focus moves directly between two editables.
-  function isEditable(el) {
-    if (!el || el.nodeType !== 1) return false;
-    const tag = (el.tagName || el.nodeName || "").toUpperCase();
-    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
-    try {
-      if (el.isContentEditable) return true;
-    } catch (_e) {
-      /* ignore */
-    }
-    return false;
-  }
-  function reportFocus() {
-    let editable = false;
-    try {
-      editable = isEditable(document.activeElement);
-    } catch (_e) {
-      editable = false;
-    }
-    invoke("text_field_focus", { focused: !!editable }).catch(() => {});
-  }
+  // ---- Menubar focus policy (latched) ---------------------------------------
+  // The app idles as a menubar Accessory (never steals focus). TYPING is
+  // latched by openFind/closeFind above (setPolicy dedupes), so this section
+  // only covers page-owned editables (e.g. the harness composer): lift on
+  // focusin, restore on settled blur. While the find bar is open the latch
+  // is held unconditionally — transient blurs from selection changes or
+  // timers never send OFF mid-search.
   document.addEventListener("focusin", (e) => {
-    if (isEditable(e.target)) {
-      invoke("text_field_focus", { focused: true }).catch(() => {});
-    }
+    if (isEditable(e.target)) setPolicy(true);
   });
   document.addEventListener("focusout", () => {
-    setTimeout(reportFocus, 0);
+    if (findOpen) return;
+    setTimeout(() => {
+      let editable = false;
+      try {
+        editable = isEditable(document.activeElement);
+      } catch (_e) {
+        editable = false;
+      }
+      setPolicy(editable);
+    }, 0);
   });
 
   // ---- Shortcuts ------------------------------------------------------------

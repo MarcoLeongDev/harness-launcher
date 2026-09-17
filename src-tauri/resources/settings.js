@@ -1066,11 +1066,19 @@
     if (l) setLanguage(l);
   });
 
-  // Menubar focus policy: the app idles as an Accessory (never steals
-  // focus) — but that starves text fields (port input, version dropdown
-  // search) to one keystroke at a time. While any editable is focused lift
-  // to Regular; on blur restore Accessory. Tick-delayed blur check avoids
-  // flicker moving between editables.
+  // Menubar focus policy (latched): the app idles as an Accessory (never
+  // steals focus) — but that starves text fields (port input, version
+  // dropdown search) to one keystroke at a time. While any editable is
+  // focused lift to Regular; on genuine blur restore Accessory. Every send
+  // goes through the latch below, so repeated focusin noise and transient
+  // blurs never flap the OS policy mid-word.
+  let focusPolicyOn = false;
+  function setPolicy(on) {
+    on = !!on;
+    if (on === focusPolicyOn) return;
+    focusPolicyOn = on;
+    invoke("text_field_focus", { focused: on }).catch(() => {});
+  }
   function isEditable(el) {
     if (!el || el.nodeType !== 1) return false;
     const tag = (el.tagName || el.nodeName || "").toUpperCase();
@@ -1081,7 +1089,7 @@
     return false;
   }
   document.addEventListener("focusin", (e) => {
-    if (isEditable(e.target)) invoke("text_field_focus", { focused: true }).catch(() => {});
+    if (isEditable(e.target)) setPolicy(true);
   });
   document.addEventListener("focusout", () => {
     setTimeout(() => {
@@ -1089,7 +1097,7 @@
       try {
         editable = isEditable(document.activeElement);
       } catch (_e) {}
-      invoke("text_field_focus", { focused: !!editable }).catch(() => {});
+      setPolicy(editable);
     }, 0);
   });
 

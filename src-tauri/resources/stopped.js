@@ -136,8 +136,17 @@
       });
     }
   } catch (_e) {}
-  // Menubar focus policy (same as Control Panel): lift the no-focus default
-  // while any text field is focused so typing works normally, restore on blur.
+  // Menubar focus policy (latched, same as Control Panel): lift the no-focus
+  // default while any text field is focused so typing works normally, restore
+  // on genuine blur. Sends dedupe through the latch so transient blurs never
+  // flap the OS policy mid-word.
+  let focusPolicyOn = false;
+  function setPolicy(on) {
+    on = !!on;
+    if (on === focusPolicyOn) return;
+    focusPolicyOn = on;
+    invoke("text_field_focus", { focused: on }).catch(() => {});
+  }
   function isEditable(el) {
     if (!el || el.nodeType !== 1) return false;
     const tag = (el.tagName || el.nodeName || "").toUpperCase();
@@ -149,7 +158,7 @@
   }
   try {
     document.addEventListener("focusin", (e) => {
-      if (isEditable(e.target)) invoke("text_field_focus", { focused: true }).catch(() => {});
+      if (isEditable(e.target)) setPolicy(true);
     });
     document.addEventListener("focusout", () => {
       setTimeout(() => {
@@ -157,7 +166,7 @@
         try {
           editable = isEditable(document.activeElement);
         } catch (_e2) {}
-        invoke("text_field_focus", { focused: !!editable }).catch(() => {});
+        setPolicy(editable);
       }, 0);
     });
   } catch (_e) {}

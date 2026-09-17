@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.1.112 — Typing is never interrupted (latched focus)
+- The find bar no longer fights the user on a clock: typing is now purely passive — it counts matches and highlights them, and never moves the selection, never clears it, never calls `focus()`, never sends a policy flip on a timer.
+- Deleted the 150ms `guardFocus()` yank that refocused the field after every search, and removed the auto-`window.find` from the typing path (it fired selection changes that caused transient blurs mid-word).
+- Focus policy is latched instead of event-chased: exactly one send on entering TYPING (find open, or an editable focusin), silence for the whole search — transient blurs while the bar is open are ignored — and exactly one send on genuine exit. Same latch in the Control Panel and the engine-stopped splash.
+- `Enter`/`Shift+Enter`/prev/next are explicit gestures: one navigation each, with a single synchronous in-gesture focus hold so selection-stealing pages can't strand the field. The count label reads "N matches" until you navigate, then "N of M".
+
 ## v0.1.111 — Focus-aware menubar typing
 - New benign `text_field_focus` command toggles the macOS activation policy: the app idles as Accessory (no Dock icon, never steals focus) but lifts to Regular while ANY text field is focused — find bar, harness composer/inputs, Control Panel port input, splash fields — and restores Accessory on blur. Typing (notably Cmd/Ctrl+F find) now works normally keystroke after keystroke instead of losing focus after each key. Callable from any window like `set_zoom`; user data untouched. Pinned by extended `test-findzoom` + `test-events` contracts.
 
