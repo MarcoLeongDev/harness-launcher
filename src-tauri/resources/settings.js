@@ -1071,13 +1071,16 @@
   // dropdown search) to one keystroke at a time. While any editable is
   // focused lift to Regular; on genuine blur restore Accessory. Every send
   // goes through the latch below, so repeated focusin noise and transient
-  // blurs never flap the OS policy mid-word.
-  let focusPolicyOn = false;
+  // blurs never flap the OS policy mid-word. `null` = unknown: a failed send
+  // (or another window's flip) is re-derived on the next boundary.
+  let focusPolicyOn = null;
   function setPolicy(on) {
     on = !!on;
     if (on === focusPolicyOn) return;
     focusPolicyOn = on;
-    invoke("text_field_focus", { focused: on }).catch(() => {});
+    invoke("text_field_focus", { focused: on }).catch(() => {
+      focusPolicyOn = null;
+    });
   }
   function isEditable(el) {
     if (!el || el.nodeType !== 1) return false;
@@ -1088,17 +1091,27 @@
     } catch (_e) {}
     return false;
   }
+  function reevaluatePolicy() {
+    let editable = false;
+    try {
+      editable = isEditable(document.activeElement);
+    } catch (_e) {}
+    setPolicy(editable);
+  }
   document.addEventListener("focusin", (e) => {
     if (isEditable(e.target)) setPolicy(true);
   });
   document.addEventListener("focusout", () => {
-    setTimeout(() => {
-      let editable = false;
-      try {
-        editable = isEditable(document.activeElement);
-      } catch (_e) {}
-      setPolicy(editable);
-    }, 0);
+    setTimeout(reevaluatePolicy, 0);
+  });
+  // The OS policy is app-global: leaving the window restores Accessory and
+  // clears the latch, so returning re-derives it (another window may have
+  // flipped it). Latch-deduped — one send per real activation change.
+  window.addEventListener("blur", () => {
+    setPolicy(false);
+  });
+  window.addEventListener("focus", () => {
+    reevaluatePolicy();
   });
 
   // events

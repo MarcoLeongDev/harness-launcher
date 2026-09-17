@@ -59,6 +59,10 @@ for (const [name, src] of [
     `${name} dedupes policy sends through a latch`,
     src.includes("function setPolicy") && src.includes("focusPolicyOn"),
   );
+  check(
+    `${name} re-derives policy on activation boundaries`,
+    src.includes('addEventListener("blur"') && src.includes('addEventListener("focus"'),
+  );
 }
 if (failures > 0) {
   console.error(`test-events: ${failures} failures`);

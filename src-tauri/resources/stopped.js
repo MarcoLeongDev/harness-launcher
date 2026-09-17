@@ -139,13 +139,16 @@
   // Menubar focus policy (latched, same as Control Panel): lift the no-focus
   // default while any text field is focused so typing works normally, restore
   // on genuine blur. Sends dedupe through the latch so transient blurs never
-  // flap the OS policy mid-word.
-  let focusPolicyOn = false;
+  // flap the OS policy mid-word; `null` = unknown (failed send or another
+  // window's flip) and is re-derived on the next activation boundary.
+  let focusPolicyOn = null;
   function setPolicy(on) {
     on = !!on;
     if (on === focusPolicyOn) return;
     focusPolicyOn = on;
-    invoke("text_field_focus", { focused: on }).catch(() => {});
+    invoke("text_field_focus", { focused: on }).catch(() => {
+      focusPolicyOn = null;
+    });
   }
   function isEditable(el) {
     if (!el || el.nodeType !== 1) return false;
@@ -156,18 +159,25 @@
     } catch (_e2) {}
     return false;
   }
+  function reevaluatePolicy() {
+    let editable = false;
+    try {
+      editable = isEditable(document.activeElement);
+    } catch (_e2) {}
+    setPolicy(editable);
+  }
   try {
     document.addEventListener("focusin", (e) => {
       if (isEditable(e.target)) setPolicy(true);
     });
     document.addEventListener("focusout", () => {
-      setTimeout(() => {
-        let editable = false;
-        try {
-          editable = isEditable(document.activeElement);
-        } catch (_e2) {}
-        setPolicy(editable);
-      }, 0);
+      setTimeout(reevaluatePolicy, 0);
+    });
+    window.addEventListener("blur", () => {
+      setPolicy(false);
+    });
+    window.addEventListener("focus", () => {
+      reevaluatePolicy();
     });
   } catch (_e) {}
   refresh();

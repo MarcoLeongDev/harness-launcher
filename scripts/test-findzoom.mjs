@@ -277,6 +277,11 @@ function makeContext({
     return e;
   }
 
+  function fire(list, type, event = {}) {
+    const e = { type, target: document.activeElement || body, ...event };
+    for (const fn of list[type] || []) fn(e);
+  }
+
   return {
     document,
     window,
@@ -288,6 +293,8 @@ function makeContext({
     sandbox,
     hooks,
     selectionCleared: () => selectionCleared,
+    fireDoc: (type, event) => fire(listeners.doc, type, event),
+    fireWin: (type, event) => fire(listeners.window, type, event),
   };
 }
 
@@ -526,6 +533,90 @@ console.log("findzoom: latched activation");
   check("typing path never touches focus", !rs.includes(".focus("), "runSearch touches focus");
   check("timer yank is gone", !JS.includes("guardFocus"), "guardFocus still present");
   check("navigation holds the field", JS.includes("function holdField"));
+}
+
+// ---- 7. Latch behavior: no sends while searching -----------------------------
+// Behavioral guarantee for the reported bug: after Cmd+F, typing (including
+// the 150ms debounce and the focusout ticks a stealing page can cause) must
+// not send ANY further policy flip. Exactly one ON on open, one OFF on close.
+console.log("findzoom: latch sends");
+{
+  const calls = [];
+  const ctx = makeContext({
+    bodyText: "hello world, hello again",
+    tauri: {
+      core: {
+        invoke: (cmd, args) => {
+          if (cmd === "text_field_focus") calls.push(!!args?.focused);
+          return Promise.resolve("ok");
+        },
+      },
+    },
+  });
+  const input = () => ctx.document.getElementById("dsh-fz-input");
+  await sleep(20); // boot restore settles
+  const base = calls.length;
+
+  ctx.keydown({ key: "f", metaKey: true });
+  check("open sends exactly one ON", calls.slice(base).join(",") === "true", JSON.stringify(calls));
+
+  // Typing + debounce: still no further sends.
+  input().value = "hello";
+  input().dispatch("input");
+  ctx.fireDoc("focusin", { target: input() });
+  ctx.fireDoc("focusout");
+  await sleep(250);
+  check("typing sends nothing", calls.slice(base).join(",") === "true", JSON.stringify(calls));
+
+  // A stealing page's transient focus/blur churn: still nothing.
+  ctx.fireDoc("focusout");
+  await sleep(20);
+  ctx.fireDoc("focusin", { target: input() });
+  await sleep(20);
+  check(
+    "transient blur sends nothing while open",
+    calls.slice(base).join(",") === "true",
+    JSON.stringify(calls),
+  );
+
+  // Genuine exit: exactly one OFF.
+  input().dispatch("keydown", { key: "Escape" });
+  await sleep(20);
+  check("close sends exactly one OFF", calls.slice(base).join(",") === "true,false", JSON.stringify(calls));
+}
+
+// ---- 8. Activation boundaries re-derive the latch -----------------------------
+// The OS policy is app-global; another window may flip it. Window blur
+// restores Accessory and window focus re-asserts TYPING while the bar is
+// open, so this document's latch can never stay stale and starve typing.
+console.log("findzoom: activation boundaries");
+{
+  const calls = [];
+  const ctx = makeContext({
+    bodyText: "hello",
+    tauri: {
+      core: {
+        invoke: (cmd, args) => {
+          if (cmd === "text_field_focus") calls.push(!!args?.focused);
+          return Promise.resolve("ok");
+        },
+      },
+    },
+  });
+  await sleep(20);
+  const base = calls.length;
+  ctx.keydown({ key: "f", metaKey: true });
+  ctx.fireWin("blur");
+  ctx.fireWin("focus");
+  await sleep(20);
+  check(
+    "blur then focus re-asserts TYPING",
+    calls.slice(base).join(",") === "true,false,true",
+    JSON.stringify(calls),
+  );
+  // Focus return with an editable focused and no bar re-sends ON from unknown.
+  ctx.fireWin("focus");
+  check("redundant focus re-derive sends nothing extra", calls.length === base + 3, JSON.stringify(calls));
 }
 
 if (failures) {

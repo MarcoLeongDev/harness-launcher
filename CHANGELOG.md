@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.1.113 — Focus latch hardening (regression pass)
+- The latch can no longer stick in the wrong state: a rejected `text_field_focus` IPC (or another window flipping the app-global policy) forgets the latch, so the next boundary re-asserts instead of deduping into silence — the exact way typing could have been starved again.
+- Window activation boundaries now restore Accessory on blur and re-derive on focus (find bar open or editable focused → Regular), in the harness window, the Control Panel and the splash. Still latch-deduped, still no timers.
+- The `focusout` tick re-checks `findOpen` at fire time, so a tick scheduled just before Cmd+F can no longer send OFF mid-search.
+- `closeFind()` blur()s the hidden field for real (the old `body.focus()` branch was always taken and blur never ran), and the first navigation on a query clears the stale selection so Enter lands on match 1 deterministically.
+- New behavioral tests drive the latch end to end (one ON on open, silence through typing/debounce/transient blurs, one OFF on close, re-derive across activation boundaries).
+
 ## v0.1.112 — Typing is never interrupted (latched focus)
 - The find bar no longer fights the user on a clock: typing is now purely passive — it counts matches and highlights them, and never moves the selection, never clears it, never calls `focus()`, never sends a policy flip on a timer.
 - Deleted the 150ms `guardFocus()` yank that refocused the field after every search, and removed the auto-`window.find` from the typing path (it fired selection changes that caused transient blurs mid-word).

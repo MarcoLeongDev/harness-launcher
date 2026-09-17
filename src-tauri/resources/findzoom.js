@@ -149,13 +149,19 @@
   // setPolicy, which dedupes: one send on entering TYPING, silence while
   // searching, one send on genuine exit. Transient blurs (e.g. selection
   // changes from `window.find`) never flap the OS policy.
-  let focusPolicyOn = false;
+  // `null` means "unknown" (never sent, or the last send failed): the next
+  // evaluation re-sends instead of trusting a stale latch — so a rejected
+  // IPC or another window's OFF send can never leave typing starved.
+  let focusPolicyOn = null;
   let findOpen = false;
   function setPolicy(on) {
     on = !!on;
     if (on === focusPolicyOn) return;
     focusPolicyOn = on;
-    invoke("text_field_focus", { focused: on }).catch(() => {});
+    invoke("text_field_focus", { focused: on }).catch(() => {
+      // Send failed: forget the latch so the next focus/blur re-asserts.
+      focusPolicyOn = null;
+    });
   }
   function isEditable(el) {
     if (!el || el.nodeType !== 1) return false;
@@ -167,6 +173,13 @@
       /* ignore */
     }
     return false;
+  }
+  function clearSelection() {
+    try {
+      if (window.getSelection) window.getSelection().removeAllRanges();
+    } catch (_e) {
+      /* ignore */
+    }
   }
 
   function uiRoot() {
@@ -344,6 +357,10 @@
 
   function findNavigate(backwards) {
     if (!lastQuery) return;
+    // First gesture on this query: start from a clean selection so forward
+    // lands on match 1 and backward on match N (typing stays passive, so it
+    // may have left an unrelated page selection behind).
+    if (lastIndex < 1) clearSelection();
     if (nativeFind(lastQuery, backwards)) {
       // Advance the "n of m" indicator in navigation order (wraps around).
       if (totalMatches > 0) {
@@ -355,8 +372,8 @@
             ? 1
             : lastIndex + 1;
       }
-      holdField();
     }
+    holdField();
     updateCount();
   }
 
@@ -435,13 +452,14 @@
     }
     // Never leave focus on the now-hidden field: further keystrokes would go
     // nowhere visible, and Cmd+F would reselect instead of reopening.
+    // blur() first (real de-focus); body.focus() only as a fallback for the
+    // case where blur did not take.
     try {
       const field = bar.querySelector("#dsh-fz-input");
       if (field && document.activeElement === field) {
-        if (document.body && typeof document.body.focus === "function") {
+        if (typeof field.blur === "function") field.blur();
+        if (document.activeElement === field && document.body && typeof document.body.focus === "function") {
           document.body.focus();
-        } else if (typeof field.blur === "function") {
-          field.blur();
         }
       }
     } catch (_e) {
@@ -632,8 +650,10 @@
     if (isEditable(e.target)) setPolicy(true);
   });
   document.addEventListener("focusout", () => {
-    if (findOpen) return;
     setTimeout(() => {
+      // Re-check at FIRE time: the bar may have opened between scheduling and
+      // now, in which case the search owns the policy and this is a no-op.
+      if (findOpen) return;
       let editable = false;
       try {
         editable = isEditable(document.activeElement);
@@ -642,6 +662,26 @@
       }
       setPolicy(editable);
     }, 0);
+  });
+  // App-switch boundaries: window blur restores Accessory and clears the
+  // latch, so re-deriving on window focus re-asserts TYPING (bar open or an
+  // editable focused) even if another window changed the shared OS policy.
+  // Latch-deduped, so a single activation cannot send twice or loop back.
+  window.addEventListener("blur", () => {
+    setPolicy(false);
+  });
+  window.addEventListener("focus", () => {
+    if (findOpen) {
+      setPolicy(true);
+      return;
+    }
+    let editable = false;
+    try {
+      editable = isEditable(document.activeElement);
+    } catch (_e) {
+      editable = false;
+    }
+    setPolicy(editable);
   });
 
   // ---- Shortcuts ------------------------------------------------------------

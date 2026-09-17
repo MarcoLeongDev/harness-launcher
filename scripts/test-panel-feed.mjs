@@ -201,6 +201,7 @@ function boot(opts) {
   const handlers = {};
   const invoked = [];
   const win = {
+    addEventListener() {},
     __TAURI__: {
       core: {
         invoke: async (cmd, args) => {
