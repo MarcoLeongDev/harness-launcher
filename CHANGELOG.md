@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.1.109 — Find bar scoped to engine content
+- `findzoom.js` now bails out early on launcher-owned `dsh-ui:` pages, so the find bar/zoom shortcuts never appear (unstyled) on the Control Panel or the engine-stopped splash; the Control Panel window no longer injects the script at all (compat shims retained). Harness-window behavior unchanged. Pinned by a new `dsh-ui` scope case in `scripts/test-findzoom.mjs` and a Rust `findzoom_tests` guard.
+- Release bookkeeping: `Cargo.lock` now tracks the current version (was one bump behind).
+
 ## v0.1.108 — Seamless web auth token refresh
 - The main webview now silently follows the engine-printed `dsh web: http://127.0.0.1:<port>/?token=…` URL: every new capture repoints the existing window without changing visibility/focus, so a version switch/restart that rotates the launch token no longer strands users on "authentication required — reopen the URL printed by dsh web".
 - Fixed `rollback` navigating to the plain URL (401 on token engines): it now waits for the fresh authenticated URL like every other switch path. Raw tokens stay memory-only for navigation; logs/status remain redacted. User data (`~/.dsh`, sibling versions) untouched.

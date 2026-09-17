@@ -11,6 +11,8 @@
 //      stale out-of-range values reset to 100% instead of clamping
 //   3. find: Cmd/Ctrl+F opens + focuses the bar, typing counts matches,
 //      Enter/Shift+Enter navigates, Esc closes and clears the selection
+//   4. scope: launcher-owned `dsh-ui:` pages (Control Panel, stopped splash)
+//      never build the bar or steal Cmd+F
 //
 // Run: node scripts/test-findzoom.mjs
 import { readFileSync } from "node:fs";
@@ -52,7 +54,13 @@ function makeClassList() {
   };
 }
 
-function makeContext({ storage = {}, bodyText = "", withHighlight = false, tauri = null } = {}) {
+function makeContext({
+  storage = {},
+  bodyText = "",
+  withHighlight = false,
+  tauri = null,
+  protocol = "http:",
+} = {}) {
   const byId = new Map();
   const store = new Map(Object.entries(storage));
   const listeners = { window: {}, doc: {} };
@@ -200,6 +208,7 @@ function makeContext({ storage = {}, bodyText = "", withHighlight = false, tauri
   };
 
   const window = {
+    location: { protocol, href: `${protocol}//localhost/` },
     localStorage: {
       getItem: (k) => (store.has(k) ? store.get(k) : null),
       setItem: (k, v) => store.set(String(k), String(v)),
@@ -466,6 +475,17 @@ console.log("findzoom: keeps focus against page thieves");
   ctx.keydown({ key: "=", metaKey: true, target: input() });
   check("Cmd+= zooms from find field", ctx.document.documentElement.style.zoom === "110%");
   check("field keeps focus after zoom", ctx.document.activeElement === input());
+}
+
+// ---- 5. Launcher-owned pages stay find-free ---------------------------------
+console.log("findzoom: dsh-ui scope");
+{
+  const ctx = makeContext({ protocol: "dsh-ui:" });
+  check("no find bar on dsh-ui pages", !ctx.document.getElementById("dsh-fz-bar"));
+  check("no find style on dsh-ui pages", !ctx.document.getElementById("dsh-fz-style"));
+  const e = ctx.keydown({ key: "f", metaKey: true });
+  check("Cmd+F untouched on dsh-ui pages", !e.defaultPrevented);
+  check("still no bar after Cmd+F", !ctx.document.getElementById("dsh-fz-bar"));
 }
 
 if (failures) {

@@ -51,9 +51,12 @@ pub fn compat_script() -> &'static str {
 }
 
 /// Browser-style find-in-page + zoom (Cmd/Ctrl+F, Cmd/Ctrl +/−/0), injected
-/// into every webview. Zoom goes through the benign window-local `set_zoom`
-/// command (native page zoom); the find bar is DOM-only (no IPC): safe for
-/// both launcher-owned pages and untrusted engine-served content.
+/// into the harness-content webview only. Zoom goes through the benign
+/// window-local `set_zoom` command (native page zoom); the find bar is
+/// DOM-only (no IPC): safe for untrusted engine-served content. Never
+/// injected into launcher-owned pages (Control Panel / stopped splash):
+/// the script additionally early-returns on `dsh-ui:` so the stopped page
+/// hosted in the main window stays find-free too.
 pub fn findzoom_script() -> &'static str {
     include_str!("../resources/findzoom.js")
 }
@@ -114,7 +117,6 @@ pub fn open_settings_window(app: &AppHandle) -> Result<(), String> {
         .inner_size(680.0, 800.0)
         .min_inner_size(560.0, 640.0)
         .initialization_script(compat_script())
-        .initialization_script(findzoom_script())
         .build()
         .map_err(|e| e.to_string())?;
     #[cfg(target_os = "macos")]
@@ -270,5 +272,13 @@ mod findzoom_tests {
         assert!(js.contains("dsh-zoom"), "missing zoom storage key");
         assert!(js.contains("MIN_ZOOM = 50"), "missing lower zoom bound");
         assert!(js.contains("MAX_ZOOM = 200"), "missing upper zoom bound");
+    }
+
+    #[test]
+    fn script_skips_launcher_owned_pages() {
+        let js = findzoom_script();
+        // Control Panel + stopped splash (dsh-ui:) never need browser find:
+        // the bar would appear unstyled there.
+        assert!(js.contains("dsh-ui:"), "missing dsh-ui early-return");
     }
 }

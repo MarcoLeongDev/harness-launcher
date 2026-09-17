@@ -1,14 +1,23 @@
 // Harness Launcher find-in-page + zoom — browser-style Cmd/Ctrl+F and
-// Cmd/Ctrl +/−/0 for both webviews (harness window + Control Panel).
-// Injected at documentStart by the Rust shell (initialization_script), so it
-// runs on launcher-owned `dsh-ui:` pages AND on engine-served pages where the
-// overlay panel cannot rely on page cooperation. Self-contained except for one
-// benign IPC (`set_zoom`, window-local page zoom): no network, no page-JS
+// Cmd/Ctrl +/−/0 for the harness-content webview only.
+// Injected at documentStart by the Rust shell (initialization_script) into the
+// main window; it runs on engine-served pages where the overlay panel cannot
+// rely on page cooperation. Launcher-owned `dsh-ui:` pages (Control Panel,
+// engine-stopped splash) never need browser find — the bar would appear
+// unstyled there — so this script bails out early on that protocol.
+// Self-contained except for benign IPCs (`set_zoom` window-local page zoom,
+// `text_field_focus` menubar focus policy): no network, no page-JS
 // interaction — DOM reads/writes only, plus one per-origin localStorage key
 // for the zoom level.
 (() => {
   if (window.__DSH_FINDZOOM__) return;
   window.__DSH_FINDZOOM__ = true;
+  // No find UI on launcher-owned pages (Control Panel / stopped splash).
+  try {
+    if (window.location && window.location.protocol === "dsh-ui:") return;
+  } catch (_e) {
+    /* location unreadable: fall through to engine behavior */
+  }
 
   function invoke(cmd, args) {
     const core = window.__TAURI__?.core;
