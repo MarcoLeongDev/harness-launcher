@@ -40,6 +40,22 @@ for (const [name, src] of [
 console.log("events: polling retained as fallback");
 check("settings.js keeps status poll", settingsJs.includes("setInterval(refresh, 3000)"));
 check("stopped.js keeps status poll", stoppedJs.includes("setInterval(refresh, 3000)"));
+console.log("events: menubar focus policy");
+const libRs = readFileSync(path.join(root, "src-tauri", "src", "lib.rs"), "utf8");
+check(
+  "text_field_focus command exists",
+  commandsRs.includes("pub fn text_field_focus") && commandsRs.includes("set_activation_policy"),
+);
+check("text_field_focus registered", libRs.includes("text_field_focus"));
+check("text_field_focus lifts to Regular", commandsRs.includes("ActivationPolicy::Regular"));
+check("text_field_focus restores Accessory", commandsRs.includes("ActivationPolicy::Accessory"));
+for (const [name, src] of [
+  ["settings.js", settingsJs],
+  ["stopped.js", stoppedJs],
+]) {
+  check(`${name} reports editable focusin`, src.includes("focusin") && src.includes("text_field_focus"));
+  check(`${name} restores on focusout`, src.includes("focusout") && src.includes("text_field_focus"));
+}
 if (failures > 0) {
   console.error(`test-events: ${failures} failures`);
   process.exit(1);

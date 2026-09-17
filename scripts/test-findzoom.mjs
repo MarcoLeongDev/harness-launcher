@@ -488,6 +488,15 @@ console.log("findzoom: dsh-ui scope");
   check("still no bar after Cmd+F", !ctx.document.getElementById("dsh-fz-bar"));
 }
 
+// ---- 6. Menubar focus policy -------------------------------------------------
+console.log("findzoom: focus-aware activation");
+{
+  check("reports editable focusin", JS.includes("focusin") && JS.includes("text_field_focus"));
+  check("restores on focusout", JS.includes("focusout") && JS.includes("text_field_focus"));
+  check("covers page text fields", JS.includes("isContentEditable") && JS.includes("TEXTAREA"));
+  check("find open lifts focus first", JS.indexOf('text_field_focus", { focused: true }') !== -1);
+}
+
 if (failures) {
   console.error(`\ntest-findzoom: ${failures} failure(s)`);
   process.exit(1);

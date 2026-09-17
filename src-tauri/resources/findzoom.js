@@ -372,6 +372,9 @@
   function openFind() {
     const bar = uiRoot();
     if (!bar) return;
+    // Lift the menubar no-focus policy BEFORE focusing so the first keystroke
+    // already lands in the field (focusin below re-asserts it anyway).
+    invoke("text_field_focus", { focused: true }).catch(() => {});
     if (!bar.classList.contains("open")) {
       try {
         savedFocus = document.activeElement;
@@ -587,6 +590,42 @@
     injectStyles();
     buildBar();
     buildBadge();
+  });
+
+  // ---- Menubar focus policy -------------------------------------------------
+  // The app idles as a menubar Accessory (never steals focus) — but that
+  // starves text fields to one keystroke at a time. While ANY editable is
+  // focused (find field or page fields like the harness composer) lift to
+  // Regular so typing works normally; on blur restore Accessory so the
+  // menubar behavior returns. Tick-delayed blur check avoids flicker when
+  // focus moves directly between two editables.
+  function isEditable(el) {
+    if (!el || el.nodeType !== 1) return false;
+    const tag = (el.tagName || el.nodeName || "").toUpperCase();
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+    try {
+      if (el.isContentEditable) return true;
+    } catch (_e) {
+      /* ignore */
+    }
+    return false;
+  }
+  function reportFocus() {
+    let editable = false;
+    try {
+      editable = isEditable(document.activeElement);
+    } catch (_e) {
+      editable = false;
+    }
+    invoke("text_field_focus", { focused: !!editable }).catch(() => {});
+  }
+  document.addEventListener("focusin", (e) => {
+    if (isEditable(e.target)) {
+      invoke("text_field_focus", { focused: true }).catch(() => {});
+    }
+  });
+  document.addEventListener("focusout", () => {
+    setTimeout(reportFocus, 0);
   });
 
   // ---- Shortcuts ------------------------------------------------------------

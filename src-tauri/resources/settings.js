@@ -1066,6 +1066,33 @@
     if (l) setLanguage(l);
   });
 
+  // Menubar focus policy: the app idles as an Accessory (never steals
+  // focus) — but that starves text fields (port input, version dropdown
+  // search) to one keystroke at a time. While any editable is focused lift
+  // to Regular; on blur restore Accessory. Tick-delayed blur check avoids
+  // flicker moving between editables.
+  function isEditable(el) {
+    if (!el || el.nodeType !== 1) return false;
+    const tag = (el.tagName || el.nodeName || "").toUpperCase();
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+    try {
+      if (el.isContentEditable) return true;
+    } catch (_e) {}
+    return false;
+  }
+  document.addEventListener("focusin", (e) => {
+    if (isEditable(e.target)) invoke("text_field_focus", { focused: true }).catch(() => {});
+  });
+  document.addEventListener("focusout", () => {
+    setTimeout(() => {
+      let editable = false;
+      try {
+        editable = isEditable(document.activeElement);
+      } catch (_e) {}
+      invoke("text_field_focus", { focused: !!editable }).catch(() => {});
+    }, 0);
+  });
+
   // events
   listen("launcher://progress", (p) => {
     if (p) applyProgress(p);

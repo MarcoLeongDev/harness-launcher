@@ -1147,6 +1147,27 @@ pub fn set_zoom(window: tauri::WebviewWindow, scale: f64) -> Result<String, Stri
     Ok(format!("zoom set to {}%", (clamped * 100.0).round()))
 }
 
+/// Menubar focus policy: the app idles as an Accessory (no Dock icon, never
+/// steals focus from other apps) — but that starves text fields to one
+/// keystroke at a time. Frontends (harness find/page fields, Control Panel,
+/// splash) report editable focusin/focusout; while any field is focused the
+/// app lifts to Regular so keystrokes land normally, restoring Accessory on
+/// blur so the menubar behavior returns. Benign and reversible — like
+/// `set_zoom`/`open_in_browser` it stays callable from the harness-content
+/// window without the Control Panel gate.
+#[tauri::command]
+pub fn text_field_focus(app: AppHandle, focused: bool) -> Result<String, String> {
+    #[cfg(target_os = "macos")]
+    {
+        let _ = app.set_activation_policy(if focused {
+            tauri::ActivationPolicy::Regular
+        } else {
+            tauri::ActivationPolicy::Accessory
+        });
+    }
+    Ok(format!("focus {}", if focused { "on" } else { "off" }))
+}
+
 #[cfg(test)]
 mod zoom_tests {
     use super::clamp_zoom_scale;

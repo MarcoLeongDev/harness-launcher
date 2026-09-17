@@ -128,6 +128,7 @@ pub fn run() {
             commands::open_in_browser,
             commands::open_repo_page,
             commands::set_zoom,
+            commands::text_field_focus,
             commands::restart_harness,
             commands::engine_start,
             commands::engine_stop,

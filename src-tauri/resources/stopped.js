@@ -136,6 +136,31 @@
       });
     }
   } catch (_e) {}
+  // Menubar focus policy (same as Control Panel): lift the no-focus default
+  // while any text field is focused so typing works normally, restore on blur.
+  function isEditable(el) {
+    if (!el || el.nodeType !== 1) return false;
+    const tag = (el.tagName || el.nodeName || "").toUpperCase();
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+    try {
+      if (el.isContentEditable) return true;
+    } catch (_e2) {}
+    return false;
+  }
+  try {
+    document.addEventListener("focusin", (e) => {
+      if (isEditable(e.target)) invoke("text_field_focus", { focused: true }).catch(() => {});
+    });
+    document.addEventListener("focusout", () => {
+      setTimeout(() => {
+        let editable = false;
+        try {
+          editable = isEditable(document.activeElement);
+        } catch (_e2) {}
+        invoke("text_field_focus", { focused: !!editable }).catch(() => {});
+      }, 0);
+    });
+  } catch (_e) {}
   refresh();
   try {
     setInterval(refresh, 3000);

@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.1.111 — Focus-aware menubar typing
+- New benign `text_field_focus` command toggles the macOS activation policy: the app idles as Accessory (no Dock icon, never steals focus) but lifts to Regular while ANY text field is focused — find bar, harness composer/inputs, Control Panel port input, splash fields — and restores Accessory on blur. Typing (notably Cmd/Ctrl+F find) now works normally keystroke after keystroke instead of losing focus after each key. Callable from any window like `set_zoom`; user data untouched. Pinned by extended `test-findzoom` + `test-events` contracts.
+
 ## v0.1.110 — Stopped splash speaks every language, every message
 - The engine-stopped splash dynamic hints (`Working…` while starting/opening, `Done` on success) are now localized in all five UI languages (En | 繁 | 簡 | 日 | Es) via the shared `locales/*.json` source of truth mirrored in `stopped.js` (pinned by `test-i18n-sync` + extended `test-stopped-i18n` key contract). Static splash copy already matched the Control Panel; backend error lines stay English like panel terminals. User data untouched.
 
