@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.1.115 — Control-panel log drawer never goes empty
+- Root cause: `<pre id="log-tail">` carried `data-i18n="noOutput"`, so `applyLanguage()` — which runs on every 3s status poll — wiped rendered log lines back to "No output yet" while `refreshLog` only repopulates every 5s. The drawer flickered empty most of the time.
+- The log container no longer carries an i18n repaint hook (initial static text is now the English empty state), `applyLanguage` defensively skips `#log-tail`/`.log-view`, and the empty placeholder is re-localised in place without touching real appended lines. Language switches and `launcher://language` events also re-fetch the drawer so the empty state converges immediately.
+- Pinned by new `scripts/test-log-append.mjs` (wired into `npm test`): markup has no `data-i18n="noOutput"`, the skip guard is present, rendered lines survive poll cycles, and the empty state shows the localised `noLogs` hint. User data untouched.
+
 ## v0.1.114 — Esc drops the pending find recount
 - Closing the bar now clears any in-flight 150ms debounce, so a recount armed by the last keystroke can no longer fire after Esc and leave highlights painted over a closed find bar. Pinned by a behavioral test (highlight map must stay empty after close).
 

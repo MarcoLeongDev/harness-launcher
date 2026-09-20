@@ -322,7 +322,36 @@
   }
   // Repaint every localizable string for language l and mark the matching
   // segment pressed. renderStatus calls this on every poll, so the panel
-  // converges on the saved language even after a restart.
+  // converges on the saved language even after a restart. The log drawer is
+  // append-only live output and is NEVER repainted here: an earlier revision
+  // tagged #log-tail with data-i18n="noOutput", so every status poll wiped
+  // rendered log lines back to "No output yet" (refreshLog only repopulates
+  // every 5s). The empty-log placeholder is re-localised separately without
+  // touching real log content.
+  function relocaliseLogEmpty() {
+    let pre = null;
+    try {
+      pre = document.getElementById("log-tail");
+    } catch (_e) {
+      return;
+    }
+    if (!pre) return;
+    const emptyTexts = {};
+    for (const k in LOCALES) {
+      if (LOCALES[k].noLogs) emptyTexts[LOCALES[k].noLogs] = 1;
+      if (LOCALES[k].noOutput) emptyTexts[LOCALES[k].noOutput] = 1;
+    }
+    // No rendered lines yet: localise the raw placeholder text in place.
+    if (!pre.childElementCount) {
+      if (pre.textContent && emptyTexts[pre.textContent]) pre.textContent = t("noLogs");
+      return;
+    }
+    // Single placeholder line: keep it in the active language.
+    if (pre.childElementCount === 1 && pre.children && pre.children[0]) {
+      const cur = pre.children[0].textContent;
+      if (cur && emptyTexts[cur]) pre.children[0].textContent = t("noLogs");
+    }
+  }
   function applyLanguage(l) {
     if (!LOCALES[l]) l = "en";
     lang = l;
@@ -331,7 +360,17 @@
     } catch (_e) {}
     let i, els;
     els = document.querySelectorAll("[data-i18n]");
-    for (i = 0; i < els.length; i++) els[i].textContent = t(els[i].getAttribute("data-i18n"));
+    for (i = 0; i < els.length; i++) {
+      const el = els[i];
+      // Defensive: even if markup re-adds an i18n tag to the log container,
+      // never wipe appended log output during the language repaint.
+      if (el.id === "log-tail") continue;
+      try {
+        if (el.classList && typeof el.classList.contains === "function" && el.classList.contains("log-view"))
+          continue;
+      } catch (_e) {}
+      el.textContent = t(el.getAttribute("data-i18n"));
+    }
     els = document.querySelectorAll("[data-i18n-title]");
     for (i = 0; i < els.length; i++) els[i].title = t(els[i].getAttribute("data-i18n-title"));
     els = document.querySelectorAll("[data-i18n-aria]");
@@ -346,11 +385,15 @@
           b.setAttribute("aria-pressed", b.getAttribute("data-lang") === l ? "true" : "false");
       }
     }
+    // Keep the log empty-state in the active language without touching real
+    // appended log lines (which this repaint must never clear).
+    relocaliseLogEmpty();
   }
   // Persist the choice, then repaint from the canonical status payload.
   function setLanguage(l) {
     if (!LOCALES[l] || l === lang) return;
     applyLanguage(l);
+    refreshLog();
     invoke("set_language", { language: l })
       .then(() => refresh())
       .catch((e) => {
@@ -1136,9 +1179,13 @@
     refresh();
   });
   // Instant repaint on language switch; the poll cycle below stays as a
-  // reconnect fallback.
+  // reconnect fallback. The log drawer re-localises its empty state inside
+  // applyLanguage and re-fetches so real lines stay appended.
   listen("launcher://language", (p) => {
-    if (p?.language) applyLanguage(p.language);
+    if (p?.language) {
+      applyLanguage(p.language);
+      refreshLog();
+    }
   });
 
   loadIconsIn(document);
