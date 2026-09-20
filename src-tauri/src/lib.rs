@@ -5,6 +5,7 @@ mod errors;
 mod mcp_env;
 mod port;
 mod presets;
+mod profile_links;
 mod progress;
 mod runtime;
 mod settings;

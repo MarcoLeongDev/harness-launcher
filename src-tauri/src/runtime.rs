@@ -286,6 +286,28 @@ pub fn start(
         );
     }
 
+    // Mirror user patch-layer plugin links into each profile's local
+    // node_modules before spawn. Newer engines resolve patch `name:` entries
+    // against the profile-local tree (not the shared parent-walk older
+    // engines tolerated), so a bare name kept only in
+    // `~/.dsh/profiles/node_modules` (e.g. a symlink to a local checkout)
+    // boots fine on one version and fails with ERR_MODULE_NOT_FOUND on the
+    // next. Additive only: existing entries are never overwritten and user
+    // patch files are never edited.
+    {
+        let log_dir = runtime_dir.to_path_buf();
+        let app_sink = app.clone();
+        let mut on_line = move |line: &str| {
+            append_log(&log_dir, &format!("[launcher] {line}"));
+            crate::progress::push_console(&app_sink, "", "info", &format!("[launcher] {line}"));
+        };
+        crate::profile_links::repair_profile_patch_links(
+            &crate::presets::dsh_home(),
+            &versions::version_dir(runtime_dir, version),
+            &mut on_line,
+        );
+    }
+
     // Bridge MCP secrets referenced as process.env.NAME in user patch layers
     // into the engine child. A GUI launch inherits a minimal launchd env, so
     // an unset NAME would resolve to undefined and fail schemastery dict

@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.1.116 — Engine updates no longer break user patch plugins (module-not-found)
+- Root cause: profile `cordis.patch.yml` inserts name plugins by bare package name. Older engines resolved them via Node's parent-walk (reaching user symlinks in `~/.dsh/profiles/node_modules`); newer engines resolve against the profile-local `node_modules` (+ installation) only, so after an update the tree died with `ERR_MODULE_NOT_FOUND ... imported from .../profiles/web/` even though the packages were still present in the shared fallback. Verified empirically: 0.1.6-alpha.1 boots, 0.1.6-alpha.2 fails the same tree, and profile-local symlinks restore the boot.
+- Before every engine spawn the launcher now mirrors each patch-referenced bare name found in the shared fallback into the profile-local `node_modules` as a symlink to the same target (new `profile_links` module, wired into `runtime::start` beside the preset repair). Additive only: existing entries are never overwritten, patch files are never edited, and names provided by the installation need no mirror; truly unknown names are left for the engine's own fail-loud diagnostic. Every repair is logged to `harness.log` and the operation console. Pinned by 6 new `cargo` unit tests. User data untouched.
+
 ## v0.1.115 — Control-panel log drawer never goes empty
 - Root cause: `<pre id="log-tail">` carried `data-i18n="noOutput"`, so `applyLanguage()` — which runs on every 3s status poll — wiped rendered log lines back to "No output yet" while `refreshLog` only repopulates every 5s. The drawer flickered empty most of the time.
 - The log container no longer carries an i18n repaint hook (initial static text is now the English empty state), `applyLanguage` defensively skips `#log-tail`/`.log-view`, and the empty placeholder is re-localised in place without touching real appended lines. Language switches and `launcher://language` events also re-fetch the drawer so the empty state converges immediately.

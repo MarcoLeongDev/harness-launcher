@@ -1,6 +1,6 @@
 [package]
 name = "dsh-launcher"
-version = "0.1.115"
+version = "0.1.116"
 description = "Harness Launcher - a Tauri macOS menubar app that installs, updates, versions and runs the DeepSeek Harness engine"
 authors = ["hikarulsi"]
 edition = "2024"
