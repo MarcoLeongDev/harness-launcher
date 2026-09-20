@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.1.117 — Spoon plugins properly installed; launcher link hot-patch removed
+- The three local spoon plugins (`dsh-opencode-patch`,
+  `dsh-opencode-free-proxy`, `dsh-nous-tags`) are now real profile
+  dependencies (`link:` entries in `~/.dsh/profiles/{web,headless}/package.json`
+  via pnpm 9, matching the profiles' lockfileVersion) instead of informal
+  shared-fallback symlinks — the engine resolves and heals them itself, so
+  updates no longer break the boot. Verified with a direct CLI boot
+  (no launcher code involved): clean `dsh web` URL, zero module errors.
+- Deleted the v0.1.116 pre-spawn symlink mirror (`profile_links` module and
+  its `runtime::start` wiring): no longer necessary and not the correct
+  layer for plugin resolution. User profiles/patches untouched by the
+  removal (only prior backups in /tmp). User data untouched.
+
 ## v0.1.116 — Engine updates no longer break user patch plugins (module-not-found)
 - Root cause: profile `cordis.patch.yml` inserts name plugins by bare package name. Older engines resolved them via Node's parent-walk (reaching user symlinks in `~/.dsh/profiles/node_modules`); newer engines resolve against the profile-local `node_modules` (+ installation) only, so after an update the tree died with `ERR_MODULE_NOT_FOUND ... imported from .../profiles/web/` even though the packages were still present in the shared fallback. Verified empirically: 0.1.6-alpha.1 boots, 0.1.6-alpha.2 fails the same tree, and profile-local symlinks restore the boot.
 - Before every engine spawn the launcher now mirrors each patch-referenced bare name found in the shared fallback into the profile-local `node_modules` as a symlink to the same target (new `profile_links` module, wired into `runtime::start` beside the preset repair). Additive only: existing entries are never overwritten, patch files are never edited, and names provided by the installation need no mirror; truly unknown names are left for the engine's own fail-loud diagnostic. Every repair is logged to `harness.log` and the operation console. Pinned by 6 new `cargo` unit tests. User data untouched.
