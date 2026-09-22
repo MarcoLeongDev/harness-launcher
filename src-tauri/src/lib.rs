@@ -239,6 +239,12 @@ fn boot_inner(app: &AppHandle) -> Result<u16, String> {
     // neighbour port would spawn a second DSH that fights this one over the
     // shared ~/.dsh sessions.
     let actual = settings_snapshot.port;
+    // Validate even when the engine will not auto-start: a corrupt/hand-
+    // edited port must fail boot loudly (same InvalidPort the old resolve
+    // gate produced), never settle as effective port 0.
+    if actual == 0 {
+        return Err(crate::errors::AppError::InvalidPort.to_string());
+    }
     *crate::state::mutex_lock(&app.state::<AppState>().effective_port) = actual;
 
     if !settings_snapshot.start_on_launch {
