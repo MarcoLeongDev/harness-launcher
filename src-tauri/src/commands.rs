@@ -23,7 +23,6 @@ pub struct StatusPayload {
     pub previous_version: Option<String>,
     pub port: u16,
     pub actual_port: u16,
-    pub port_changed: bool,
     pub versions: Vec<String>,
     pub installed_versions: Vec<String>,
     pub latest_remote: Option<String>,
@@ -152,6 +151,7 @@ fn repair_and_restart(app: &AppHandle, op: &str, version: &str, port: u16) -> Re
         None,
     );
     versions::repair_native_bindings(app, &rd, version, op)?;
+    port::ensure_free(port, port::PORT_FREE_GRACE)?;
     runtime::start(app, &st.runtime, &rd, version, port)?;
     if port::wait_until_serving(port, Duration::from_secs(30)) {
         st.runtime.mark_phase(runtime::PHASE_RUNNING);
@@ -196,6 +196,9 @@ fn start_engine(app: &AppHandle, op: &str) -> Result<u16, String> {
         &format!("Starting engine on 127.0.0.1:{actual}…"),
         None,
     );
+    // Only the configured port — a busy one is refused (holder named),
+    // never redirected to a neighbour port.
+    port::ensure_free(actual, port::PORT_FREE_GRACE)?;
     runtime::start(app, &st.runtime, &rd, &version, actual)?;
     versions::ensure_peer_completion(app, &rd, &version, op)?;
     let served = port::wait_until_serving(actual, Duration::from_secs(30));
@@ -268,6 +271,10 @@ fn restart_engine(app: &AppHandle, op: &str, version: Option<&str>) -> Result<u1
     }
 
     versions::ensure_peer_completion(app, &rd, &version, op)?;
+    // The just-stopped child may need a moment to release the port; wait out
+    // the grace, then spawn on THAT port or refuse (holder named). A restart
+    // never relocates the engine.
+    port::ensure_free(actual, port::PORT_FREE_GRACE)?;
     runtime::start(app, &st.runtime, &rd, &version, actual)?;
     let served = port::wait_until_serving(actual, Duration::from_secs(30));
     if !served {
@@ -539,7 +546,6 @@ pub async fn get_status(app: AppHandle) -> Result<StatusPayload, String> {
             previous_version: settings.previous_version.clone(),
             port: settings.port,
             actual_port: actual,
-            port_changed: actual != settings.port,
             versions: version_list,
             installed_versions: installed,
             latest_remote,
@@ -722,21 +728,28 @@ pub async fn set_port(app: AppHandle, window: tauri::Window, port: u16) -> Resul
                 &format!("Checking port {port}…"),
                 Some(10),
             );
-            let (actual, changed) = port::resolve(port)?;
+            // Re-applying the port the engine already serves on is a no-op,
+            // not a conflict: OUR child is the holder.
+            if running && port == previous_effective {
+                if port != previous_desired {
+                    state::update_settings(&app, |s| s.port = port);
+                }
+                let msg = format!("port set to {port} — harness on {port}");
+                progress::finish(&app, "port", None, &msg);
+                return Ok(msg);
+            }
+            // A busy target is refused with the holder's identity BEFORE
+            // anything is persisted: settings, effective port and the
+            // running engine all stay exactly as they were. There is no
+            // fallback port — the engine runs only where the user configured.
+            port::ensure_free(port, port::PORT_FREE_GRACE)?;
 
             state::update_settings(&app, |s| s.port = port);
-            *crate::state::mutex_lock(&st.effective_port) = actual;
+            *crate::state::mutex_lock(&st.effective_port) = port;
 
             // When the engine is stopped, only persist the port — do NOT auto-start.
             if !running {
-                let msg = format!(
-                    "port set to {port}{} — applies when you start the engine",
-                    if changed {
-                        format!(" (busy, will use {actual})")
-                    } else {
-                        String::new()
-                    }
-                );
+                let msg = format!("port set to {port} — applies when you start the engine");
                 progress::finish(&app, "port", None, &msg);
                 return Ok(msg);
             }
@@ -746,7 +759,7 @@ pub async fn set_port(app: AppHandle, window: tauri::Window, port: u16) -> Resul
                 "port",
                 None,
                 "restarting",
-                &format!("Restarting engine on port {actual}…"),
+                &format!("Restarting engine on port {port}…"),
                 Some(40),
             );
             match restart_engine(&app, "port", None) {
@@ -755,14 +768,7 @@ pub async fn set_port(app: AppHandle, window: tauri::Window, port: u16) -> Resul
                         &app,
                         &harness_web_url(&app, actual2, Some(Duration::from_secs(10))),
                     );
-                    let msg = format!(
-                        "port set to {port}{} — harness on {actual2}",
-                        if changed {
-                            format!(" (busy, using {actual2})")
-                        } else {
-                            String::new()
-                        }
-                    );
+                    let msg = format!("port set to {port} — harness on {actual2}");
                     progress::finish(&app, "port", None, &msg);
                     Ok(msg)
                 }

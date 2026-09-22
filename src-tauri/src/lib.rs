@@ -234,7 +234,11 @@ fn boot_inner(app: &AppHandle) -> Result<u16, String> {
     let version = state::active_version(app).ok_or("no harness version installed")?;
 
     let settings_snapshot = state::read_settings(app);
-    let (actual, _) = port::resolve(settings_snapshot.port)?;
+    // The effective port IS the configured port — there is no fallback port.
+    // Alpha.2 engines enforce single-writer session leases, so starting on a
+    // neighbour port would spawn a second DSH that fights this one over the
+    // shared ~/.dsh sessions.
+    let actual = settings_snapshot.port;
     *crate::state::mutex_lock(&app.state::<AppState>().effective_port) = actual;
 
     if !settings_snapshot.start_on_launch {
@@ -249,6 +253,9 @@ fn boot_inner(app: &AppHandle) -> Result<u16, String> {
 
     let st = app.state::<AppState>();
     versions::ensure_peer_completion(app, &rd, &version, "boot")?;
+    // Refuse to spawn while another process holds the configured port —
+    // read-only holder diagnosis, never an alternate port, never a signal.
+    port::ensure_free(actual, port::PORT_FREE_GRACE)?;
     runtime::start(app, &st.runtime, &rd, &version, actual)?;
     let served = port::wait_until_serving(actual, Duration::from_secs(30));
     if !served {
@@ -264,6 +271,9 @@ fn boot_inner(app: &AppHandle) -> Result<u16, String> {
         // ~/.dsh and sibling versions are untouched.
         if versions::is_native_binding_failure(&st.runtime.tail_text(40)) {
             versions::repair_native_bindings(app, &rd, &version, "boot")?;
+            // The rebuild can take a while — re-check the configured port
+            // before spawning again (same refusal, never a neighbour port).
+            port::ensure_free(actual, port::PORT_FREE_GRACE)?;
             runtime::start(app, &st.runtime, &rd, &version, actual)?;
             if port::wait_until_serving(actual, Duration::from_secs(30)) {
                 st.runtime.mark_phase(runtime::PHASE_RUNNING);

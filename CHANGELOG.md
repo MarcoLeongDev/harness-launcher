@@ -1,5 +1,30 @@
 # Changelog
 
+## v0.1.118 — Engine runs only on the configured port (no fallback port)
+- Root cause: harness 0.1.6-alpha.2+ enforces single-writer session leases
+  (`session/writer-held` + kernel `session.lock`), so two live DSH instances
+  over the same `~/.dsh` break writes such as model switching ("This session
+  is already in use…"). The launcher's free-port fallback did exactly that:
+  whenever the configured port was busy it silently started a second engine
+  on the next free port (the historical EADDRINUSE 3080/3081/3082 log
+  pattern) and drifted the UI off the user's configured port.
+- The fallback scan is gone. `port::ensure_free` now waits out a short grace
+  (our own child releasing the port on restart) and then REFUSES a busy
+  configured port with the holder's identity (read-only lsof+ps, never
+  signals a process the launcher did not spawn). Boot, engine start, engine
+  restart, native-repair respawn and `set_port` all gate on it — the engine
+  is never spawned on an alternate port.
+- `set_port` rejects a busy target BEFORE persisting: settings.json keeps
+  the previous port, the effective port is untouched and a running engine is
+  never disturbed (re-applying the current port stays a clean no-op). The
+  dead `(busy, will use …)` / `(fallback)` affordances and the `port_changed`
+  status field are removed; the README port row documents the refusal.
+- Config and user data safety: the only write in this change is
+  `settings.json` on a successful port change — `~/.dsh` and engine
+  directories are never touched. Pinned by new `cargo` tests (busy port
+  refused not redirected, grace waits for release, holder diagnosis never
+  signals) — 81 unit tests green, `npm test` green.
+
 ## v0.1.117 — Spoon plugins properly installed; launcher link hot-patch removed
 - The three local spoon plugins (`dsh-opencode-patch`,
   `dsh-opencode-free-proxy`, `dsh-nous-tags`) are now real profile

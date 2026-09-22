@@ -274,7 +274,7 @@
         const a = $("lc-url");
         a.textContent = url.replace("http://", "");
         a.href = url;
-        $("lc-actual").textContent = `in use: ${s.actualPort}${s.portChanged ? " (fallback)" : ""}`;
+        $("lc-actual").textContent = `in use: ${s.actualPort}`;
         if ($("lc-port").value === "") $("lc-port").value = String(s.port);
       }
       if (s.updateAvailable) {

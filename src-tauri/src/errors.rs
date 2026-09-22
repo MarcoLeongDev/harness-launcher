@@ -14,9 +14,16 @@ pub enum AppError {
     /// Caller-supplied port is outside 1..=65535.
     #[error("port must be between 1 and 65535")]
     InvalidPort,
-    /// No free loopback port in the scanned window.
-    #[error("no free port found near {port}")]
-    NoFreePort { port: u16 },
+    /// The configured loopback port is occupied. The engine only ever runs
+    /// on the configured port (alpha.2 single-writer), so a busy port is a
+    /// refusal — never a cue to scan for an alternate one. `holder` carries
+    /// the read-only diagnosis (`pid … (name)`) when it could be determined.
+    #[error("port {port} is held by {holder}")]
+    PortInUse { port: u16, holder: String },
+    /// The configured loopback port is occupied but the holder could not be
+    /// determined (e.g. `lsof` unavailable).
+    #[error("port {port} is already in use by another process")]
+    PortInUseUnknown { port: u16 },
     /// Caller-supplied version string failed [`crate::versions::is_valid_version_name`].
     #[error("invalid version name: {name}")]
     InvalidVersion { name: String },
@@ -27,8 +34,17 @@ impl AppError {
     pub fn code(&self) -> &'static str {
         match self {
             AppError::InvalidPort => "invalid-port",
-            AppError::NoFreePort { .. } => "no-free-port",
+            AppError::PortInUse { .. } | AppError::PortInUseUnknown { .. } => "port-in-use",
             AppError::InvalidVersion { .. } => "invalid-version",
+        }
+    }
+
+    /// Refusal for a busy configured port, carrying the holder diagnosis
+    /// when one is available.
+    pub fn port_in_use(port: u16, holder: Option<String>) -> Self {
+        match holder {
+            Some(holder) => AppError::PortInUse { port, holder },
+            None => AppError::PortInUseUnknown { port },
         }
     }
 }
@@ -48,7 +64,11 @@ mod tests {
     #[test]
     fn codes_are_stable() {
         assert_eq!(AppError::InvalidPort.code(), "invalid-port");
-        assert_eq!(AppError::NoFreePort { port: 3080 }.code(), "no-free-port");
+        assert_eq!(
+            AppError::port_in_use(3081, Some("pid 42 (node)".into())).code(),
+            "port-in-use"
+        );
+        assert_eq!(AppError::port_in_use(3081, None).code(), "port-in-use");
         assert_eq!(
             AppError::InvalidVersion {
                 name: "../evil".into()
@@ -65,8 +85,12 @@ mod tests {
             "port must be between 1 and 65535"
         );
         assert_eq!(
-            AppError::NoFreePort { port: 3080 }.to_string(),
-            "no free port found near 3080"
+            AppError::port_in_use(3081, Some("pid 42 (node)".into())).to_string(),
+            "port 3081 is held by pid 42 (node)"
+        );
+        assert_eq!(
+            AppError::port_in_use(3081, None).to_string(),
+            "port 3081 is already in use by another process"
         );
         assert_eq!(
             AppError::InvalidVersion {
