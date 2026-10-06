@@ -129,8 +129,48 @@ npm run deploy:relaunch    # build, install, then restart the running instance
 - **Capability-gated IPC.** The WebViews reach the Rust core through a Tauri
   capability file with an explicit allow-list; harness-served content is
   treated as untrusted.
+- **No hardcoded secrets.** All credentials are read from user-owned files
+  and passed as environment variables — never persisted by the launcher.
+- **Pinned toolchain.** Node.js v24.20.0 and npm 12.0.2 are pinned with
+  SHA256 checksums verified at build time.
+- **Path traversal protection.** Version names are validated against a strict
+  allowlist before any filesystem operations.
+- **Token redaction.** Engine tokens are redacted at every log surface
+  (Rust-side, IPC boundary, and client-side).
 - Found a vulnerability? Please see [SECURITY.md](SECURITY.md) — do not open
   a public issue for security problems.
+
+### Security audit (2026-10-06)
+
+A comprehensive security audit was conducted prior to public release.
+**No Critical or High severity issues were found.** The audit covered:
+
+| Category | Result |
+|----------|--------|
+| Content Security Policy | **PASS** — No inline scripts, no `unsafe-inline`, no `unsafe-eval` |
+| Tauri capabilities | **PASS** — Least-privilege: harness window gets `core:default` only |
+| Command injection | **PASS** — All commands use argument arrays, never shell strings |
+| Path traversal | **PASS** — Strict version-name validation on every IPC entry |
+| Secrets/credentials | **PASS** — No hardcoded keys; tokens redacted in all logs |
+| Dependencies | **PASS** — Minimal footprint, all recent versions |
+| Updater security | **PASS** — Updater is inert (no endpoints, no pubkey) |
+| Shell plugin | **PASS** — Used only from Rust side; no webview permissions |
+| External binaries | **PASS** — Node.js pinned with SHA256 checksum verification |
+| XSS prevention | **PASS** — All user data rendered via `textContent`, not `innerHTML` |
+
+**Medium severity observations** (defense-in-depth recommendations, not
+exploitable vulnerabilities):
+
+1. The overlay script injected into the harness content window contains
+   event listeners that call mutating IPC commands. While the Rust-side
+   `require_panel()` check effectively blocks these calls, adding Tauri
+   permission restrictions would provide defense-in-depth.
+2. The `engine_start` command lacks a `require_panel()` check (intentional —
+   the stopped page needs it), but adding a window check would be more
+   consistent.
+
+See [SECURITY.md](SECURITY.md) for the full security model and hardening
+history.
 
 ## 🔧 How it works
 
