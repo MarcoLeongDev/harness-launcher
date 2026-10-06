@@ -17,10 +17,14 @@ import { pipeline } from "node:stream/promises";
 import { fileURLToPath } from "node:url";
 import { gunzipSync } from "node:zlib";
 
-const PINNED_NODE_VERSION = "v24.20.0";
+// Node 22 LTS: last major line whose prebuilt macOS binaries still run on
+// macOS 11 (the launcher's minimumSystemVersion). Node 24's binary links a
+// libc++ symbol only present on macOS 13.5+ and dies with dyld "Symbol not
+// found" on 11/12 (seen on 10.1.1.19, macOS 11.7.10 Intel).
+const PINNED_NODE_VERSION = "v22.22.3";
 const PINNED_NODE_SHA256 = {
-  "aarch64-apple-darwin": "40e5607e5ecb3db9192723776da2d75d966260fc74a7a9e731c1bd67dda96bc8",
-  "x86_64-apple-darwin": "9e5b2644cf107befb6aefca676b96d3296bc10138096f022ed378d6233ed81f4",
+  "aarch64-apple-darwin": "0da7ff74ef8611328c8212f17943368713a2ad953fb7d89a8c8a0eae87c23207",
+  "x86_64-apple-darwin": "45830ba752fa0d892c6dcd640946669801293cac820a33591ded40ac075198ec",
 };
 // Nodejs dist asset arch per Rust target triple (macOS universal = both).
 function assetArch(triple) {
