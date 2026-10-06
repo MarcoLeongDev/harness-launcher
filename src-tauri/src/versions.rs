@@ -373,6 +373,43 @@ mod newest_tests {
     }
 }
 
+/// Minimum macOS version required by the harness engine's native modules.
+/// All harness versions depend on `node-addon-require-builtin` whose prebuilt
+/// binaries are compiled for macOS 15.0+ (LC_BUILD_VERSION minos 15.0). There
+/// is no local-build fallback (no install script), so the engine cannot boot
+/// on macOS < 15.0. This check prevents a doomed install and tells the user
+/// exactly what is wrong.
+const MIN_HARNESS_MACOS: &str = "15.0";
+
+fn macos_version() -> Result<String, String> {
+    let out = std::process::Command::new("sw_vers")
+        .arg("-productVersion")
+        .output()
+        .map_err(|e| format!("cannot determine macOS version: {e}"))?;
+    if !out.status.success() {
+        return Err("sw_vers failed".to_string());
+    }
+    Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
+}
+
+fn version_at_least(current: &str, required: &str) -> bool {
+    let parse = |s: &str| -> Vec<u64> {
+        s.split('.')
+            .map(|p| p.parse::<u64>().unwrap_or(0))
+            .collect::<Vec<_>>()
+    };
+    let cur = parse(current);
+    let req = parse(required);
+    for i in 0..cur.len().max(req.len()) {
+        let c = cur.get(i).copied().unwrap_or(0);
+        let r = req.get(i).copied().unwrap_or(0);
+        if c != r {
+            return c > r;
+        }
+    }
+    true
+}
+
 pub fn install_version(
     app: &AppHandle,
     runtime_dir: &Path,
@@ -386,6 +423,15 @@ pub fn install_version(
     checked_version_name(version)?;
     if is_installed(runtime_dir, version) {
         return Ok(());
+    }
+    let current = macos_version()?;
+    if !version_at_least(&current, MIN_HARNESS_MACOS) {
+        return Err(format!(
+            "macOS {} is too old for the harness engine. The engine's native modules \
+             (node-addon-require-builtin) require macOS {} or later. \
+             Please upgrade macOS or use a newer Mac.",
+            current, MIN_HARNESS_MACOS
+        ));
     }
     let dir = version_dir(runtime_dir, version);
     std::fs::create_dir_all(&dir).map_err(|e| format!("mkdir {dir:?}: {e}"))?;
@@ -993,11 +1039,21 @@ pub fn repair_native_bindings(
 
 #[cfg(test)]
 mod native_tests {
-    use super::{ALLOW_SCRIPTS_FLAG, is_native_binding_failure, native_binding_error};
+    use super::{ALLOW_SCRIPTS_FLAG, is_native_binding_failure, native_binding_error, version_at_least};
 
     #[test]
     fn scripts_flag_is_the_documented_opt_in() {
         assert_eq!(ALLOW_SCRIPTS_FLAG, "--dangerously-allow-all-scripts");
+    }
+
+    #[test]
+    fn version_at_least_checks_macos_compatibility() {
+        assert!(version_at_least("15.0", "15.0"));
+        assert!(version_at_least("15.1", "15.0"));
+        assert!(version_at_least("16.0", "15.0"));
+        assert!(!version_at_least("14.9", "15.0"));
+        assert!(!version_at_least("11.7", "15.0"));
+        assert!(!version_at_least("11.7.10", "15.0"));
     }
 
     #[test]
