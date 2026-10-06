@@ -43,6 +43,20 @@ if (!existsSync("/Applications")) {
   process.exit(1);
 }
 
+// The harness engine's native modules (node-addon-require-builtin) require
+// macOS 15.0+. Refuse to install on older macOS — the engine cannot boot.
+const MIN_MACOS = "15.0";
+const swVers = execFileSync("sw_vers", ["-productVersion"], { encoding: "utf8" }).trim();
+const [maj, min] = swVers.split(".").map(Number);
+const [reqMaj, reqMin] = MIN_MACOS.split(".").map(Number);
+if (maj < reqMaj || (maj === reqMaj && min < reqMin)) {
+  console.error(
+    `macOS ${swVers} is too old. The harness engine requires macOS ${MIN_MACOS}+.`,
+  );
+  console.error("Install aborted — the engine cannot boot on this OS version.");
+  process.exit(1);
+}
+
 console.log("Deploying");
 console.log("  from:", bundle);
 console.log("  to:  ", dest);
